@@ -21,7 +21,7 @@ O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionai
 
 Os IDs **1–3** são trabalho de validação e decisão, não implementação. Nenhuma tarefa de implementação pode começar até que esses gates estejam concluídos, este plano seja aprovado e o feedback obrigatório do advisor seja recebido.
 
-- **1–2:** resolver as evidências e decisões de fonte, segurança, política de dados e critérios mensuráveis de capacidade descritas no checklist.
+- **1–2:** resolver as evidências e decisões de fonte, segurança e política de dados descritas no checklist. Os critérios numéricos de capacidade serão aprovados após medir uma linha de base real e bloqueiam a entrega, não o início da implementação.
 - **3:** completar decisões da stack já escolhida, versões, arquitetura física, limites entre componentes, políticas RLS, contratos compartilhados e ferramentas/comandos de desenvolvimento e verificação. Definir estrutura e caminhos concretos somente após essas decisões.
 - Confirmar que os contratos e escopos de cada tarefa permanecem dentro das seis especificações aprovadas. Mudanças de escopo exigem aprovação, não são presumidas pelo plano.
 

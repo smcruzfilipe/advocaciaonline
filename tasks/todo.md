@@ -15,7 +15,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 ### 1. Confirmar contrato da fonte
 
-- [ ] **1a — Fixar o contrato do caderno DJEN.**
+- [x] **1a — Fixar o contrato do caderno DJEN.**
   **Aceite:** (1) documentar tribunal e meio aplicáveis, ZIP e processamento de todos os JSONs; (2) mapear os campos e limitações observados para advogado/OAB, parte e processo, sem decidir regras de correspondência; (3) fixar somente a data corrente da execução.
   **Verificação comportamental:** revisar um caderno válido e cenários de ZIP incompleto/inválido, avaliando os campos disponíveis para cada tipo de entidade sem exigir decisão de matching.
   **Smoke específico:** percorrer, em revisão de contrato, um caderno JSON de um tribunal/data/meio e identificar os campos e limitações observados, sem executar coleta nem fixar correspondências.
@@ -57,11 +57,11 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Áreas previstas (≤5):** especificação de autorização; matriz de decisões.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Critérios observáveis](../SPEC-autorizacao.md#critérios-observáveis); [Questões abertas](../SPEC-autorizacao.md#questões-abertas); [Fronteiras](../SPEC-autorizacao.md#fronteiras).
 
-- [ ] **2c — Aprovar dashboard, dados e metas de capacidade.**
-  **Aceite:** (1) definir métricas, unidade/período, escopo parcial de tribunal e regra de `*` para números negados; (2) decidir retenção/tratamento de dados pessoais do Escriba e distinção entre zero, falha e indisponível; (3) fixar perfil de carga, duração, ambiente, latência e taxa de erro para comprovar pelo menos 300 usuários simultâneos.
-  **Verificação comportamental:** revisão dos cenários de dashboard restrita, métrica parcial, falha persistente, retenção e carga representativa com limites numéricos aprovados.
+- [ ] **2c — Aprovar dashboard, dados e estratégia de capacidade.**
+  **Aceite:** (1) definir métricas, unidade/período, escopo parcial de tribunal e regra de `*` para números negados; (2) decidir retenção/tratamento de dados pessoais do Escriba e distinção entre zero, falha e indisponível; (3) registrar que as metas de capacidade serão aprovadas após medição real e bloqueiam a entrega.
+  **Verificação comportamental:** revisão dos cenários de dashboard restrita, métrica parcial, falha persistente, retenção e estratégia de medição.
   **Smoke específico:** conferir uma tabela de métricas/estados com valores autorizados, negados (`*`), zero e falha, sem expor valor protegido.
-  **Dep.:** 2b e 1c. **Escopo:** políticas e critérios mensuráveis, sem executar carga.
+  **Dep.:** 2b e 1c. **Escopo:** políticas e estratégia de capacidade, sem executar carga.
   **Áreas previstas (≤5):** especificações de autorização, Escriba e consulta; critérios de desempenho/dados.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Questões abertas](../SPEC-autorizacao.md#questões-abertas); [SPEC-escriba.md — Fronteiras](../SPEC-escriba.md#fronteiras); [SPEC-consulta.md — Requisitos](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Questões abertas](../SPEC-consulta.md#questões-abertas-e-bloqueios).
 
@@ -357,7 +357,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Rastreio:** [SPEC-identidade.md — Critérios observáveis](../SPEC-identidade.md#critérios-observáveis); [SPEC-autorizacao.md — Critérios observáveis](../SPEC-autorizacao.md#critérios-observáveis); [SPEC-monitoramentos.md — Critérios observáveis](../SPEC-monitoramentos.md#critérios-observáveis); [SPEC-escriba.md — Critérios de sucesso](../SPEC-escriba.md#critérios-de-sucesso); [SPEC-coleta.md — Critérios de sucesso](../SPEC-coleta.md#critérios-de-sucesso); [SPEC-consulta.md — Critérios de sucesso](../SPEC-consulta.md#critérios-de-sucesso); [CAPABILITIES.md — Mapa de capacidades: monitoramento jurídico](../CAPABILITIES.md#mapa-de-capacidades-monitoramento-jurídico).
 
 - [ ] **16b — Comprovar carga de 300 usuários simultâneos.**
-  **Aceite:** (1) exercitar perfil de carga representativo com pelo menos 300 usuários simultâneos; (2) medir latência, taxa de erro e estabilidade contra limites numéricos/ambiente aprovados em 2c; (3) registrar resultado e condições de reprodução sem declarar capacidade antes da medição.
+  **Aceite:** (1) medir linha de base e aprovar perfil de carga, duração, ambiente, limites de latência e taxa de erro; (2) exercitar perfil representativo com pelo menos 300 usuários simultâneos e avaliar os limites aprovados; (3) registrar resultado e condições de reprodução sem declarar capacidade antes da medição. Aprovação das metas e teste bloqueiam a entrega.
   **Verificação comportamental:** executar o perfil aprovado e avaliar cada limite, incluindo operações protegidas e consultas representativas.
   **Smoke específico:** cenário de carga configurado com exatamente o limite mínimo aprovado e verificação de sucesso/erro e isolamento entre tenants; comando somente após stack/ferramenta aprovadas.
   **Dep.:** 16a, 2c, 3a. **Escopo:** medição de capacidade, sem inventar perfil, limiares ou comando.

@@ -32,16 +32,16 @@ Coleta compreende microaplicações de ETL e uma aplicação de planejamento/con
 
 ### Coleta e Escriba
 
-1. Duas execuções por dia, em horários configuráveis a definir; o planejador produz linhas rastreáveis para cada entidade elegível e sua associação ao advogado, fonte e tribunal aplicável. Horário e fuso ainda não foram decididos.
-2. Para cada execução, a data de consulta é o dia corrente da execução. A coleta principal consulta o caderno por tribunal, data corrente e meio, baixa o ZIP, descompacta seus JSONs e procura correspondências por nome ou OAB do advogado, número de processo e nome de parte. Se houver problema nos cadernos, o fallback consulta comunicações paginadas, sempre passando `dataDisponibilizacaoInicio` e `dataDisponibilizacaoFim` iguais à data corrente. Trata e normaliza os dados e persiste os resultados e vínculos aos tenants corretos. Tentativas com backoff ocorrem após falhas, com limites a definir.
-3. Cada publicação distinta aparece uma vez por tenant mesmo que encontrada por buscas ou execuções diferentes. Assumir os identificadores estáveis conforme decisão do solicitante. Usar conjuntamente `id` e `hash` da comunicação como referência para deduplicação, escopada por fonte e tenant, preservando os vínculos de todos os monitoramentos que a encontraram. Cadernos e consulta de comunicações são dois acessos à mesma fonte lógica DJEN e devem deduplicar entre si. Ambos os identificadores são essenciais. A unicidade global não foi comprovada pelos testes. Não deduplicar publicações distintas só por compartilharem processo ou tribunal.
-4. O Escriba registra, linha por linha, início, término e dados relevantes do fluxo, incluindo fonte, execução, entidade, advogado, tribunal e processos associados quando disponíveis. Seus registros são somente leitura e inserção: sem alteração ou exclusão. Não registra ações de usuários nem detalhes de erros; falhas técnicas são tratadas separadamente.
+1. Duas execuções por dia, em horários configuráveis sem valores padrão; o planejador produz linhas rastreáveis para cada entidade elegível e sua associação ao advogado, fonte e tribunal aplicável. Agenda e data corrente usam `America/Sao_Paulo`.
+2. Para cada execução, a data de consulta é o dia corrente da execução. A coleta principal consulta o caderno por tribunal, data corrente e meio, baixa o ZIP, descompacta seus JSONs e procura correspondências por nome ou OAB do advogado, número de processo e nome de parte. ZIP inválido ou divergente é falha; esgotadas as tentativas do caderno, o fallback consulta comunicações paginadas, com início e fim iguais à data corrente. São inicialmente três tentativas por caminho, com esperas de um e cinco minutos, configuráveis.
+3. Publicações com `id` e `hash` válidos são deduplicadas conjuntamente por fonte e tenant, preservando os vínculos de todos os monitoramentos. Cadernos e consulta de comunicações são dois acessos à mesma fonte lógica DJEN. Publicação sem chave completa válida é guardada separadamente e exibida ao tenant autorizado com aviso de pendência e possível duplicidade; não há resolução nesta entrega. A unicidade global dos identificadores não foi comprovada.
+4. O Escriba registra, linha por linha, início, término e dados relevantes do fluxo, incluindo fonte, execução, entidade, advogado, tribunal e processos associados quando disponíveis. Seus registros não são alterados nem excluídos por operações normais; a retenção será configurável e seu tratamento administrativo será definido. Não registra ações de usuários nem detalhes de erros; falhas técnicas são tratadas separadamente.
 5. Se as tentativas se esgotarem, a dashboard informa qual tribunal falhou. Uma execução posterior no mesmo dia pode recuperar publicações; não há recuperação automática de datas anteriores. Falha não pode ser apresentada como zero publicações.
 
 ### Consulta e desempenho
 
 1. Cada comunicação é apresentada independentemente, agrupada por tribunal. O usuário autorizado pode abrir detalhes com tribunal, número do processo e conteúdo fornecido pela fonte.
-2. A dashboard mostra volumetrias relevantes, incluindo coletas do dia, semana e últimos sete dias. A definição exata de cada contagem e período ainda precisa ser acordada.
+2. A dashboard mostra comunicações novas persistidas e processos distintos associados a elas, respeitando tenant e tribunais autorizados, para hoje, semana civil e últimos sete dias de calendário em `America/Sao_Paulo`.
 3. Suportar pelo menos 300 usuários simultâneos na aplicação central. O alvo de latência, perfil de uso, ambiente e taxa de erro precisam ser definidos antes de um teste de carga que permita comprovar o requisito.
 
 ## Segurança e riscos
@@ -54,10 +54,10 @@ A API usará Swagger UI para expor sua documentação interativa, protegida por 
 
 ## Decisões pendentes e evidências
 
-- Credenciais: instante inicial da validade, fuso, renovação e revogação; comportamento de múltiplos grupos, conflitos e permissões de escrita.
-- Regras de escopo da dashboard e suas agregações quando o usuário só acessa alguns tribunais.
-- Comunicação versus processo: definição das volumetrias, janelas temporais e inclusão de repetidos.
-- Horários, fuso, recuperação após interrupção, limites de retry/backoff e status de conclusão parcial.
+- Identidade: login Google, escopo e contagem da validade, renovação e revogação estão decididos; permanecem os detalhes técnicos de convite e implementação.
+- Autorização: grupos somam concessões, negação explícita prevalece e escrita exige concessão por operação; falta enumerar operações. Dashboard e agregações respeitam os tribunais autorizados.
+- Volumetrias aprovadas: comunicações novas e processos distintos, nos períodos hoje, semana civil e últimos sete dias de calendário no fuso de Brasília.
+- Coleta: duas execuções com horários configuráveis sem padrão, fuso Brasília, retomada do dia corrente e três tentativas por caminho com intervalos iniciais de um e cinco minutos. Resultados parciais identificam tribunais concluídos e falhos.
 - Acesso à documentação interativa da API: Swagger UI protegida por login e senha; mecanismo de autenticação, configuração de credenciais, nomes/defaults/obrigatoriedade das variáveis correspondentes e relação com a identidade da aplicação ainda precisam ser definidos antes da implementação.
 - Disponibilidade por tribunal, paginação, limites e política de acesso; o caderno retorna URL temporária de cinco minutos e é disponibilizado a partir das 03h segundo a documentação. A estabilidade dos identificadores é premissa aceita, não uma decisão pendente.
 - Consulta real de metadados em 28/10/2026: TJSP, meio D, status `Processado`, 273.925 comunicações e 274 arquivos no pacote. Essa amostra evidencia o volume, mas não verifica o conteúdo do ZIP nem a capacidade do sistema.
@@ -67,7 +67,7 @@ A API usará Swagger UI para expor sua documentação interativa, protegida por 
 - Referência observada em 28/10/2026: uma publicação TJRO/D apareceu tanto no caderno quanto na página 1 da consulta por número de processo sem máscara e datas iguais, com `id` **769263947** e `hash` **jlx8NKdwzRKJtohPTKe77wYbD1mrEX** em ambas as fontes. As páginas 2 e 3 estavam vazias. Para uma publicação de cada caderno TJRR/D e TJAP/D, as páginas 1–3 estavam vazias. Essas amostras não demonstram unicidade global.
 - Correspondência por nome, homônimos e vínculos entre monitoramentos; política para alterações posteriores da fonte. A chave conjunta `id` e `hash` já está definida no requisito de deduplicação.
 - Critérios quantitativos de desempenho para 300 usuários e perfis de carga.
-- Retenção, dados pessoais e compatibilidade do Escriba imutável com obrigações legais.
+- Retenção do Escriba será configurável; nomes, default, validação e procedimento administrativo, incluindo tratamento de dados pessoais, permanecem por definir.
 - Stack central definida pelo solicitante: Ruby/Rails exclusivamente API-only, Next.js e PostgreSQL com RLS, conforme [registro técnico](stack.md). Versões, infraestrutura, tecnologias de ETL, ferramentas, comandos e estrutura física continuam pendentes; não há aplicação implementada.
 
 ## Verificação e limites

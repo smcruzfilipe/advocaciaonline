@@ -23,13 +23,16 @@ A administração por usuário advogado e os grupos são requisitos. Login é Go
 
 Composição aprovada pelo solicitante: somar as permissões concedidas pelos grupos, com **negação explícita prevalecendo** sobre concessões para a mesma operação e escopo. Ausência de concessão não é negação explícita. Com grupos associados, a leitura ampla padrão de usuários sem grupo não é somada às permissões. Exemplo: leitura TJSP e leitura TJRJ permitem ambos; uma negação explícita de dashboard prevalece mesmo que outro grupo conceda esse acesso. Nenhuma combinação ultrapassa o tenant autenticado.
 Permissões são atribuídas **somente por grupos**, conforme decisão do solicitante. Não há concessões ou negações diretamente no usuário; uma exceção individual é representada por um grupo específico, mantendo a mesma composição de regras.
+Escrita é concedida por operação em grupos: cada operação de escrita exige concessão específica; na ausência de concessão, é negada. Negações explícitas prevalecem conforme a composição acima. A lista exata de operações permanece pendente.
+
+Operações já previstas nos contratos funcionais, sem criar novas permissões ou ações: consultar monitoramentos e comunicações; consultar dashboard; cadastrar, editar e desativar monitoramentos de partes e processos; convidar usuários de equipe, revogar ou renovar credenciais; administrar grupos. A administração de usuários e grupos pelo advogado pertence ao próprio tenant. O catálogo técnico e a granularidade restante das operações devem preservar essas fronteiras.
 
 ## Requisitos
 
 1. O advogado administra os usuários e grupos do próprio tenant. Uma administração ou leitura de estado de outro tenant não pode ser autorizada por identificador enviado pelo cliente.
 2. Grupos definem operações autorizadas e podem restringir o acesso a tribunais. A decisão é aplicada no servidor a cada operação e ao conjunto de dados retornado.
 3. A identidade sem grupos recebe leitura de todos os tribunais e acesso à dashboard por padrão.
-4. A regra de leitura ampla sem grupo não concede escrita implicitamente. A lista de operações e suas regras efetivas precisa ser definida antes de habilitar escrita; não inferir um nível fixo de permissão.
+4. A regra de leitura ampla sem grupo não concede escrita implicitamente. Cada operação de escrita exige concessão específica em grupo; na ausência de concessão, é negada. A lista exata de operações precisa ser definida antes de habilitar escrita.
 5. Um grupo `Consulta TJSP` é somente leitura e restringe o escopo de leitura a TJSP quando avaliado sem conflito de outros grupos.
 6. O advogado pode negar acesso à dashboard. Quando negado, os valores numéricos protegidos são apresentados como `*` pela consulta/interface e não podem ser extraídos pelas respostas do servidor.
 7. A autorização de tribunal e dashboard é aplicada também a consultas de comunicações, detalhes e volumetrias; esconder links ou controles na interface não satisfaz o requisito.
@@ -45,6 +48,19 @@ Permissões são atribuídas **somente por grupos**, conforme decisão do solici
 - Uma restrição por tribunal continua efetiva ao abrir detalhe, consultar API e receber agregações, e não apenas na listagem inicial.
 - Grupos de leitura TJSP e TJRJ juntos permitem ambos; adicionar negação explícita de leitura TJRJ mantém apenas TJSP. Não confundir ausência de concessão de um grupo com negação explícita.
 - Se um grupo concede dashboard e outro a nega explicitamente, os números permanecem protegidos e aparecem como `*`.
+
+Revisão de decisões para usuário de equipe autenticado no tenant correto:
+
+| Grupos e regras | Leitura TJSP | Leitura TJRJ | Escrita |
+|---|---|---|---|
+| Sem grupo | Permitida | Permitida | Negada |
+| Apenas `Consulta TJSP` | Permitida | Negada | Negada |
+| Grupos que concedem leitura TJSP e TJRJ | Permitida | Permitida | Negada sem concessão específica |
+| As duas concessões e negação explícita de leitura TJRJ | Permitida | Negada | Negada sem concessão específica |
+| Grupo concede uma operação de escrita, sem negação conflitante | Conforme concessões de leitura | Conforme concessões de leitura | Permitida somente para a operação e escopo concedidos |
+| Concessão e negação explícita da mesma escrita e escopo | Conforme concessões de leitura | Conforme concessões de leitura | Negada para essa operação e escopo |
+
+As decisões de tribunal aplicam-se a lista, detalhe e agregações. Nenhuma concessão permite acesso a outro tenant; expiração ou revogação da identidade bloqueia operações protegidas. A tabela é revisão de contrato, não teste executado.
 
 ## Ambiente de implementação e teste: pendências bloqueantes
 
@@ -67,7 +83,7 @@ As políticas de RLS não substituem RBAC nem as decisões de autorização por 
 ## Questões abertas
 
 1. Regras diretamente em usuários foram excluídas por decisão do solicitante: atribuir permissões somente por grupos, inclusive para exceções individuais.
-2. Quais operações existem e quais concessões de leitura/escrita cada uma exige? Qual regra se aplica à escrita até essa matriz ser definida?
+2. Quais operações específicas de leitura e escrita existem? A escrita exige concessão por operação em grupo e é negada na ausência de concessão.
 3. Escopo parcial definido pelo solicitante: dashboard, métricas e avisos respeitam os tribunais autorizados; acesso à dashboard não concede acesso a agregados de outros tribunais. Quais métricas e janelas serão usadas ainda precisa ser definido.
 4. Quais ações de ciclo de vida ainda não definidas o advogado poderá executar para usuários e grupos? O acesso de equipe já é por convite ao e-mail com aceitação pelo Google, sem senha local; validade, revogação e renovação seguem o contrato de identidade.
 5. O acesso `*` cobre todos os números da dashboard ou somente indicadores definidos? Como distinguir valores indisponíveis por autorização de zero/falha sem vazar dados?

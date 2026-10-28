@@ -19,7 +19,9 @@ O mapa de módulos e a ordem de dependências estão em [`CAPABILITIES.md`](CAPA
 - Frontend: Next.js.
 - Banco de dados: PostgreSQL com Row-Level Security (RLS).
 
-Versões de referência e limites da decisão: [`docs/stack.md`](docs/stack.md). Estrutura de diretórios, dependências, infraestrutura, ferramentas e comandos ainda não foram definidos. O planejador e os componentes ETL também não têm stack definida.
+O projeto é um monorepo. As imagens de frontend e backend serão separadas; a imagem PostgreSQL será usada somente para testes locais. No deploy, a aplicação usará a instância PostgreSQL já existente no servidor. A criação do banco da aplicação e as migrations nessa instância dependem das permissões e do procedimento de deploy, ainda não definidos. Todas as imagens deverão ser mínimas e executar sem root, conforme [`AGENTS.md`](AGENTS.md).
+
+Versões de referência e limites da decisão: [`docs/stack.md`](docs/stack.md). Estrutura de diretórios, dependências, demais detalhes de infraestrutura, ferramentas e comandos ainda não foram definidos. O planejador e os componentes ETL também não têm stack definida.
 
 ## Swagger UI e acesso à documentação
 
@@ -33,7 +35,7 @@ Esta tabela cobre as variáveis **implementadas no repositório hoje**. A inspe�
 |---|---|---|---|
 | Nenhuma definida | — | — | Nenhuma variável de ambiente está implementada neste repositório. |
 
-Os requisitos já preveem configurações futuras por ambiente: horários das duas coletas diárias, limites de tentativas e intervalos de backoff. Os nomes, formatos, defaults e obrigatoriedade dessas variáveis ainda não foram definidos; ver [`SPEC-coleta.md`](SPEC-coleta.md). A configuração de acesso do Swagger UI também está pendente. Não use a tabela acima como contrato dessas configurações futuras.
+Os requisitos já preveem configurações futuras por ambiente: os horários das duas coletas diárias deverão ser fornecidos sem valores padrão; para tentativas e backoff foram aprovados valores iniciais de três tentativas e intervalos de um e cinco minutos. O prazo de retenção do Escriba também será configurável. Nomes e formatos das variáveis, o default e a obrigatoriedade da retenção e a obrigatoriedade das variáveis de tentativas e backoff ainda não foram definidos; ver [`SPEC-coleta.md`](SPEC-coleta.md) e [`SPEC-escriba.md`](SPEC-escriba.md). A configuração de acesso do Swagger UI também está pendente. Não use a tabela acima como contrato dessas configurações futuras.
 
 **Regra de manutenção:** toda variável de ambiente introduzida ou alterada em uma implementação deve ser registrada nesta seção do README no mesmo conjunto de mudanças. Para cada variável, informe nome exato, valor default (ou `Nenhum` se não houver), se é obrigatória e para que serve. Quando não existir default, documente também como fornecer o valor sem incluir segredos. Atualize a tabela ao remover variáveis.
 

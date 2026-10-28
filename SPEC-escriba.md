@@ -12,7 +12,7 @@ Manter um registro imutável e consultável do fluxo de coleta, com os marcos de
 - **Dependência do mapa:** `identidade`. O contexto de execução deve estar vinculado ao usuário/tenant autenticado e imposto no servidor. Tenant enviado pelo cliente, isoladamente, não comprova acesso. RLS é uma camada adicional: não substitui autorização/RBAC nem a derivação server-side do tenant.
 - **Consumidor lógico:** `coleta` (`SPEC-coleta.md`). A fronteira não exige serviço, processo, armazenamento ou transporte independente.
 - **Dados mínimos do fluxo, quando disponíveis:** início ou término, execução, tenant, fonte lógica, entidade/monitoramento, advogado, tribunal e processos associados. Fonte e execução devem permitir distinguir ocorrências; o formato e a cardinalidade desses dados não estão definidos.
-- O Escriba registra cada marco como nova informação. Não sobrescreve um registro anterior para refletir estado posterior. A política de retenção é pendente; imutabilidade não equivale a retenção ilimitada já decidida.
+- O Escriba registra cada marco como nova informação. Não sobrescreve um registro anterior para refletir estado posterior. O prazo de retenção será configurável por variável de ambiente; seu nome, formato, valor padrão e procedimento de expurgo ainda serão definidos na implementação. Imutabilidade nas operações normais não impede o tratamento administrativo de retenção.
 - Não recebe ações de usuários nem detalhes de erro. Tratamento de falhas técnicas e seu estado por execução/tribunal pertencem a outros contratos; um registro do Escriba não substitui esse estado.
 
 ## Requisitos e critérios observáveis
@@ -49,7 +49,7 @@ Os cenários abaixo descrevem resultados observáveis, não comandos nem uma dec
 
 - Qual o esquema lógico mínimo, a identificação da execução e a granularidade dos marcos de início/término?
 - Quais campos de identidade precisam constar do registro sem transformá-lo em log de ações de usuário?
-- Qual política de retenção e tratamento de dados pessoais atende às obrigações legais mantendo a exigência append-only?
+- Como implementar e validar o prazo de retenção configurável e o tratamento administrativo dos dados pessoais, mantendo a exigência append-only nas operações normais?
 - Onde o estado de falha será mantido e como a consulta o relacionará à execução/tribunal sem expor detalhes de erro no Escriba?
 - O Escriba será implementado dentro da aplicação central ou como componente independente? No segundo caso, qual será sua tecnologia? Versões, runtime, bibliotecas, comandos, estrutura física, estilo real, framework/localização de testes e cobertura continuam pendentes antes da implementação.
 
