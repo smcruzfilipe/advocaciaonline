@@ -24,9 +24,9 @@ Plano: [plan.md](plan.md). As tarefas são propostas; não executar antes da apr
 - [ ] Cadastros e invariantes do Escriba demonstrados.
 
 - [ ] **10. Planejamento da coleta.** Aceite: linhas de execução identificam tenant, entidade, fonte e tribunal aplicável. Verificação: planejar advogados, partes e processos em mais de um tenant. Dep.: 7–9. Arquivos: planejador e testes.
-- [ ] **11. Coleta e persistência reais.** Aceite: obter, normalizar e persistir comunicações reais com vínculo correto; registrar fluxo no Escriba. Verificação: execução controlada contra fonte e inspeção dos dados. Dep.: 1, 9–10. Arquivos: conector, processamento e testes.
-- [ ] **12. Deduplicação.** Aceite: repetidos por busca ou execução aparecem uma vez por tenant; comunicações distintas permanecem distintas. Verificação: simular 15 resultados repetidos e cinco novos. Dep.: 11. Arquivos: persistência e testes.
-- [ ] **13. Agenda e falhas.** Aceite: duas execuções diárias, tentativas e estado de falha por tribunal; execução posterior recupera resultados. Verificação: fonte controlada falha e depois responde. Dep.: 12. Arquivos: agendador, execução e testes.
+- [ ] **11. Coleta e persistência reais.** Aceite: baixar caderno ZIP do dia corrente, ler seus JSONs e persistir comunicações com vínculo correto e registros no Escriba; em caso de problema, usar fallback paginado com início e fim iguais ao dia corrente. Verificação: execução controlada da fonte e fallback, incluindo datas e inspeção dos dados. Dep.: 1, 9–10. Arquivos: conector, processamento e testes.
+- [ ] **12. Deduplicação.** Aceite: usar conjuntamente `id` e `hash`, por fonte e tenant; repetidos aparecem uma vez e mantêm vínculos de todos os monitoramentos. Comunicações distintas permanecem distintas. Verificação: simular 15 resultados repetidos e cinco novos, incluindo a mesma comunicação no caderno e no fallback. Dep.: 11. Arquivos: persistência e testes.
+- [ ] **13. Agenda e falhas.** Aceite: duas execuções diárias, tentativas e estado de falha por tribunal; execução posterior no mesmo dia pode recuperar resultados, sem buscar datas anteriores. Verificação: fonte controlada falha e depois responde. Dep.: 12. Arquivos: agendador, execução e testes.
 
 ## Checkpoint 4
 - [ ] Duas coletas e recuperação demonstradas sem duplicação; registros rastreáveis.
