@@ -12,10 +12,10 @@ Planejar e executar duas coletas diárias de publicações do DJEN para os tenan
 - **Consumidor:** `consulta` (`SPEC-consulta.md`) lê comunicações persistidas e estado de coleta por execução/tribunal.
 - A aplicação de planejamento/control plane e as microaplicações ETL são responsabilidades lógicas distintas da aplicação central, conforme o mapa; não se determina aqui se serão processos, serviços ou diretórios separados.
 - O contexto autenticado identifica usuário e tenant no servidor. A coleta sempre associa entidade e publicação ao tenant obtido do contrato confiável, nunca ao tenant fornecido pelo cliente como prova de acesso.
-- O planejador produz trabalho rastreável por entidade/tenant elegível, execução, fonte e tribunal aplicável. Há duas execuções por dia; horários, fuso, elegibilidade e comportamento após interrupção ainda precisam ser definidos.
+- O planejador produz trabalho rastreável por entidade/tenant elegível, execução, fonte e tribunal aplicável. Há duas execuções por dia, com horários definidos por variáveis de ambiente conforme decisão do solicitante. O fuso é fixo em Brasília (`America/Sao_Paulo`) tanto para a agenda quanto para determinar a data corrente enviada à fonte, independentemente do fuso do servidor. Nomes e formato das variáveis, elegibilidade e comportamento após interrupção ainda precisam ser definidos.
 - Para cada execução, usar exclusivamente o dia corrente da execução como data de consulta. A fonte principal é o caderno DJEN para tribunal, data corrente e meio aplicável: obter o ZIP, descompactar todos os JSONs e pesquisar correspondências de nome e OAB do advogado, número de processo e nome de parte monitorados.
 - Meios aprovados pelo solicitante: **Diário Eletrônico (`D`) e Edital (`E`)**, em ambas as coletas diárias, para os tribunais monitorados. Não adicionar configuração de meios por advogado.
-- Quando houver problema nos cadernos, usar a consulta de comunicações paginada como fallback, enviando `dataDisponibilizacaoInicio` e `dataDisponibilizacaoFim` iguais ao dia corrente. Percorrer as páginas necessárias segundo o contrato efetivo da fonte. Cadernos e API são caminhos de acesso à mesma fonte lógica, DJEN.
+- Se o problema no caderno persistir após esgotar as tentativas do caminho principal, usar a consulta de comunicações paginada como fallback, enviando `dataDisponibilizacaoInicio` e `dataDisponibilizacaoFim` iguais ao dia corrente. Percorrer as páginas necessárias segundo o contrato efetivo da fonte. Cadernos e API são caminhos de acesso à mesma fonte lógica, DJEN. Quantidade de tentativas e intervalos de backoff permanecem pendentes.
 - Normalizar e persistir comunicações, vínculos aos monitoramentos que as encontraram e estado por execução/tribunal. Uma falha persistente deve permanecer distinguível de zero publicações e permitir aviso por tribunal na dashboard. Uma execução posterior no mesmo dia pode recuperar publicações; não há recuperação automática de dias anteriores.
 - Após falhas, fazer novas tentativas com backoff. Não estão definidos quantidade de tentativas, intervalos, limites ou condições exatas de parada; nenhum número fica implícito nesta especificação.
 
@@ -64,9 +64,9 @@ São cenários propostos de contrato, não repetição de teste da fonte externa
 
 ## Questões abertas e bloqueios
 
-- Quais horários, fuso, configuração e elegibilidade determinam as duas execuções diárias? O que acontece com execução interrompida?
-- Quais meios e tribunais são aplicáveis a cada entidade, e como a fonte indica ZIP inválido, indisponível, incompleto ou resposta válida sem itens?
-- Quais condições exatas acionam fallback? Quais são a semântica de paginação, limites e disponibilidade efetiva da API? O filtro por processo não foi comprovado de forma geral; evidência inconclusiva está documentada na especificação geral.
+- Quais nomes e formato das variáveis de horários, elegibilidade e comportamento após interrupção? O fuso de agenda e data corrente já está fixado em `America/Sao_Paulo`.
+- Quais tribunais são aplicáveis a cada entidade, e como a fonte indica ZIP inválido, indisponível, incompleto ou resposta válida sem itens? Os meios já estão definidos: D e E.
+- Como classificar os problemas do caderno e definir o esgotamento de tentativas antes do fallback? Quais são a semântica de paginação, limites e disponibilidade efetiva da API? O filtro por processo não foi comprovado de forma geral; evidência inconclusiva está documentada na especificação geral.
 - Quais regras de normalização e correspondência resolvem homônimos, acentos, pontuação e variações de nome/OAB/processo sem ampliar indevidamente os resultados?
 - Como tratar ausência, alteração ou inconsistência de `id`/`hash` e mudanças posteriores no conteúdo da fonte?
 - Quais limites numéricos, intervalos de backoff, critérios de parada e estado de execução parcial devem ser usados?

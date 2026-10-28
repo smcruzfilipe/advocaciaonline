@@ -4,7 +4,7 @@ Fonte oficial: [OpenAPI](https://comunicaapi.pje.jus.br/swagger/djen.yml). Refer
 
 ## Cadernos: contrato e campos
 
-`GET /api/v1/caderno/{sigla_tribunal}/{data}/{meio}` recebe data no formato `YYYY-MM-DD`; `D` representa Diário Eletrônico e `E`, Edital. Segundo a documentação, retorna metadados e URL temporária de cinco minutos; cadernos do dia são disponibilizados a partir das 03h. O fuso operacional não foi decidido.
+`GET /api/v1/caderno/{sigla_tribunal}/{data}/{meio}` recebe data no formato `YYYY-MM-DD`; `D` representa Diário Eletrônico e `E`, Edital. Segundo a documentação, retorna metadados e URL temporária de cinco minutos; cadernos do dia são disponibilizados a partir das 03h. O fuso operacional da aplicação foi fixado pelo solicitante em `America/Sao_Paulo`.
 
 Decisão do solicitante: incluir **D e E** nas duas coletas diárias dos tribunais monitorados, sem configuração adicional por advogado.
 
@@ -30,6 +30,6 @@ O experimento verifica estrutura e integridade dessa amostra, não capacidade de
 
 ## Decisões ainda pendentes
 
-Os meios D e E estão decididos. Permanecem pendentes seleção de tribunais, critérios de pacote incompleto, comportamento para divergência de hash/contagem e acionamento do fallback. A validação não decide se cada problema deve provocar nova tentativa ou fallback imediato. Quantidade de tentativas, backoff, horários/fuso e definição operacional de falha dependem da tarefa 1c.
+Os meios D e E estão decididos. Horários das duas execuções serão definidos por variáveis de ambiente; nomes e formato permanecem pendentes. Agenda e data corrente usam sempre Brasília (`America/Sao_Paulo`), independentemente do fuso do servidor. Acionar fallback somente após esgotar as tentativas do caderno. Permanecem pendentes seleção de tribunais, critérios de pacote incompleto e tratamento de divergência de hash/contagem. Quantidade de tentativas, backoff, retomada e definição operacional de falha dependem da tarefa 1c.
 
 Na API de comunicações, usar paginação e sempre `dataDisponibilizacaoInicio` e `dataDisponibilizacaoFim` iguais ao dia corrente. Detalhamento e fechamento do contrato de paginação permanecem na tarefa 1b. Nenhuma dessas tarefas deve ser marcada concluída apenas pela existência desta amostra.
