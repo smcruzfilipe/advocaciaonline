@@ -8,18 +8,11 @@ Advogados independentes e suas equipes acompanham publicações judiciais sem co
 
 Fora da primeira entrega: envio de e-mails e implementação de fontes adicionais. O sistema deve permitir fontes adicionais sem prometer cobertura não verificada. Nome comercial do escritório é informação opcional, não tenant.
 
-## Mapa de capacidades proposto
+## Mapa de capacidades aprovado
 
-| Identificador | Responsabilidade | Dependências |
-|---|---|---|
-| identidade | Login, tenant do advogado, onboarding e credenciais | — |
-| autorizacao | Grupos, permissões e escopo de tribunais | identidade |
-| monitoramentos | Advogado, partes, processos e filtros | identidade, autorizacao |
-| coleta | Planejamento, execução, fontes, normalização e deduplicação | monitoramentos |
-| escriba | Registros append-only do fluxo de coleta | identidade |
-| consulta | Comunicações, agrupamento, detalhes e dashboard | autorizacao, coleta |
+O [mapa aprovado](../CAPABILITIES.md) é o índice canônico dos módulos, dependências e especificações. Esta especificação geral preserva requisitos e evidências; as especificações modulares permanecem propostas até aprovação humana.
 
-Construção orientada por dependências e fatias verticais. Os limites são propostos, não uma escolha de tecnologia ou exigência de processos independentes para cada módulo. Coleta compreende microaplicações de ETL e uma aplicação de planejamento/control plane, separadas da aplicação central.
+Coleta compreende microaplicações de ETL e uma aplicação de planejamento/control plane, separadas da aplicação central. As fronteiras lógicas não exigem um processo independente para cada módulo.
 
 ## Requisitos e critérios de aceitação
 

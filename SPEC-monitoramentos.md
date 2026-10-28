@@ -1,0 +1,68 @@
+# Especificação proposta: monitoramentos
+
+**Estado:** proposta para revisão; não aprovada e não autoriza planejamento ou implementação. **ID do mapa:** `monitoramentos`. Fontes: [mapa de capacidades](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção confirmada](docs/intent/monitoramento-juridico.md), [identidade](SPEC-identidade.md) e [autorização](SPEC-autorizacao.md).
+
+## Objetivo
+
+Permitir ao advogado e aos usuários autorizados manter os alvos de acompanhamento do tenant: o próprio advogado, partes identificadas por nome e processos identificados por número, com seleção de tribunais para partes e processos. Os cadastros alimentam os módulos de coleta e consulta sem transferir a este módulo a responsabilidade por executar buscas na fonte ou decidir quem pode acessar os dados.
+
+## Escopo e dono dos contratos
+
+Este módulo é dono da identidade lógica dos monitoramentos e de sua associação ao tenant: perfil profissional do advogado monitorado, cadastro de partes por nome, cadastro de processos por número e filtros de tribunal associados aos cadastros de partes/processos. Fornece a identidade da entidade e seu tenant ao módulo de coleta, conforme o [mapa](CAPABILITIES.md).
+
+[Identidade](SPEC-identidade.md) é dona do perfil profissional do advogado e seu tenant; monitoramentos consome nome e OAB principal/secundárias sem criar um segundo perfil divergente. [Autorização](SPEC-autorizacao.md) decide se o usuário pode cadastrar ou ler monitoramentos e se pode operar no tribunal em questão. Coleta é dona da obtenção/normalização de publicações e de como a fonte retorna correspondências; consulta é dona de comunicações, detalhes e dashboard. Correspondência por nome e tratamento de homônimos não são definidos neste módulo.
+
+## Contratos lógicos
+
+- **Advogado monitorado:** o monitoramento do advogado é derivado do perfil de identidade do advogado do tenant, incluindo nome e OAB principal/secundárias existentes. Não cria um tenant de escritório nem um cadastro profissional conflitante.
+- **Parte:** cadastro com nome informado pelo usuário autorizado, associado ao tenant autenticado. O critério de correspondência desse nome com publicações não está decidido.
+- **Processo:** cadastro com número informado pelo usuário autorizado, associado ao tenant autenticado. Normalização do número e alcance real do filtro na fonte não estão decididos.
+- **Tribunais:** filtros de tribunal são associados a monitoramentos de partes e processos somente entre tribunais disponibilizados pela fonte, sujeitos à capacidade real dessa fonte. A lista, representação, seleção inicial e semântica de lista vazia não são especificadas.
+- **Saída para coleta:** cada monitoramento disponibiliza ao consumidor sua identidade lógica e o tenant dono, além dos dados de busca definidos para o tipo de entidade. Formato de ID, persistência, serialização e transporte são decisões técnicas pendentes.
+- **Acesso:** cadastro, leitura e qualquer outra ação dependem da decisão de autorização. O servidor vincula o registro ao tenant do contexto autenticado e não aceita tenant enviado pelo cliente como prova de propriedade.
+
+## Requisitos
+
+1. O advogado do tenant é acompanhado por seu nome e suas OABs, conforme perfil de identidade; o perfil não é duplicado nem escolhido como entidade de outro tenant.
+2. Um usuário autorizado pode cadastrar e ler partes por nome e processos por número no tenant do advogado.
+3. Partes e processos podem ter filtro de tribunais disponibilizados pela fonte, sujeito à capacidade real de consulta da fonte. Não prometer cobertura de tribunal ou capacidade de filtro não verificada.
+4. Cada monitoramento pertence a exatamente seu tenant autenticado para fins de isolamento; dados de tenant enviados pelo cliente não alteram essa associação.
+5. O módulo disponibiliza a identidade lógica da entidade e o tenant para coleta, sem executar coleta nem definir resultado, deduplicação ou algoritmo de correspondência da fonte.
+6. A interface oferece páginas de cadastro e leitura dos monitoramentos e navegação para dashboard e resultados. A autorização de cada destino continua sob responsabilidade de autorização/consulta.
+7. Não se presume algoritmo de correspondência exata ou aproximada por nome, resolução de homônimos, normalização de nome/OAB/número, tratamento de duplicatas, edição ou remoção de cadastros.
+
+## Critérios observáveis
+
+- No tenant do advogado, o acompanhamento do advogado reflete o nome, OAB principal e OABs secundárias do perfil de identidade, sem exigir cadastro profissional separado.
+- Um usuário autorizado consegue cadastrar uma parte informando nome e consultar a leitura desse cadastro no tenant correto.
+- Um usuário autorizado consegue cadastrar um processo informando número e consultar a leitura desse cadastro no tenant correto.
+- O usuário consegue selecionar filtros de tribunal oferecidos para os cadastros aplicáveis; a aplicação não apresenta como suportado um tribunal/filtro que a fonte não disponibiliza.
+- Um cadastro associado a um tenant não pode ser lido ou alterado por outro tenant apenas pelo envio do identificador do cadastro.
+- A saída lógica para coleta permite identificar a entidade monitorada e seu tenant, sem exigir formato técnico ainda não escolhido.
+- As páginas de cadastro/leitura e a navegação para dashboard/resultados estão disponíveis aos usuários autorizados; negar acesso impede leitura dos dados protegidos.
+- O cadastro de nome não promete correspondência correta em caso de homônimo nem fixa regras para correspondência por nome.
+
+## Ambiente de implementação e teste: pendências bloqueantes
+
+Não há aplicação, stack, convenção de comandos, estrutura de código, framework de teste ou exemplo real de estilo estabelecidos no repositório. Não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Esses itens precisam ser escolhidos antes da implementação.
+
+- **Comandos:** build, execução de testes, lint e desenvolvimento local — não definidos; nenhum comando é proposto.
+- **Estrutura:** diretórios de aplicação, testes e configuração — não definidos.
+- **Estilo:** não há código real que sirva de referência. Convenções e snippet só podem ser definidos após a escolha da stack e do repositório de implementação.
+- **Estratégia de teste:** framework, localização e comandos são pendências. Os testes de aceitação devem cobrir perfil do advogado derivado de identidade, criação/leitura de partes e processos, filtros de tribunal suportados, autorização e isolamento entre tenants, e fornecimento de identidade/tenant ao consumidor coleta. A qualidade de correspondência por nome e homônimos só poderá ser testada após regra de negócio e política de matching aprovadas; não usar testes de fonte como se fossem garantia de cobertura.
+- **Limite de desempenho compartilhado:** a aplicação central deve suportar ao menos 300 usuários simultâneos; perfil, latências-alvo, ambiente e taxa de erro continuam pendentes na [especificação geral](docs/especificacao.md).
+
+## Fronteiras
+
+- **Sempre:** vincular cadastros ao tenant autenticado no servidor; usar perfil profissional de identidade para o advogado monitorado; restringir a seleção de tribunal à disponibilidade real da fonte; aplicar decisões de autorização em cadastro e leitura; fornecer identidade lógica e tenant a coleta.
+- **Pedir aprovação:** definir formatos e validações de nomes, OAB e números; correspondência por nome/homônimos; filtros disponíveis, comportamento sem filtro e alterações posteriores de cadastro; edição/remoção e duplicidades; formato técnico e persistência dos registros.
+- **Nunca:** tratar escritório como tenant; aceitar tenant enviado pelo cliente como prova de propriedade; inventar correspondência por similaridade, desambiguação de homônimos, normalização, cobertura da fonte ou recuperação histórica; executar coleta ou decisão de acesso dentro deste módulo.
+
+## Questões abertas
+
+1. Como se determina a correspondência por nome e como são tratados homônimos, variações de grafia e falso positivo/falso negativo?
+2. Qual é a normalização/validação dos nomes, OABs e números de processo e como se identificam cadastros duplicados?
+3. Quais tribunais a fonte disponibiliza para cada tipo de monitoramento e qual é a semântica de filtro ausente, conjunto vazio ou alteração posterior?
+4. Quais operações de ciclo de vida existem além do cadastro e leitura, inclusive edição e remoção?
+5. Qual referência lógica de entidade e contrato de saída serão necessários para coleta, sem acoplar a escolha a um formato de armazenamento/transportes ainda não decidido?
+6. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
