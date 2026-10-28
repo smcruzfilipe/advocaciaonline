@@ -33,6 +33,7 @@ Este módulo é dono da identidade lógica dos monitoramentos e de sua associaç
 5. O módulo disponibiliza a identidade lógica da entidade e o tenant para coleta, sem executar a coleta nem implementar o matching. Os critérios de equivalência estão definidos nesta especificação e Coleta os aplica ao matching de publicações; resultado da fonte e deduplicação continuam fora do escopo deste módulo.
 6. A interface oferece páginas de cadastro e leitura dos monitoramentos e navegação para dashboard e resultados. A autorização de cada destino continua sob responsabilidade de autorização/consulta.
 7. O matching de nomes exige igualdade de nomes completos após normalizar caixa, acentos e espaços excedentes; não aceita aproximações, apelidos ou abreviações. Para advogado, o matching também pode ocorrer pela igualdade do par númeroOAB+UF em qualquer OAB principal/secundária. Homônimos continuam possíveis e não há promessa de desambiguá-los ou excluí-los. Normalização/validação de OAB e número de processo, tratamento de pontuação e de duplicatas continuam pendentes.
+8. Na primeira entrega, o advogado pode editar e desativar monitoramentos de partes e processos. Desativar interrompe novas coletas do alvo, preservando comunicações já coletadas, vínculos históricos e registros imutáveis do Escriba. Não implementar exclusão do cadastro como substituta da desativação.
 
 ## Critérios observáveis
 
@@ -60,7 +61,7 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 ## Fronteiras
 
 - **Sempre:** vincular cadastros ao tenant autenticado no servidor; usar perfil profissional de identidade para o advogado monitorado; restringir a seleção de tribunal à disponibilidade real da fonte; aplicar decisões de autorização em cadastro e leitura; fornecer identidade lógica e tenant a coleta.
-- **Pedir aprovação:** definir normalização/validação da representação de OAB e números de processo, tratamento de pontuação em nomes e números e identificação de cadastros duplicados; filtros disponíveis, comportamento sem filtro e alterações posteriores de cadastro; edição/remoção e formato técnico/persistência dos registros.
+- **Pedir aprovação:** definir validações de OAB/processo, sufixos, pontuação e duplicidade de cadastros; comportamento de edições/desativação sobre trabalhos já planejados ou em execução; formato técnico e persistência. Edição e desativação estão aprovadas; exclusão de cadastro não foi escolhida.
 - **Nunca:** tratar escritório como tenant; aceitar tenant enviado pelo cliente como prova de propriedade; inventar correspondência por similaridade, apelidos, abreviações ou desambiguação de homônimos, nem regras de normalização de OAB/processo ou tratamento de pontuação; prometer cobertura da fonte ou recuperação histórica; executar coleta ou decisão de acesso dentro deste módulo.
 
 ## Questões abertas
@@ -68,6 +69,6 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 1. Que validações ou tratamento de pontuação se aplicam a nomes sem alterar o critério de equivalência nominal já definido?
 2. Como validar representações inválidas, sufixos de OAB e cadastros duplicados? Processo sem máscara com zeros preservados e OAB/UF separadas já foram definidos.
 3. Quais tribunais estão efetivamente disponíveis e como tratar alterações posteriores do filtro? Ausência de filtro já significa todos os tribunais disponíveis na fonte.
-4. Quais operações de ciclo de vida existem além do cadastro e leitura, inclusive edição e remoção?
+4. Edição e desativação de partes/processos estão aprovadas, com histórico preservado. Qual o efeito sobre trabalhos já planejados ou em execução? Não presumir cancelamento ou mudança retroativa de execução em curso.
 5. Qual referência lógica de entidade e contrato de saída serão necessários para coleta, sem acoplar a escolha a um formato de armazenamento/transportes ainda não decidido?
 6. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?

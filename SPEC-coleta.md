@@ -73,6 +73,7 @@ São cenários propostos de contrato, não repetição de teste da fonte externa
 - Quais tribunais são aplicáveis a cada entidade, e como a fonte indica ZIP inválido, indisponível, incompleto ou resposta válida sem itens? Os meios já estão definidos: D e E.
 - Como classificar os problemas do caderno e definir o esgotamento de tentativas antes do fallback? Quais são a semântica de paginação, limites e disponibilidade efetiva da API? O filtro por processo não foi comprovado de forma geral; evidência inconclusiva está documentada na especificação geral.
 - Qual regra deve ser aplicada aos sinais de pontuação nos nomes e a dados de OAB ausentes, inválidos ou com sufixos? A comparação por processo sem máscara, com zeros preservados, e OAB com UF separada já estão definidas; não converter identificadores em inteiros nem remover sufixos por suposição.
+- A regra para publicações sem `id` ou sem `hash` foi explicitamente adiada pelo solicitante. Não escolher descarte, identificador sintético, persistência parcial ou falha de tribunal por conta própria; resolver esse caso excepcional antes de implementar seu tratamento.
 - Como tratar ausência, alteração ou inconsistência de `id`/`hash` e mudanças posteriores no conteúdo da fonte?
 - Quais limites numéricos, intervalos de backoff configurados por variáveis de ambiente, critérios de parada e estado de execução parcial devem ser usados?
 - Quais métricas/estados são mantidos por execução e tribunal para permitir consulta e aviso sem levar detalhes de erro ao Escriba?
