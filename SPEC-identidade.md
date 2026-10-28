@@ -39,7 +39,7 @@ O contrato é lógico; não fixa protocolo, formato de sessão, endpoint, esquem
 - Uma sessão aberta antes do vencimento não permite uma nova operação protegida depois do vencimento.
 - Identidade sem validade reconhecida ou credencial expirada não é apresentada aos módulos consumidores como contexto autenticado válido.
 
-O instante exato de início da contagem e as regras de calendário/fuso não estão definidos; portanto, os critérios de vencimento não fixam um instante além do que for decidido nessas questões abertas.
+Decisão do solicitante: contar a validade desde o instante de criação da credencial em períodos completos de 24 horas. Para N dias, o vencimento é o instante de criação mais N × 24 horas, sem depender do primeiro login ou do fim do dia de calendário. No instante de vencimento e depois dele, negar operações protegidas, inclusive em sessão já aberta.
 
 ## Ambiente de implementação e teste: pendências bloqueantes
 
@@ -61,7 +61,7 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 
 1. Qual mecanismo de login será adotado e como será iniciada a identidade do advogado e de cada usuário da equipe?
 2. A política de validade configurada pelo advogado se aplica às próprias credenciais, às credenciais dos usuários da equipe ou a ambas? Como são criadas e alteradas essas credenciais?
-3. A partir de qual evento começa a contagem dos dias; como se interpretam dias, fuso horário e instante de vencimento?
+3. A contagem está definida: desde a criação, em períodos de 24 horas. Representação técnica dos instantes e validação dos dias informados devem constar do contrato de identidade.
 4. Como renovação, alteração de validade e revogação afetam credenciais e sessões já ativas?
 5. Quais validações, formatos canônicos e tratamento de duplicidades se aplicam a nome e OAB principal/secundárias?
 6. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?

@@ -22,6 +22,7 @@ A administração por usuário advogado e o conceito de grupos são requisitos. 
 - **Fronteiras:** identidade determina quem é o ator e a qual tenant pertence; autorização determina o acesso; cada módulo consumidor continua responsável por filtrar as próprias respostas segundo a decisão recebida.
 
 Composição aprovada pelo solicitante: somar as permissões concedidas pelos grupos, com **negação explícita prevalecendo** sobre concessões para a mesma operação e escopo. Ausência de concessão não é negação explícita. Com grupos associados, a leitura ampla padrão de usuários sem grupo não é somada às permissões. Exemplo: leitura TJSP e leitura TJRJ permitem ambos; uma negação explícita de dashboard prevalece mesmo que outro grupo conceda esse acesso. Nenhuma combinação ultrapassa o tenant autenticado.
+Permissões são atribuídas **somente por grupos**, conforme decisão do solicitante. Não há concessões ou negações diretamente no usuário; uma exceção individual é representada por um grupo específico, mantendo a mesma composição de regras.
 
 ## Requisitos
 
@@ -63,7 +64,7 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 
 ## Questões abertas
 
-1. Existirão regras atribuídas diretamente a usuários além das regras de grupos? Esse mecanismo e sua precedência não foram aprovados; a composição entre grupos já está definida.
+1. Regras diretamente em usuários foram excluídas por decisão do solicitante: atribuir permissões somente por grupos, inclusive para exceções individuais.
 2. Quais operações existem e quais concessões de leitura/escrita cada uma exige? Qual regra se aplica à escrita até essa matriz ser definida?
 3. Escopo parcial definido pelo solicitante: dashboard, métricas e avisos respeitam os tribunais autorizados; acesso à dashboard não concede acesso a agregados de outros tribunais. Quais métricas e janelas serão usadas ainda precisa ser definido.
 4. Quais ações de ciclo de vida o advogado pode executar para usuários e grupos? Como usuários de equipe obtêm identidade e credencial, sem presumir fluxo de convite?
