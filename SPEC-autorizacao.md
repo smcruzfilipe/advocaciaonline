@@ -10,7 +10,7 @@ Permitir que o advogado administre usuários e grupos de seu tenant e que a apli
 
 Este módulo é dono da gestão lógica de usuários/grupos e da decisão de autorização por operação, tribunal e dashboard. Recebe de [identidade](SPEC-identidade.md) usuário, tenant e estado de validade; não autentica usuários, não cria credenciais nem decide expiração. [Monitoramentos](SPEC-monitoramentos.md) e consulta de comunicações dependem das decisões de acesso para as ações e dados correspondentes. A consulta é dona da apresentação da dashboard, inclusive da representação `*` para números não autorizados; autorização define que esses números não podem ser revelados.
 
-A administração por usuário advogado e o conceito de grupos são requisitos. Não ficam definidos aqui métodos de criação de conta, convites, ciclo de vida completo de usuários, formato de permissões, CRUD de grupos, níveis/roles fixos, precedência entre vários grupos nem transporte técnico.
+A administração por usuário advogado e os grupos são requisitos. Login é Google para advogado e equipe; primeiro acesso de equipe ocorre por convite ao e-mail informado, sem senha local, conforme [identidade](SPEC-identidade.md). Grupos somam concessões com prevalência de negação explícita. Formato das permissões, detalhes técnicos de convite, ciclo de vida completo, operações de grupos e transportes ainda precisam ser definidos.
 
 ## Contratos lógicos
 
@@ -67,7 +67,7 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 1. Regras diretamente em usuários foram excluídas por decisão do solicitante: atribuir permissões somente por grupos, inclusive para exceções individuais.
 2. Quais operações existem e quais concessões de leitura/escrita cada uma exige? Qual regra se aplica à escrita até essa matriz ser definida?
 3. Escopo parcial definido pelo solicitante: dashboard, métricas e avisos respeitam os tribunais autorizados; acesso à dashboard não concede acesso a agregados de outros tribunais. Quais métricas e janelas serão usadas ainda precisa ser definido.
-4. Quais ações de ciclo de vida o advogado pode executar para usuários e grupos? Como usuários de equipe obtêm identidade e credencial, sem presumir fluxo de convite?
+4. Quais ações de ciclo de vida ainda não definidas o advogado poderá executar para usuários e grupos? O acesso de equipe já é por convite ao e-mail com aceitação pelo Google, sem senha local; validade, revogação e renovação seguem o contrato de identidade.
 5. O acesso `*` cobre todos os números da dashboard ou somente indicadores definidos? Como distinguir valores indisponíveis por autorização de zero/falha sem vazar dados?
 6. Qual representação distinguirá concessão, negação explícita e ausência de regra, preservando a leitura ampla somente para usuários sem grupo?
 7. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
