@@ -7,7 +7,23 @@
 - Banco de dados: PostgreSQL com Row-Level Security (RLS).
 - Tenant: advogado independente, não escritório; RLS deve preservar esse isolamento.
 
-A escolha não fixa versões, runtime Node.js, bibliotecas, hospedagem, estrutura de pastas, linguagem dos coletores/ETL, fila ou infraestrutura. Esses pontos continuam pendentes. Não inicializar a aplicação nem inventar comandos de build/teste antes de definir essas decisões e resolver os gates do [plano](../tasks/plan.md).
+As versões centrais selecionadas estão documentadas abaixo. Bibliotecas adicionais, hospedagem, estrutura de pastas, linguagem dos coletores/ETL, fila e infraestrutura continuam pendentes. Por instrução expressa do solicitante, este trabalho é **somente documental: não instalar runtimes, pacotes, dependências ou containers nesta máquina**. Não gerar a aplicação nem executar instalação, build ou testes de integração.
+
+## Versões selecionadas
+
+Referência da consulta: 28/10/2026. Seleção de releases estáveis documentadas nas fontes oficiais, sem beta, RC ou canary como versão dos componentes listados. Não é uma garantia de que não exista patch posterior ao anúncio consultado.
+
+| Componente | Versão de referência | Fonte e evidência |
+|---|---|---|
+| Ruby | 4.0.9 | [Anúncio oficial de 23/10/2026](https://www.ruby-lang.org/en/news/2026/10/23/ruby-4-0-9-released/) |
+| Ruby on Rails | 8.1.4, somente API-only | [Metadados exatos do gem](https://rubygems.org/api/v2/rubygems/rails/versions/8.1.4.json): publicado em 24/09/2026, `prerelease: false`, requisito Ruby `>= 3.2.0` |
+| Next.js | 16.4.1 | [Atualização oficial de segurança de 14/10/2026](https://nextjs.org/blog/nextjs-security-update-october-14-2026): versão corrigida da linha Active LTS |
+| PostgreSQL | 18.6, com RLS | [Política oficial de versões](https://www.postgresql.org/support/versioning/): minor atual da linha 18, suportada até novembro de 2030 |
+| Node.js, referência de runtime do frontend | Linha 24 LTS; patch ainda não fixado | [Estado de suporte](https://nodejs.org/en/about/previous-releases); [requisito do Next.js 16](https://nextjs.org/docs/app/guides/upgrading/version-16): Node.js `>= 20.9.0` |
+
+Ruby 4.0.9 satisfaz o requisito numérico do gem Rails 8.1.4. Isso não substitui uma matriz explícita de suporte nem demonstra funcionamento em execução. A linha Node.js 24 LTS satisfaz o mínimo documentado do Next.js 16; a versão exata do runtime e as dependências React/adapter PostgreSQL precisam ser fixadas no futuro contrato de dependências, sem instalar nada agora.
+
+Estas são versões de referência para a aplicação central. Não definem versões ou tecnologias do planejador, ETL ou de um Escriba independente. Não houve instalação, inicialização de banco, geração de lockfiles, migration, teste de RLS ou smoke da integração Rails–Next.js–PostgreSQL. A compatibilidade operacional permanece não verificada.
 
 ## Referências oficiais consultadas
 
