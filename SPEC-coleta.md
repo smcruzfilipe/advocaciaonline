@@ -1,6 +1,6 @@
 # Especificação proposta: coleta (`coleta`)
 
-**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `coleta`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md).
+**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `coleta`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [stack da aplicação central](docs/stack.md).
 
 ## Objetivo
 
@@ -10,8 +10,8 @@ Planejar e executar duas coletas diárias de publicações do DJEN para os tenan
 
 - **Dependências do mapa:** `monitoramentos` (`SPEC-monitoramentos.md`) fornece entidades, seus vínculos e tenant; `escriba` (`SPEC-escriba.md`) recebe marcos append-only do fluxo.
 - **Consumidor:** `consulta` (`SPEC-consulta.md`) lê comunicações persistidas e estado de coleta por execução/tribunal.
-- A aplicação de planejamento/control plane e as microaplicações ETL são responsabilidades lógicas distintas da aplicação central, conforme o mapa; não se determina aqui se serão processos, serviços ou diretórios separados.
-- O contexto autenticado identifica usuário e tenant no servidor. A coleta sempre associa entidade e publicação ao tenant obtido do contrato confiável, nunca ao tenant fornecido pelo cliente como prova de acesso.
+- A aplicação de planejamento/control plane e as microaplicações ETL são responsabilidades lógicas distintas da aplicação central, conforme o mapa. A stack da aplicação central está definida em [docs/stack.md](docs/stack.md), mas não determina se esses componentes serão processos, serviços ou diretórios separados nem sua tecnologia; não se presume Ruby/Rails para planejador ou ETL.
+- O contexto autenticado identifica usuário e tenant no servidor. A coleta sempre associa entidade e publicação ao tenant obtido do contrato confiável, nunca ao tenant fornecido pelo cliente como prova de acesso. PostgreSQL RLS é uma camada adicional e não substitui a derivação server-side do tenant nem autorização/RBAC.
 - O planejador produz trabalho rastreável por entidade/tenant elegível, execução, fonte e tribunal aplicável. Há duas execuções por dia, com horários definidos por variáveis de ambiente conforme decisão do solicitante. O fuso é fixo em Brasília (`America/Sao_Paulo`) tanto para a agenda quanto para determinar a data corrente enviada à fonte, independentemente do fuso do servidor. Nomes e formato das variáveis e critérios de elegibilidade ainda precisam ser definidos.
 - Para cada execução, usar exclusivamente o dia corrente da execução como data de consulta. A fonte principal é o caderno DJEN para tribunal, data corrente e meio aplicável: obter o ZIP, descompactar todos os JSONs e pesquisar correspondências de nome e OAB do advogado, número de processo e nome de parte monitorados.
 - Meios aprovados pelo solicitante: **Diário Eletrônico (`D`) e Edital (`E`)**, em ambas as coletas diárias, para os tribunais monitorados. Não adicionar configuração de meios por advogado.
@@ -42,13 +42,13 @@ Planejar e executar duas coletas diárias de publicações do DJEN para os tenan
 
 ## Comandos, estrutura e estilo
 
-- **Build, teste, lint e formatação:** comandos não existem no repositório e são bloqueantes para implementação. Stack e ferramentas não foram escolhidas; não inventar comandos.
+- **Build, teste, lint e formatação:** comandos não existem no repositório e são bloqueantes para implementação. A stack da aplicação central foi decidida (ver [stack](docs/stack.md)), mas isso não define comandos, versões, runtime, bibliotecas ou ferramentas dos componentes de planejamento/ETL; não inventá-los.
 - **Estrutura física:** pendente. O limite lógico reúne planejador/control plane e ETL e mantém esses componentes separados da aplicação central, sem decidir diretórios, deploy ou processos.
-- **Estilo de código:** não há implementação ou snippet real para servir de padrão. Linguagem, convenções de nomes/formatação e exemplo devem ser definidos a partir da stack e de código existente quando houver; nenhum estilo fictício é prescrito.
+- **Estilo de código:** não há implementação ou snippet real para servir de padrão. Convenções, formatação e exemplo devem ser definidos a partir de código existente quando houver; a escolha da stack central não define o estilo real nem a tecnologia do planejador/ETL.
 
 ## Estratégia de testes comportamentais proposta
 
-São cenários propostos de contrato, não repetição de teste da fonte externa. Framework, diretório, comandos e cobertura dependem de decisões técnicas ainda bloqueantes. A validação de cadernos/API reais deve ser planejada separadamente; as amostras existentes não devem ser tratadas como prova global.
+São cenários propostos de contrato, não repetição de teste da fonte externa. A stack da aplicação central está definida, mas framework de testes, diretório, comandos e cobertura permanecem pendentes. A validação de cadernos/API reais deve ser planejada separadamente; as amostras existentes não devem ser tratadas como prova global.
 
 - Um ZIP contendo JSONs é processado por tribunal, data e meio; advogados são associados por igualdade do nome completo normalizado ou por igualdade do par número OAB + UF em qualquer inscrição principal/secundária, e partes por igualdade do nome completo normalizado. A normalização ignora caixa e acentos e remove espaços excedentes; não há correspondência aproximada.
 - Nomes completos que diferem apenas em caixa, acentos ou espaços excedentes são iguais para matching, tanto para advogado quanto para parte.
@@ -77,7 +77,7 @@ São cenários propostos de contrato, não repetição de teste da fonte externa
 - Como tratar ausência, alteração ou inconsistência de `id`/`hash` e mudanças posteriores no conteúdo da fonte?
 - Quais limites numéricos, intervalos de backoff configurados por variáveis de ambiente, critérios de parada e estado de execução parcial devem ser usados?
 - Quais métricas/estados são mantidos por execução e tribunal para permitir consulta e aviso sem levar detalhes de erro ao Escriba?
-- Stack, estrutura física, comandos, estilo real, framework, localização e cobertura dos testes precisam ser decididos antes de implementar.
+- A stack da aplicação central está definida em [docs/stack.md](docs/stack.md). Quais versões, runtime, bibliotecas, comandos, convenções de estilo, estrutura física e framework/localização/cobertura dos testes serão adotados? Quais tecnologias serão usadas no planejador e nos componentes ETL? A escolha central não determina essas tecnologias.
 
 ## Critérios de sucesso
 

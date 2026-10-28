@@ -1,6 +1,6 @@
 # Especificação proposta: autorização
 
-**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `autorizacao`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [identidade](SPEC-identidade.md).
+**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas ainda pendentes continuam bloqueantes antes da implementação. **ID:** `autorizacao`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [identidade](SPEC-identidade.md), [stack](docs/stack.md).
 
 ## Objetivo
 
@@ -48,11 +48,13 @@ Permissões são atribuídas **somente por grupos**, conforme decisão do solici
 
 ## Ambiente de implementação e teste: pendências bloqueantes
 
-Não há aplicação, stack, convenção de comandos, estrutura de código, framework de teste ou exemplo real de estilo estabelecidos no repositório. Não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Esses itens precisam ser escolhidos antes da implementação.
+Stack base definida: API central em Ruby on Rails exclusivamente no modo API (`--api`), frontend Next.js e PostgreSQL com Row-Level Security (RLS), conforme [stack](docs/stack.md). Versões, ferramentas e dependências, comandos e caminhos físicos da aplicação continuam pendentes; não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Ainda não há aplicação nem código real que sirva de referência para estilo.
+
+As políticas de RLS não substituem RBAC nem as decisões de autorização por operação e grupo desta especificação; o tenant efetivo deve ser derivado no servidor do contexto autenticado, nunca de dado enviado pelo cliente. Ver também [stack](docs/stack.md).
 
 - **Comandos:** build, execução de testes, lint e desenvolvimento local — não definidos; nenhum comando é proposto.
 - **Estrutura:** diretórios de aplicação, testes e configuração — não definidos.
-- **Estilo:** não há código real que sirva de referência. Convenções e snippet só podem ser definidos após a escolha da stack e do repositório de implementação.
+- **Estilo:** não há código real que sirva de referência. Convenções e snippet dependem do repositório de implementação e de seu estilo, ainda não estabelecidos.
 - **Estratégia de teste:** framework, localização e comandos são pendências. Cobrir isolamento por tenant, decisão por tribunal/operação, padrão sem grupo, `Consulta TJSP`, união de concessões e precedência de negação explícita, inclusive dashboard com `*` sem exposição por respostas ou agregações.
 - **Limite de desempenho compartilhado:** a aplicação central deve suportar ao menos 300 usuários simultâneos; perfil, latências-alvo, ambiente e taxa de erro continuam pendentes na [especificação geral](docs/especificacao.md).
 
@@ -70,4 +72,4 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 4. Quais ações de ciclo de vida ainda não definidas o advogado poderá executar para usuários e grupos? O acesso de equipe já é por convite ao e-mail com aceitação pelo Google, sem senha local; validade, revogação e renovação seguem o contrato de identidade.
 5. O acesso `*` cobre todos os números da dashboard ou somente indicadores definidos? Como distinguir valores indisponíveis por autorização de zero/falha sem vazar dados?
 6. Qual representação distinguirá concessão, negação explícita e ausência de regra, preservando a leitura ampla somente para usuários sem grupo?
-7. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
+7. Quais caminhos físicos/layout, comandos, estilo real e framework, ferramentas e locais de teste serão definidos para o repositório de implementação? A stack base já está registrada em [stack](docs/stack.md).

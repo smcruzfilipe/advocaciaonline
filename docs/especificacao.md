@@ -63,7 +63,7 @@ A restrição a tribunais e dashboard precisa aplicar-se também às respostas d
 - Correspondência por nome, homônimos e vínculos entre monitoramentos; política para alterações posteriores da fonte. A chave conjunta `id` e `hash` já está definida no requisito de deduplicação.
 - Critérios quantitativos de desempenho para 300 usuários e perfis de carga.
 - Retenção, dados pessoais e compatibilidade do Escriba imutável com obrigações legais.
-- Stack, infraestrutura, ferramentas, comandos de build/teste/lint e estrutura de código: não há aplicação existente no repositório; decidir antes da implementação, sem inventar comandos.
+- Stack central definida pelo solicitante: Ruby/Rails exclusivamente API-only, Next.js e PostgreSQL com RLS, conforme [registro técnico](stack.md). Versões, infraestrutura, tecnologias de ETL, ferramentas, comandos e estrutura física continuam pendentes; não há aplicação implementada.
 
 ## Verificação e limites
 

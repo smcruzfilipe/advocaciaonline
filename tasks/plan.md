@@ -6,7 +6,7 @@ O [checklist canônico](todo.md) contém o aceite, a verificação proposta, as 
 
 ## Base aprovada e especificações
 
-O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionais aprovadas são a referência de escopo. Aprovação funcional não equivale a decisão de stack, arquitetura física, comandos ou critérios operacionais.
+O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionais aprovadas são a referência de escopo. O solicitante definiu a [stack central](../docs/stack.md): Rails API-only, Next.js e PostgreSQL com RLS. Versões, arquitetura física, ETL, comandos e critérios operacionais continuam pendentes.
 
 | Módulo | Especificação aprovada |
 |---|---|
@@ -22,7 +22,7 @@ O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionai
 Os IDs **1–3** são trabalho de validação e decisão, não implementação. Nenhuma tarefa de implementação pode começar até que esses gates estejam concluídos, este plano seja aprovado e o feedback obrigatório do advisor seja recebido.
 
 - **1–2:** resolver as evidências e decisões de fonte, segurança, política de dados e critérios mensuráveis de capacidade descritas no checklist.
-- **3:** decidir stack, arquitetura física, limites entre componentes, contratos compartilhados e ferramentas/comandos de desenvolvimento e verificação. Definir estrutura e caminhos concretos somente após essas decisões.
+- **3:** completar decisões da stack já escolhida, versões, arquitetura física, limites entre componentes, políticas RLS, contratos compartilhados e ferramentas/comandos de desenvolvimento e verificação. Definir estrutura e caminhos concretos somente após essas decisões.
 - Confirmar que os contratos e escopos de cada tarefa permanecem dentro das seis especificações aprovadas. Mudanças de escopo exigem aprovação, não são presumidas pelo plano.
 
 ## Ordem vertical e checkpoints
@@ -118,7 +118,7 @@ flowchart LR
 | Escriba | 9 | Esquema lógico e granularidade dos marcos; identificação de execução e dados disponíveis; retenção e tratamento de dados pessoais. Não registrar ações de usuários nem detalhes de erro. |
 | coleta | 1, 10–13 | Evidência do contrato da fonte; critérios de tribunal/meio e elegibilidade; horários, fuso e interrupções; validade do ZIP/JSON e semântica da paginação; acionamento do fallback; limites de tentativas/backoff; estados de falha e tratamento de chaves ausentes/inválidas. |
 | consulta | 14–15 | Definição de métricas, unidade e janelas; comportamento de agregações sob escopo parcial; campos efetivamente fornecidos pela fonte; apresentação de falha distinta de zero e de números sem autorização. |
-| transversal | 3, 16 | Stack, caminhos e estrutura de código, arquitetura/transportes, comandos e ferramentas de build/teste/lint; perfil, ambiente, latência e taxa de erro para comprovar 300 usuários simultâneos. |
+| transversal | 3, 16 | Stack central escolhida: Rails API-only, Next.js e PostgreSQL/RLS. Faltam versões, stack de ETL, políticas/roles RLS, caminhos de código, arquitetura/transportes, comandos/ferramentas e metas de carga de 300 usuários. |
 
 ## Oportunidades de paralelização e contratos compartilhados
 
@@ -142,7 +142,7 @@ Não paralelizar tarefas com dependência direta nem alterações concorrentes a
 | Dados pessoais em registros imutáveis e política de retenção pendente. | Resolver retenção no desenho do Escriba; manter o escopo append-only e excluir ações de usuário e detalhes de erro. |
 | Regras de grupo e dashboard podem permitir exposição indevida ou bloquear acesso esperado. | Definir composição e escopos; aplicar decisões no servidor a listas, detalhes, respostas e agregações, preservando as regras funcionais aprovadas. |
 | Requisito de 300 simultâneos não tem perfil ou limites mensuráveis. | Aprovar perfil de carga, latência, erro e ambiente antes do teste; não afirmar conformidade sem resultado reproduzível. |
-| Stack, caminhos de código e comandos não existem como decisões no repositório. | Resolver no ID 3; só então fixar caminhos reais, limitar cada fatia a 3–5 arquivos e subdividir acima desse limite. |
+| Versões, ETL, políticas RLS, caminhos e comandos ainda não definidos. | Completar ID 3 a partir da stack central escolhida; depois fixar caminhos reais, limitar cada fatia a 3–5 arquivos e subdividir acima desse limite. |
 
 ## Fronteiras e execução
 

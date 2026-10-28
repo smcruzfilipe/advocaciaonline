@@ -1,6 +1,6 @@
 # Especificação proposta: identidade
 
-**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `identidade`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md).
+**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas ainda pendentes continuam bloqueantes antes da implementação. **ID:** `identidade`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [stack](docs/stack.md).
 
 ## Objetivo
 
@@ -50,11 +50,13 @@ Decisão do solicitante: contar a validade desde o instante de criação da cred
 
 ## Ambiente de implementação e teste: pendências bloqueantes
 
-Não há aplicação, stack, convenção de comandos, estrutura de código, framework de teste ou exemplo real de estilo estabelecidos no repositório. Não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Esses itens precisam ser escolhidos antes da implementação.
+Stack base definida: API central em Ruby on Rails exclusivamente no modo API (`--api`), frontend Next.js e PostgreSQL com Row-Level Security (RLS), conforme [stack](docs/stack.md). Versões, ferramentas e dependências, comandos e caminhos físicos da aplicação continuam pendentes; não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Ainda não há aplicação nem código real que sirva de referência para estilo.
+
+As políticas de RLS não substituem RBAC nem as verificações de identidade e autorização da aplicação; o tenant efetivo deve ser derivado no servidor do contexto autenticado, nunca de dado enviado pelo cliente. Ver também [stack](docs/stack.md).
 
 - **Comandos:** build, execução de testes, lint e desenvolvimento local — não definidos; nenhum comando é proposto.
 - **Estrutura:** diretórios de aplicação, testes e configuração — não definidos.
-- **Estilo:** não há código real que sirva de referência. Convenções e snippet só podem ser definidos após a escolha da stack e do repositório de implementação.
+- **Estilo:** não há código real que sirva de referência. Convenções e snippet dependem do repositório de implementação e de seu estilo, ainda não estabelecidos.
 - **Estratégia de teste:** framework, localização e comandos são pendências. Os testes de aceitação devem cobrir onboarding do perfil profissional, derivação server-side do tenant, isolamento de tenant e expiração aplicada a solicitações com sessão ativa. Isso é uma estratégia comportamental, não escolha de ferramenta nem repetição de testes já feitos sobre a fonte de dados.
 - **Limite de desempenho compartilhado:** a aplicação central deve suportar ao menos 300 usuários simultâneos; perfil, latências-alvo, ambiente e taxa de erro continuam pendentes na [especificação geral](docs/especificacao.md).
 
@@ -71,4 +73,4 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 3. A contagem está definida: desde a criação, em períodos de 24 horas. Representação técnica dos instantes e validação dos dias informados devem constar do contrato de identidade.
 4. Revogação é imediata inclusive em sessões abertas; renovação conta desde o instante em que ocorre e não reativa credencial revogada. Não criar exceções silenciosas a essas regras.
 5. Quais validações, formatos canônicos e tratamento de duplicidades se aplicam a nome e OAB principal/secundárias?
-6. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
+6. Quais caminhos físicos/layout, comandos, estilo real e framework, ferramentas e locais de teste serão definidos para o repositório de implementação? A stack base já está registrada em [stack](docs/stack.md).

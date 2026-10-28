@@ -1,6 +1,6 @@
 # Especificação proposta: monitoramentos
 
-**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `monitoramentos`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [identidade](SPEC-identidade.md), [autorização](SPEC-autorizacao.md).
+**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas ainda pendentes continuam bloqueantes antes da implementação. **ID:** `monitoramentos`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [identidade](SPEC-identidade.md), [autorização](SPEC-autorizacao.md), [stack](docs/stack.md).
 
 ## Objetivo
 
@@ -50,11 +50,13 @@ Este módulo é dono da identidade lógica dos monitoramentos e de sua associaç
 
 ## Ambiente de implementação e teste: pendências bloqueantes
 
-Não há aplicação, stack, convenção de comandos, estrutura de código, framework de teste ou exemplo real de estilo estabelecidos no repositório. Não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Esses itens precisam ser escolhidos antes da implementação.
+Stack base definida: API central em Ruby on Rails exclusivamente no modo API (`--api`), frontend Next.js e PostgreSQL com Row-Level Security (RLS), conforme [stack](docs/stack.md). Versões, ferramentas e dependências, comandos e caminhos físicos da aplicação continuam pendentes; não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Ainda não há aplicação nem código real que sirva de referência para estilo.
+
+As políticas de RLS não substituem RBAC nem a autorização exigida para cada ação; o tenant efetivo deve ser derivado no servidor do contexto autenticado, nunca de dado enviado pelo cliente. Ver também [stack](docs/stack.md).
 
 - **Comandos:** build, execução de testes, lint e desenvolvimento local — não definidos; nenhum comando é proposto.
 - **Estrutura:** diretórios de aplicação, testes e configuração — não definidos.
-- **Estilo:** não há código real que sirva de referência. Convenções e snippet só podem ser definidos após a escolha da stack e do repositório de implementação.
+- **Estilo:** não há código real que sirva de referência. Convenções e snippet dependem do repositório de implementação e de seu estilo, ainda não estabelecidos.
 - **Estratégia de teste:** framework, localização e comandos são pendências. Os testes de aceitação devem cobrir perfil do advogado derivado de identidade, criação/leitura de partes e processos, filtros de tribunal suportados, autorização e isolamento entre tenants, e fornecimento de identidade/tenant ao consumidor coleta. Testes de matching devem verificar igualdade de nomes completos após ignorar caixa/acentos, remover espaços nas extremidades e reduzir sequências internas de espaços, rejeitar nomes parciais/aproximações/apelidos/abreviações, e verificar para advogado a alternativa de correspondência por nome ou igualdade do par númeroOAB+UF em qualquer OAB principal/secundária. Não exigir desambiguação ou exclusão de homônimos; a normalização/validação de OAB e número de processo e o tratamento de pontuação permanecem pendentes. Não usar testes de fonte como se fossem garantia de cobertura.
 - **Limite de desempenho compartilhado:** a aplicação central deve suportar ao menos 300 usuários simultâneos; perfil, latências-alvo, ambiente e taxa de erro continuam pendentes na [especificação geral](docs/especificacao.md).
 
@@ -71,4 +73,4 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 3. Quais tribunais estão efetivamente disponíveis e como tratar alterações posteriores do filtro? Ausência de filtro já significa todos os tribunais disponíveis na fonte.
 4. Edição e desativação de partes/processos estão aprovadas, com histórico preservado. Qual o efeito sobre trabalhos já planejados ou em execução? Não presumir cancelamento ou mudança retroativa de execução em curso.
 5. Qual referência lógica de entidade e contrato de saída serão necessários para coleta, sem acoplar a escolha a um formato de armazenamento/transportes ainda não decidido?
-6. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
+6. Quais caminhos físicos/layout, comandos, estilo real e framework, ferramentas e locais de teste serão definidos para o repositório de implementação? A stack base já está registrada em [stack](docs/stack.md).

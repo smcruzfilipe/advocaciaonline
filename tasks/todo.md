@@ -68,7 +68,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 ### 3. Definir stack e contratos
 
 - [ ] **3a — Decidir stack, arquitetura física e ferramentas.**
-  **Aceite:** (1) aprovar stack, layout, convenções e comandos reais a partir da base escolhida; (2) mapear áreas e caminhos exatos dos arquivos/testes de cada fatia antes da execução; (3) redividir qualquer fatia que exija mais de cinco arquivos.
+  **Aceite:** (1) completar a stack central escolhida — Rails API-only, Next.js, PostgreSQL com RLS — com versões, ETL, layout, convenções, políticas RLS e comandos reais, conforme [registro técnico](../docs/stack.md); (2) mapear áreas e caminhos exatos dos arquivos/testes de cada fatia antes da execução; (3) redividir qualquer fatia que exija mais de cinco arquivos.
   **Verificação comportamental:** revisão de que cada área física tem dono e que nenhum comando/caminho presumido entrou no checklist.
   **Smoke específico:** percorrer um fluxo representativo do mapa até os arquivos/camadas definidos, sem criar código.
   **Dep.:** 1a–1c e 2a–2c. **Escopo:** decisão técnica, sem implementação.
