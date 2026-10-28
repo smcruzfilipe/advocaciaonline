@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+# Run only in a dedicated migration container, never in the web entrypoint.
+ENV["DATABASE_URL"] = ENV.fetch("MIGRATION_DATABASE_URL")
+ARGV.replace(["db:migrate"])
+load File.expand_path("rails", __dir__)
