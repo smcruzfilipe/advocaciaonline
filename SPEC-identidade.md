@@ -1,6 +1,6 @@
 # Especificação proposta: identidade
 
-**Estado:** proposta para revisão; não aprovada e não autoriza planejamento ou implementação. **ID do mapa:** `identidade`. Fonte de requisitos: [mapa de capacidades](CAPABILITIES.md), [especificação geral](docs/especificacao.md) e [intenção confirmada](docs/intent/monitoramento-juridico.md).
+**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `identidade`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md).
 
 ## Objetivo
 

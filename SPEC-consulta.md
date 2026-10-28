@@ -1,6 +1,6 @@
 # Especificação proposta: consulta (`consulta`)
 
-**Estado:** proposta para revisão; não declarar aprovada nem iniciar implementação antes da aprovação. Módulo e dependências conforme [mapa de capacidades](CAPABILITIES.md); requisitos compartilhados em [especificação geral](docs/especificacao.md) e [intenção confirmada](docs/intent/monitoramento-juridico.md).
+**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `consulta`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md).
 
 ## Objetivo
 

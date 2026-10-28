@@ -1,24 +1,153 @@
 # Plano de implementação: monitoramento jurídico
 
-Base: [especificação](../docs/especificacao.md). Plano proposto, sujeito à aprovação e à resolução das decisões bloqueantes; não implica autorização para implementar. Checklist detalhado em [todo.md](todo.md).
+**Estado:** aprovado pelo solicitante. O advisor revisou este planejamento sem impedimentos para versionamento. As seis especificações funcionais também foram aprovadas; decisões técnicas e bloqueios abaixo continuam pendentes. A aprovação do plano não dispensa os gates 1–3 antes da implementação.
 
-## Sequência
+O [checklist canônico](todo.md) contém o aceite, a verificação proposta, as dependências e as áreas de arquivos por tarefa. Este plano organiza os IDs principais, seus gates, sequência, dependências e paralelização, sem duplicar o checklist.
 
-1. Validar contrato real do Comunica, critérios de capacidade, política de dados e modelo de permissões; aprovar a especificação e o mapa de capacidades.
-2. Definir stack, infraestrutura e contratos entre aplicação central, planejador, ETL e Escriba. Implementar acesso do advogado e isolamento em uma fatia verificável.
-3. Entregar gestão de usuários, grupos e credenciais; depois cadastros de monitoramento.
-4. Entregar planejamento e coleta real de ponta a ponta, com registros Escriba, persistência e deduplicação; acrescentar segunda execução e recuperação de falhas.
-5. Entregar consulta agrupada e detalhes, dashboard e aplicação de permissões às respostas.
-6. Validar cenários integrados, isolamento, carga de 300 usuários e experiência no navegador.
+## Base aprovada e especificações
 
-## Dependências e riscos
+O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionais aprovadas são a referência de escopo. Aprovação funcional não equivale a decisão de stack, arquitetura física, comandos ou critérios operacionais.
 
-Identidade precede permissões e monitoramentos; estes precedem planejamento e coleta. Escriba precisa estar disponível durante a primeira coleta real. Consulta depende de resultados persistidos e autorização. A documentação oficial foi acessada pela máquina local; a estabilidade dos identificadores é premissa aceita e a deduplicação usa conjuntamente `id` e `hash`, por fonte e tenant. Cadernos e comunicações pertencem à mesma fonte lógica DJEN. A coleta principal baixa cadernos ZIP e lê seus JSONs; comunicações paginadas são fallback. Ambas usam somente a data corrente, sem recuperação automática de dias anteriores. Outros riscos: homônimos, divergências observadas no filtro por processo, dados pessoais em registros imutáveis, permissões amplas por padrão e critérios de carga indefinidos.
+| Módulo | Especificação aprovada |
+|---|---|
+| identidade | [SPEC-identidade.md](../SPEC-identidade.md) |
+| autorização | [SPEC-autorizacao.md](../SPEC-autorizacao.md) |
+| monitoramentos | [SPEC-monitoramentos.md](../SPEC-monitoramentos.md) |
+| Escriba | [SPEC-escriba.md](../SPEC-escriba.md) |
+| coleta | [SPEC-coleta.md](../SPEC-coleta.md) |
+| consulta | [SPEC-consulta.md](../SPEC-consulta.md) |
 
-## Fluxo de branches
+## Gate antes de qualquer implementação
 
-`dev` é a base e a branch padrão remota; criar `feature/<nome>` a partir de `dev` para cada feature e integrar após revisão.
+Os IDs **1–3** são trabalho de validação e decisão, não implementação. Nenhuma tarefa de implementação pode começar até que esses gates estejam concluídos, este plano seja aprovado e o feedback obrigatório do advisor seja recebido.
 
-## Verificações
+- **1–2:** resolver as evidências e decisões de fonte, segurança, política de dados e critérios mensuráveis de capacidade descritas no checklist.
+- **3:** decidir stack, arquitetura física, limites entre componentes, contratos compartilhados e ferramentas/comandos de desenvolvimento e verificação. Definir estrutura e caminhos concretos somente após essas decisões.
+- Confirmar que os contratos e escopos de cada tarefa permanecem dentro das seis especificações aprovadas. Mudanças de escopo exigem aprovação, não são presumidas pelo plano.
 
-Cada tarefa descreve aceite, dependências e verificação no checklist. Comandos concretos serão registrados após escolha da stack; não existem comandos de build ou testes neste repositório ainda. Revisão humana nos checkpoints antes de avançar.
+## Ordem vertical e checkpoints
+
+Executar as fatias em ordem de dependência. IDs são os principais do checklist; se uma fatia exceder o limite de 3–5 arquivos, subdividi-la em subtarefas `a`, `b`, `c` dentro do mesmo ID, sem renumerar os IDs principais. O checklist registra áreas de arquivos; caminhos físicos de código ficam pendentes do gate 3 e não são inventados aqui.
+
+### Fase 0 — Resolver bloqueios
+
+- **IDs 1 e 2:** podem avançar parcialmente em paralelo; a decisão do subitem 1c deve estar concluída antes do subitem 2c. Ambos são pré-requisitos do ID 3.
+- **ID 3:** fechar as decisões técnicas e os contratos necessários para as fatias seguintes.
+
+**Checkpoint após 1–3:** registrar decisões e evidências pendentes resolvidas; obter aprovação deste plano e feedback do advisor. Sem isso, não iniciar implementação.
+
+### Fase 1 — Identidade e autorização
+
+- **ID 4:** onboarding do advogado e contexto de identidade/tenant.
+- **ID 5:** usuários e validade da credencial, após ID 4.
+- **ID 6:** grupos e escopos, após ID 5.
+
+**Checkpoint após 4–6:** rever os contratos de identidade, validade, tenant e autorização antes de liberar os consumidores.
+
+### Fase 2 — Monitoramentos e registro do fluxo
+
+- **IDs 7 e 8:** cadastros de partes e processos, em paralelo após os contratos do ID 3 e o ID 6.
+- **ID 9:** Escriba append-only; depende dos contratos técnicos e do contexto de identidade, não dos cadastros de monitoramento.
+
+**Checkpoint após 7–9:** confirmar os contratos de identidade/tenant dos monitoramentos e o limite do Escriba antes de planejar coletas.
+
+### Fase 3 — Coleta e estado de execução
+
+- **ID 10:** planejamento por entidade/tenant e tribunal, após IDs 7–9.
+- **ID 11:** coleta e persistência, após IDs 1, 9 e 10.
+- **ID 12:** deduplicação e preservação de vínculos, após ID 11.
+- **ID 13:** agenda, novas tentativas e estado de falha, após ID 12.
+
+**Checkpoint após 10–12:** verificar os contratos propostos de planejamento, persistência e deduplicação. Confirmar coleta primária dos cadernos DJEN ZIP/JSON e fallback pela API paginada da mesma fonte lógica, somente para o dia corrente; deduplicação por `id` e `hash` conjuntamente, com vínculos preservados.
+
+### Fase 4 — Consulta e dashboard
+
+- **ID 14:** consulta independente de comunicações, após IDs 6 e 12.
+- **ID 15:** dashboard numérica e sua UI, avisos e restrição de acesso, após IDs 2, 13 e 14. O ID 6 estabelece a política de autorização e escopo que a dashboard aplica; a interface e as volumetrias pertencem somente ao ID 15.
+
+**Checkpoint após 13–15:** rever o estado de falhas por tribunal, a aplicação da autorização nas respostas e os critérios de volumetria acordados.
+
+### Fase 5 — Validação integrada
+
+- **ID 16:** validação ponta a ponta, isolamento e requisito de 300 usuários simultâneos, após IDs 14 e 15.
+
+**Checkpoint final após 16:** avaliar os critérios mensuráveis aprovados, registrar resultados e obter revisão humana. Este checkpoint não presume aprovação enquanto os gates ou feedback obrigatório estiverem pendentes.
+
+## Grafo de dependências
+
+Cada aresta aponta para um ID posterior; assim, o grafo é acíclico e sua ordem é verificável. A dependência parcial entre os IDs 1 e 2 é somente da decisão do subitem 1c para o subitem 2c:
+
+```mermaid
+flowchart LR
+    T1 -.->|somente decisão 1c → 2c| T2["ID 2"]
+    T1 --> T3["ID 3"]
+    T1 --> T11["ID 11"]
+    T2 --> T3
+    T2 --> T15["ID 15"]
+    T3 --> T4["ID 4"]
+    T3 --> T7["ID 7"]
+    T3 --> T8["ID 8"]
+    T3 --> T9["ID 9"]
+    T4 --> T5["ID 5"]
+    T4 --> T9
+    T5 --> T6["ID 6"]
+    T6 --> T7
+    T6 --> T8
+    T6 --> T14["ID 14"]
+    T7 --> T10["ID 10"]
+    T8 --> T10
+    T9 --> T10
+    T9 --> T11
+    T10 --> T11
+    T11 --> T12["ID 12"]
+    T12 --> T13["ID 13"]
+    T12 --> T14
+    T13 --> T15
+    T14 --> T15
+    T14 --> T16["ID 16"]
+    T15 --> T16
+```
+
+## Bloqueios técnicos por módulo
+
+| Módulo | IDs | Decisões/bloqueios a resolver antes da implementação |
+|---|---:|---|
+| identidade | 4–5 | Mecanismo de login e identidade para usuários da equipe; aplicação da validade às credenciais e sessões; início, fuso e instante de expiração; validações de nome/OAB. |
+| autorização | 5–6, 14–15 | Composição e conflitos entre grupos; operações e concessões de escrita; escopo de tribunal e dashboard; ações de gestão de usuários/grupos; proteção das respostas e agregações. |
+| monitoramentos | 7–8 | Validação e normalização de nome/OAB/número, duplicidades, ciclo de vida; tribunais realmente disponíveis e semântica de filtros; política de correspondência e homônimos, sem presumir algoritmo. |
+| Escriba | 9 | Esquema lógico e granularidade dos marcos; identificação de execução e dados disponíveis; retenção e tratamento de dados pessoais. Não registrar ações de usuários nem detalhes de erro. |
+| coleta | 1, 10–13 | Evidência do contrato da fonte; critérios de tribunal/meio e elegibilidade; horários, fuso e interrupções; validade do ZIP/JSON e semântica da paginação; acionamento do fallback; limites de tentativas/backoff; estados de falha e tratamento de chaves ausentes/inválidas. |
+| consulta | 14–15 | Definição de métricas, unidade e janelas; comportamento de agregações sob escopo parcial; campos efetivamente fornecidos pela fonte; apresentação de falha distinta de zero e de números sem autorização. |
+| transversal | 3, 16 | Stack, caminhos e estrutura de código, arquitetura/transportes, comandos e ferramentas de build/teste/lint; perfil, ambiente, latência e taxa de erro para comprovar 300 usuários simultâneos. |
+
+## Oportunidades de paralelização e contratos compartilhados
+
+| Fatias paralelizáveis | Condição para paralelizar sem conflito |
+|---|---|
+| IDs 1 e 2 | Podem avançar parcialmente em paralelo; a decisão do subitem 1c precisa estar concluída antes do subitem 2c. |
+| IDs 5 e 9 | Após IDs 3 e 4, os contratos de identidade e tenant devem estar fixos; separar áreas de arquivo e evitar alterações concorrentes no contrato compartilhado. |
+| IDs 7 e 8 | Após os contratos do ID 3 e o ID 6, com a definição compartilhada de identidade de monitoramento, tenant e filtro de tribunal; limitar cada fatia à sua entidade e áreas de arquivo próprias. |
+| IDs 13 e 14 | Após ID 12 e a estabilização do contrato de estado da coleta, podem avançar em módulos distintos; ID 15 aguarda ambos. |
+
+Não paralelizar tarefas com dependência direta nem alterações concorrentes a um mesmo contrato ou arquivo. Antes de dividir o trabalho, fixar: contexto autenticado e tenant derivado no servidor; decisão de autorização por operação/tribunal/dashboard; identidade e tenant do monitoramento fornecidos à coleta; registros append-only do Escriba sem detalhes de erro; estado por execução/tribunal; e identidade de publicação pela combinação conjunta `id` + `hash`, escopada por tenant e fonte lógica DJEN.
+
+## Riscos e mitigação
+
+| Risco dentro do escopo aprovado | Mitigação planejada |
+|---|---|
+| Contrato da fonte, filtros, cobertura e paginação não comprovados para todos os tribunais. | Validar evidências e limites antes do gate 3; usar cadernos ZIP/JSON como caminho principal e consulta paginada como fallback da mesma fonte lógica, sem prometer cobertura não demonstrada. |
+| Divergência de nome, homônimos ou filtro por processo pode causar resultados indevidos ou ausentes. | Manter critérios de correspondência e semântica da fonte como decisões explícitas; não inventar normalização nem tratar uma amostra como garantia geral. |
+| `id` e `hash` podem não ter estabilidade/unicidade global comprovada. | Tratar estabilidade como premissa limitada; deduplicar apenas pela combinação conjunta, por tenant e DJEN, preservando vínculos e sem fundir por processo/tribunal. |
+| Horários, fuso, critérios de fallback e política de tentativas ainda não definidos. | Aprovar elegibilidade, condições e limites antes de configurar execução; não inferir quantidade, intervalos ou recuperação de dias anteriores. |
+| Dados pessoais em registros imutáveis e política de retenção pendente. | Resolver retenção no desenho do Escriba; manter o escopo append-only e excluir ações de usuário e detalhes de erro. |
+| Regras de grupo e dashboard podem permitir exposição indevida ou bloquear acesso esperado. | Definir composição e escopos; aplicar decisões no servidor a listas, detalhes, respostas e agregações, preservando as regras funcionais aprovadas. |
+| Requisito de 300 simultâneos não tem perfil ou limites mensuráveis. | Aprovar perfil de carga, latência, erro e ambiente antes do teste; não afirmar conformidade sem resultado reproduzível. |
+| Stack, caminhos de código e comandos não existem como decisões no repositório. | Resolver no ID 3; só então fixar caminhos reais, limitar cada fatia a 3–5 arquivos e subdividir acima desse limite. |
+
+## Fronteiras e execução
+
+Manter o escopo das seis especificações: DJEN como fonte lógica, cadernos ZIP/JSON primários, API paginada como fallback, data corrente exclusiva por execução e deduplicação pela combinação conjunta `id` + `hash`. Não introduzir coleta histórica automática, e-mail, fontes adicionais ou regras de negócio não aprovadas.
+
+`dev` é a base das features; quando os gates liberarem a implementação, cada feature parte de `dev` em `feature/<nome>` e integra após revisão. Os caminhos físicos de código e comandos ficam pendentes do ID 3; não os inventar neste plano.
+
+As verificações do [checklist](todo.md) são propostas e ainda não foram executadas. Nenhum comando de build, teste, lint ou formatação foi presumido. A conclusão de cada etapa e a entrega final também dependem do feedback do advisor, conforme [AGENTS.md](../AGENTS.md).

@@ -1,6 +1,6 @@
 # Mapa de capacidades: monitoramento jurídico
 
-Mapa aprovado pelo solicitante. Especificações abaixo são propostas sujeitas a aprovação antes de planejamento e implementação. Requisitos e evidências anteriores: [especificação geral](docs/especificacao.md); [intenção confirmada](docs/intent/monitoramento-juridico.md).
+Mapa e seis especificações aprovados pelo solicitante como base funcional, mantendo as decisões técnicas pendentes como bloqueios antes da implementação. Requisitos e evidências anteriores: [especificação geral](docs/especificacao.md); [intenção confirmada](docs/intent/monitoramento-juridico.md).
 
 | Módulo | Responsabilidade | Dependências | Especificação |
 |---|---|---|---|
@@ -15,4 +15,4 @@ Ordem: identidade → autorização e Escriba → monitoramentos → coleta → 
 
 Contratos compartilhados de especificação: contexto autenticado identifica usuário e tenant no servidor, respeita expiração e não aceita tenant enviado pelo cliente como prova de acesso. Autorização decide operação e escopo por tribunal/dashboard. Monitoramentos fornecem identidade da entidade e seu tenant; coleta persiste publicações com vínculos e status por execução/tribunal; Escriba recebe registros de fluxo append-only. Formatos técnicos e transportes ainda não foram escolhidos.
 
-Somente o mapa foi aprovado. O plano e checklist existentes em `tasks/` continuam propostas e não autorizam implementação. `dev` é a branch padrão; cada feature nasce de `dev`. Toda conclusão depende de feedback do advisor conforme [regras do projeto](AGENTS.md).
+O plano e checklist existentes em `tasks/` foram aprovados pelo solicitante e revisados pelo advisor; as decisões técnicas bloqueantes continuam pendentes antes da implementação. `dev` é a branch padrão; cada feature nasce de `dev`. Toda conclusão depende de feedback do advisor conforme [regras do projeto](AGENTS.md).

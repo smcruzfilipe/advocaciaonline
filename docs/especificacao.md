@@ -1,6 +1,6 @@
 # Especificação: monitoramento jurídico
 
-**Estado:** proposta para revisão; não iniciar implementação antes da aprovação. Fonte de intenção: [declaração confirmada](intent/monitoramento-juridico.md).
+**Estado:** base de requisitos; mapa e seis especificações modulares aprovados funcionalmente pelo solicitante. Decisões técnicas pendentes continuam bloqueantes antes da implementação. Fonte de intenção: [declaração confirmada](intent/monitoramento-juridico.md).
 
 ## Objetivo e fronteiras
 
@@ -10,7 +10,7 @@ Fora da primeira entrega: envio de e-mails e implementação de fontes adicionai
 
 ## Mapa de capacidades aprovado
 
-O [mapa aprovado](../CAPABILITIES.md) é o índice canônico dos módulos, dependências e especificações. Esta especificação geral preserva requisitos e evidências; as especificações modulares permanecem propostas até aprovação humana.
+O [mapa aprovado](../CAPABILITIES.md) é o índice canônico dos módulos, dependências e especificações aprovadas como base funcional. Esta especificação geral preserva requisitos e evidências; aprovação funcional não resolve as decisões técnicas pendentes nem aprova o plano de implementação.
 
 Coleta compreende microaplicações de ETL e uma aplicação de planejamento/control plane, separadas da aplicação central. As fronteiras lógicas não exigem um processo independente para cada módulo.
 

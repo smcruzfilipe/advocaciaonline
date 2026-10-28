@@ -1,6 +1,6 @@
 # Especificação proposta: autorização
 
-**Estado:** proposta para revisão; não aprovada e não autoriza planejamento ou implementação. **ID do mapa:** `autorizacao`. Fontes: [mapa de capacidades](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção confirmada](docs/intent/monitoramento-juridico.md) e [contrato de identidade](SPEC-identidade.md).
+**Estado:** aprovada pelo solicitante como base funcional; decisões técnicas pendentes continuam bloqueantes antes da implementação. **ID:** `autorizacao`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [identidade](SPEC-identidade.md).
 
 ## Objetivo
 
