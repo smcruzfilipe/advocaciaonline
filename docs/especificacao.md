@@ -48,12 +48,17 @@ Coleta compreende microaplicações de ETL e uma aplicação de planejamento/con
 
 A restrição a tribunais e dashboard precisa aplicar-se também às respostas da API e a agregações; a interação exata entre permissões de tribunal e dashboard requer decisão. O padrão de leitura ampla para usuários sem grupo é uma decisão expressa do solicitante, com risco de exposição por configuração acidental. Não inventar proteção ou alterar esse padrão sem aprovação. O Escriba imutável e dados judiciais exigem uma política de retenção e tratamento de dados pessoais a definir.
 
+### Documentação da API
+
+A API usará Swagger UI para expor sua documentação interativa, protegida por login e senha, conforme requisito do solicitante. O mecanismo de autenticação dessa documentação deve ser definido no contrato técnico; não está decidido se compartilha identidade com o login Google da aplicação. Usuários e senhas padrão não devem ser embutidos no código nem versionados. A aplicação e a documentação ainda não estão implementadas.
+
 ## Decisões pendentes e evidências
 
 - Credenciais: instante inicial da validade, fuso, renovação e revogação; comportamento de múltiplos grupos, conflitos e permissões de escrita.
 - Regras de escopo da dashboard e suas agregações quando o usuário só acessa alguns tribunais.
 - Comunicação versus processo: definição das volumetrias, janelas temporais e inclusão de repetidos.
 - Horários, fuso, recuperação após interrupção, limites de retry/backoff e status de conclusão parcial.
+- Acesso à documentação interativa da API: Swagger UI protegida por login e senha; mecanismo de autenticação, configuração de credenciais, nomes/defaults/obrigatoriedade das variáveis correspondentes e relação com a identidade da aplicação ainda precisam ser definidos antes da implementação.
 - Disponibilidade por tribunal, paginação, limites e política de acesso; o caderno retorna URL temporária de cinco minutos e é disponibilizado a partir das 03h segundo a documentação. A estabilidade dos identificadores é premissa aceita, não uma decisão pendente.
 - Consulta real de metadados em 28/10/2026: TJSP, meio D, status `Processado`, 273.925 comunicações e 274 arquivos no pacote. Essa amostra evidencia o volume, mas não verifica o conteúdo do ZIP nem a capacidade do sistema.
 - Inspeção real do ZIP TJAC/D de 28/10/2026: dois arquivos JSON; o primeiro contém objeto com `count` e `items` e 1.000 itens. Um item inspecionado contém `id`, `hash`, `numero_processo`, `texto`, `siglaTribunal`, `destinatarios` e `destinatarioadvogados`. Presença numa amostra não prova unicidade, estabilidade nem preenchimento desses campos em todos os registros.
