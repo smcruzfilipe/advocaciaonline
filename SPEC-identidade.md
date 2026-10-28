@@ -16,7 +16,9 @@ Usuários de equipe podem pertencer ao tenant do advogado, mas a gestão de usu�
 
 - **Contexto autenticado:** para uma solicitação autenticada, o servidor reconhece uma identidade de usuário e o tenant a que ela pertence. O tenant efetivo é derivado pelo servidor; um valor de tenant enviado pelo cliente nunca prova associação nem concede acesso.
 - **Perfil do advogado:** o onboarding registra nome completo, uma OAB principal e zero ou mais OABs secundárias. O tenant continua sendo o advogado mesmo que exista nome comercial opcional do escritório.
-- **Credencial e validade:** a validade pode ser indefinida ou expressa em dias, conforme política definida pelo advogado. A identidade só é válida enquanto a credencial aplicável não expirou. Uma solicitação protegida após a expiração é recusada mesmo que exista uma sessão ativa; uma sessão em uso não prolonga a validade.
+- **Credencial e validade:** somente os usuários criados pelo advogado recebem a validade opcional, sem expiração ou em dias. Essa funcionalidade não aplica prazo à própria conta do advogado. No vencimento, negar solicitações protegidas inclusive em sessão ativa.
+- **Revogação:** o advogado pode revogar uma credencial imediatamente, interrompendo o acesso inclusive de sessões abertas. Renovação não reativa uma credencial revogada; para restabelecer esse acesso, criar nova credencial.
+- **Renovação:** o advogado pode renovar uma credencial não revogada, inclusive expirada. Para N dias, novo vencimento = instante da renovação + N períodos de 24 horas, sem somar ao vencimento anterior.
 - **Fronteira com autorização:** este módulo fornece o contexto autenticado e seu estado de validade; não fornece permissões, associação a grupos ou escopo de tribunais/dashboard.
 
 O contrato é lógico; não fixa protocolo, formato de sessão, endpoint, esquema de dados ou mecanismo de login.
@@ -37,6 +39,8 @@ O contrato é lógico; não fixa protocolo, formato de sessão, endpoint, esquem
 - Enviar pelo cliente um tenant diferente não muda o tenant reconhecido pelo servidor nem permite operar sobre seus dados.
 - Com validade sem expiração, o acesso não é encerrado por uma data de expiração configurada; com validade em dias, a credencial deixa de permitir acesso após vencer.
 - Uma sessão aberta antes do vencimento não permite uma nova operação protegida depois do vencimento.
+- Após revogação, uma sessão previamente aberta não permite nova operação protegida; tentar renovar a credencial revogada não a reativa.
+- Renovar uma credencial não revogada às 14h por dois dias define novo vencimento às 14h, 48 horas depois da renovação, independentemente do vencimento anterior.
 - Identidade sem validade reconhecida ou credencial expirada não é apresentada aos módulos consumidores como contexto autenticado válido.
 
 Decisão do solicitante: contar a validade desde o instante de criação da credencial em períodos completos de 24 horas. Para N dias, o vencimento é o instante de criação mais N × 24 horas, sem depender do primeiro login ou do fim do dia de calendário. No instante de vencimento e depois dele, negar operações protegidas, inclusive em sessão já aberta.
@@ -60,8 +64,8 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 ## Questões abertas
 
 1. Qual mecanismo de login será adotado e como será iniciada a identidade do advogado e de cada usuário da equipe?
-2. A política de validade configurada pelo advogado se aplica às próprias credenciais, às credenciais dos usuários da equipe ou a ambas? Como são criadas e alteradas essas credenciais?
+2. Escopo definido: validade opcional somente para usuários criados pelo advogado, não para a conta do advogado. Detalhes técnicos de criação e entrega de credenciais continuam pendentes.
 3. A contagem está definida: desde a criação, em períodos de 24 horas. Representação técnica dos instantes e validação dos dias informados devem constar do contrato de identidade.
-4. Como renovação, alteração de validade e revogação afetam credenciais e sessões já ativas?
+4. Revogação é imediata inclusive em sessões abertas; renovação conta desde o instante em que ocorre e não reativa credencial revogada. Não criar exceções silenciosas a essas regras.
 5. Quais validações, formatos canônicos e tratamento de duplicidades se aplicam a nome e OAB principal/secundárias?
 6. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
