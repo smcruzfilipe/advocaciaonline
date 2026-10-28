@@ -9,5 +9,5 @@ Declaração confirmada pelo solicitante.
 - **Escriba:** registrar o fluxo e os dados relevantes das coletas desde o início, sem registrar ações do usuário nem erros.
 - **Permissões:** o advogado administra usuários e grupos, com restrições por operação, tribunal e dashboard. Usuários sem grupo têm leitura de todos os tribunais e acesso à dashboard por padrão; sem acesso à dashboard, os números aparecem como `*`.
 - **Credenciais:** o advogado pode definir validade em número de dias ou deixar a credencial sem expiração. Após o prazo definido, ela não permite mais acesso.
-- **Capacidade:** a aplicação central deve suportar pelo menos 300 usuários simultâneos sem travamentos ou lentidão significativa.
+- **Capacidade:** 300 usuários simultâneos são referência de planejamento, não requisito de aceite atual; testes serão feitos futuramente.
 - **Fora da primeira entrega:** relatórios e avisos por e-mail; outras fontes de coleta ficam para o futuro.

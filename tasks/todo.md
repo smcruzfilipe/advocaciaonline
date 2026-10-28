@@ -6,10 +6,11 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 - Preservar os IDs principais 1–16; as fatias `a/b/c` ficam dentro do ID principal. O plano referencia somente os IDs principais.
 - Cada fatia limita o aceite a três critérios, traz verificação comportamental e smoke próprios, dependências, escopo e até cinco áreas previstas de arquivos.
+- **Fontes na implementação:** aplicar `source-driven-development` em cada fatia que dependa de framework, biblioteca ou serviço externo: identificar as versões efetivamente fixadas, consultar a documentação oficial específica antes de codificar, seguir as APIs documentadas e registrar os links que sustentam decisões não triviais. Conflitos com o código ou ausência de documentação devem ser explicitados; nenhuma consulta substitui teste ou verificação em execução.
 - Áreas são módulos/artefatos lógicos, não caminhos inventados. Depois da decisão técnica 3a, registrar os caminhos exatos antes de executar cada fatia; se exceder cinco arquivos, redividir antes de executar.
 - Não escolher stack, comandos, ferramentas, estruturas, formatos ou transportes antes das decisões 3a–3b. As verificações abaixo são propostas, não executadas; nenhum gate, teste, lint ou formatador foi rodado.
 - Fonte lógica DJEN: cadernos ZIP/JSON são o caminho principal; comunicações paginadas são fallback; ambos usam exclusivamente a data corrente. Não revalidar retroativamente a premissa aceita de estabilidade de `id`/`hash`, nem iniciar recuperação histórica.
-- Implementação futura parte de `dev`; o branch atual de documentação não é base de feature. E-mail e outras fontes ficam fora da primeira entrega.
+- Implementação futura parte de `dev`; o branch atual de documentação não é base de feature. Convite de equipe por e-mail está no escopo aprovado; relatórios e avisos por e-mail e outras fontes ficam fora da primeira entrega.
 
 ## Decisões bloqueantes — tarefas 1–3
 
@@ -23,15 +24,16 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Áreas previstas (≤5):** especificação de coleta; referência do contrato DJEN.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
 
-- [ ] **1b — Fixar fallback e tratamento da fonte.**
+- [x] **1b — Fixar fallback e tratamento da fonte.**
   **Aceite:** (1) definir condições de fallback e paginação da consulta de comunicações; (2) garantir datas inicial/final iguais à data corrente e distinguir resposta válida vazia de falha; (3) manter caderno e API como a mesma fonte lógica DJEN.
   **Verificação comportamental:** avaliar cenários de página única, múltiplas páginas, resposta vazia válida e caderno problemático contra as condições aprovadas.
   **Smoke específico:** revisão de um fluxo de fallback paginado com data atual, confirmando que não solicita dia anterior.
+  **Evidência:** TJAP/D, em 28/10/2026, teve páginas de 100, 100, 100, 100, 67 e 0 itens; as 467 chaves coincidiram com as do caderno. TJRR/E apresentou página inicial vazia e caderno sem comunicações. Todas as consultas usaram a mesma data inicial e final. Erros de resposta são falhas no contrato, não resultados vazios. Detalhes e limites em [contrato DJEN](../docs/contrato-djen.md#verificações-adicionais-de-28102026).
   **Dep.:** 1a. **Escopo:** contrato do caminho alternativo, sem implementar o conector.
   **Áreas previstas (≤5):** especificação de coleta; referência do contrato DJEN.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
 
-- [ ] **1c — Fixar operação diária, tentativas e falha.**
+- [x] **1c — Fixar operação diária, tentativas e falha.**
   **Aceite:** (1) decidir horários/fuso/elegibilidade para duas execuções diárias; (2) aprovar limites, backoff, parada, retomada e critérios de falha por execução/tribunal; (3) permitir recuperação na execução posterior do mesmo dia, sem coleta retroativa.
   **Verificação comportamental:** revisar cenários de interrupção, tentativas esgotadas, falha persistente e sucesso posterior no mesmo dia; cada resultado distingue falha de zero publicações.
   **Smoke específico:** exercício de mesa “falha na primeira execução, sucesso na segunda, mesma data” e conferência do estado esperado.
@@ -41,7 +43,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 ### 2. Fechar decisões de segurança, dados e desempenho
 
-- [ ] **2a — Aprovar política de identidade e validade.**
+- [x] **2a — Aprovar política de identidade e validade.**
   **Aceite:** (1) decidir escopo da validade (advogado/equipe), criação e ciclo de vida das credenciais e início/fuso/instante da contagem; (2) definir efeitos de renovação, alteração e revogação em credenciais/sessões; (3) preservar a recusa server-side após expiração mesmo para sessão ativa.
   **Verificação comportamental:** revisão dos cenários sem expiração, validade em dias e operação protegida depois do vencimento numa sessão previamente aberta.
   **Smoke específico:** tabela de decisão para sessão ativa antes/depois do instante aprovado de expiração.
@@ -49,7 +51,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Áreas previstas (≤5):** especificação de identidade; política de credenciais.
   **Rastreio:** [SPEC-identidade.md — Requisitos](../SPEC-identidade.md#requisitos); [Critérios observáveis](../SPEC-identidade.md#critérios-observáveis); [Questões abertas](../SPEC-identidade.md#questões-abertas); [Fronteiras](../SPEC-identidade.md#fronteiras).
 
-- [ ] **2b — Aprovar composição de grupos e operações.**
+- [x] **2b — Aprovar composição de grupos e operações.**
   **Aceite:** (1) decidir composição/conflito de grupos e operações, inclusive concessões de escrita; (2) manter leitura ampla sem grupo sem conceder escrita e preservar `Consulta TJSP` como somente leitura de TJSP quando não conflitante; (3) definir o escopo de tribunal aplicado a lista, detalhe e agregações.
   **Verificação comportamental:** matriz aprovada para sem grupo, `Consulta TJSP`, outros grupos/conflitos e operações de leitura/escrita.
   **Smoke específico:** revisão de chamadas permitidas e negadas para TJSP, outro tribunal e escrita.
@@ -57,8 +59,8 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Áreas previstas (≤5):** especificação de autorização; matriz de decisões.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Critérios observáveis](../SPEC-autorizacao.md#critérios-observáveis); [Questões abertas](../SPEC-autorizacao.md#questões-abertas); [Fronteiras](../SPEC-autorizacao.md#fronteiras).
 
-- [ ] **2c — Aprovar dashboard, dados e estratégia de capacidade.**
-  **Aceite:** (1) definir métricas, unidade/período, escopo parcial de tribunal e regra de `*` para números negados; (2) decidir retenção/tratamento de dados pessoais do Escriba e distinção entre zero, falha e indisponível; (3) registrar que as metas de capacidade serão aprovadas após medição real e bloqueiam a entrega.
+- [x] **2c — Aprovar dashboard, dados e estratégia de capacidade.**
+  **Aceite:** (1) definir métricas, unidade/período, escopo parcial de tribunal e regra de `*`; (2) decidir tratamento dos dados do Escriba e distinção entre zero, falha e indisponível; (3) registrar 300 usuários como referência para avaliação futura, sem bloquear esta entrega.
   **Verificação comportamental:** revisão dos cenários de dashboard restrita, métrica parcial, falha persistente, retenção e estratégia de medição.
   **Smoke específico:** conferir uma tabela de métricas/estados com valores autorizados, negados (`*`), zero e falha, sem expor valor protegido.
   **Dep.:** 2b e 1c. **Escopo:** políticas e estratégia de capacidade, sem executar carga.
@@ -67,33 +69,36 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 ### 3. Definir stack e contratos
 
-- [ ] **3a — Decidir stack, arquitetura física e ferramentas.**
-  **Aceite:** (1) completar a stack central escolhida — Rails API-only, Next.js, PostgreSQL com RLS — com versões, ETL, layout, convenções, políticas RLS e comandos reais, conforme [registro técnico](../docs/stack.md); (2) mapear áreas e caminhos exatos dos arquivos/testes de cada fatia antes da execução; (3) redividir qualquer fatia que exija mais de cinco arquivos.
-  **Verificação comportamental:** revisão de que cada área física tem dono e que nenhum comando/caminho presumido entrou no checklist.
-  **Smoke específico:** percorrer um fluxo representativo do mapa até os arquivos/camadas definidos, sem criar código.
+- [x] **3a — Decidir stack, arquitetura física e ferramentas.**
+  **Aceite:** (1) registrar decisões de versões, ETL, layout, ferramentas, políticas RLS e comandos previstos; (2) mapear áreas físicas e responsáveis; (3) exigir caminhos exatos e subdivisão em até cinco arquivos antes de executar cada fatia. Comandos serão confirmados após geração da aplicação, sem presumir execução nesta etapa.
+  **Verificação comportamental:** revisar fronteiras e responsabilidades em [arquitetura](../docs/arquitetura.md) e [mapa físico](../docs/mapa-implementacao.md).
+  **Smoke específico:** exercício de mesa do fluxo de onboarding à consulta registrado em [arquitetura](../docs/arquitetura.md#verificação-de-arquitetura); não é execução da aplicação.
+  **Situação:** propostas registradas; compatibilidade, comandos reais e isolamento RLS exigem verificação durante implementação e antes de produção. O solicitante dispensou retenção automática do Escriba nesta etapa.
   **Dep.:** 1a–1c e 2a–2c. **Escopo:** decisão técnica, sem implementação.
   **Áreas previstas (≤5):** decisão de stack; arquitetura; convenções; estratégia de testes.
   **Rastreio:** [SPEC-identidade.md — Ambiente de implementação e teste: pendências bloqueantes](../SPEC-identidade.md#ambiente-de-implementação-e-teste-pendências-bloqueantes); [SPEC-autorizacao.md — Ambiente de implementação e teste: pendências bloqueantes](../SPEC-autorizacao.md#ambiente-de-implementação-e-teste-pendências-bloqueantes); [SPEC-monitoramentos.md — Ambiente de implementação e teste: pendências bloqueantes](../SPEC-monitoramentos.md#ambiente-de-implementação-e-teste-pendências-bloqueantes); [SPEC-escriba.md — Comandos, estrutura e estilo](../SPEC-escriba.md#comandos-estrutura-e-estilo); [SPEC-coleta.md — Comandos, estrutura e estilo](../SPEC-coleta.md#comandos-estrutura-e-estilo); [SPEC-consulta.md — Comandos, estrutura e estilo](../SPEC-consulta.md#comandos-estrutura-e-estilo); [CAPABILITIES.md — Mapa de capacidades: monitoramento jurídico](../CAPABILITIES.md#mapa-de-capacidades-monitoramento-jurídico).
 
-- [ ] **3b — Definir contratos entre aplicação e módulos lógicos.**
+- [x] **3b — Definir contratos entre aplicação e módulos lógicos.**
   **Aceite:** (1) definir contratos de identidade/tenant server-side, autorização, monitoramentos, coleta, estado por tribunal e consulta; (2) preservar planner/control plane e ETL como responsabilidades distintas da aplicação central sem impor serviço/processo/diretório; (3) definir entrada append-only do Escriba e manter estado/detalhes de falha fora dele.
   **Verificação comportamental:** revisão de contrato para tenant adulterado pelo cliente, vínculo de execução/entidade/tribunal e resposta autorizada.
   **Smoke específico:** seguir um diagrama de sequência de onboarding até consulta, identificando consumidor/dono de cada dado.
+  **Evidência:** contratos e sequência de revisão documental em [arquitetura](../docs/arquitetura.md#verificação-de-arquitetura).
   **Dep.:** 3a. **Escopo:** interfaces lógicas; transporte/formato só quando aprovados.
   **Áreas previstas (≤5):** contratos de identidade/autorização; monitoramentos; coleta/Escriba; consulta.
   **Rastreio:** [CAPABILITIES.md — Mapa de capacidades: monitoramento jurídico](../CAPABILITIES.md#mapa-de-capacidades-monitoramento-jurídico); [SPEC-identidade.md — Escopo e dono dos contratos](../SPEC-identidade.md#escopo-e-dono-dos-contratos); [SPEC-autorizacao.md — Escopo e dono dos contratos](../SPEC-autorizacao.md#escopo-e-dono-dos-contratos); [SPEC-monitoramentos.md — Escopo e dono dos contratos](../SPEC-monitoramentos.md#escopo-e-dono-dos-contratos); [SPEC-escriba.md — Escopo e contratos lógicos](../SPEC-escriba.md#escopo-e-contratos-lógicos); [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [SPEC-consulta.md — Escopo e contratos lógicos](../SPEC-consulta.md#escopo-e-contratos-lógicos).
 
-- [ ] **3c — Resolver decisões de domínio restantes antes de codificar.**
-  **Aceite:** (1) aprovar validação/normalização e correspondência de nome, OAB e processo, homônimos, duplicidade e filtros de tribunal; (2) decidir tratamento de `id`/`hash` ausente, inválido ou inconsistente sem alterar a chave conjunta aceita; (3) registrar explicitamente o que permanece fora do escopo sem presumir fluxo de convite, edição/remoção, e-mail ou recuperação histórica.
+- [x] **3c — Resolver decisões de domínio restantes antes de codificar.**
+  **Aceite:** (1) aprovar validação/normalização e correspondência de nome, OAB e processo, homônimos, duplicidade e filtros de tribunal; (2) decidir tratamento de `id`/`hash` ausente, inválido ou inconsistente sem alterar a chave conjunta aceita; (3) preservar o convite e edição/desativação aprovados, sem acrescentar exclusão de cadastro, relatórios/avisos por e-mail ou recuperação histórica.
   **Verificação comportamental:** revisão de casos limítrofes e fronteiras de cada spec; estabilidade/unicidade global de `id`/`hash` não é revalidada.
   **Smoke específico:** walkthrough de monitoramento com homônimo/filtro indisponível e publicação sem chave válida, confirmando decisão explícita para cada caso.
+  **Evidência:** regras e exercício de bordas em [monitoramentos](../SPEC-monitoramentos.md#contratos-lógicos), [coleta](../SPEC-coleta.md#deduplicação-e-vínculos) e [arquitetura](../docs/arquitetura.md#verificação-de-arquitetura).
   **Dep.:** 1a–1c, 2a–2c e 3b. **Escopo:** fechar pendências funcionais, sem ampliar produto.
   **Áreas previstas (≤5):** especificações de identidade, monitoramentos e coleta; decisões de domínio.
   **Rastreio:** [SPEC-identidade.md — Questões abertas](../SPEC-identidade.md#questões-abertas); [SPEC-monitoramentos.md — Requisitos](../SPEC-monitoramentos.md#requisitos); [Questões abertas](../SPEC-monitoramentos.md#questões-abertas); [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
 
 ## Checkpoint 1 — após decisões 1–3
-- [ ] Decisões bloqueantes resolvidas e alinhadas com a base funcional das seis specs; sem iniciar implementação antes da aprovação humana.
-- [ ] Feedback obrigatório do advisor recebido e apontamentos pertinentes tratados; aprovação humana registrada antes de avançar (`AGENTS.md`).
+- [x] Decisões dos gates 1–3 registradas; verificações de execução e retenção permanecem obrigatórias nas tarefas correspondentes.
+- [x] O solicitante autorizou resolver as decisões por recomendação e destravar o andamento; isso não equivale a aprovação de produção ou de resultados ainda não medidos.
 
 ## Implementação — tarefas 4–16
 
@@ -102,10 +107,11 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 - [ ] **4a — Persistir perfil profissional e tenant próprio.**
   **Aceite:** (1) onboarding registra nome completo, OAB principal e OABs secundárias informadas; (2) cada advogado pertence ao próprio tenant e escritório/nome comercial opcional não define tenant.
   **Verificação comportamental:** concluir onboarding e ler o perfil e tenant; comparar dois advogados/tenants sem inferir monitoramentos.
-  **Smoke específico:** primeiro acesso de advogado com OAB principal e sem OAB secundária, conferindo vínculo ao tenant próprio.
-  **Dep.:** 3a–3c. **Escopo:** onboarding, perfil profissional e vínculo ao tenant.
-  **Áreas previstas (≤5):** identidade; persistência de perfil; onboarding/interface.
+  **Smoke específico:** primeiro acesso pela API de advogado com OAB principal e sem OAB secundária, conferindo vínculo ao tenant próprio.
+  **Dep.:** 3a–3c. **Escopo:** backend de onboarding, perfil profissional e vínculo ao tenant; interface frontend fica para etapa posterior, conforme decisão do solicitante.
+  **Áreas previstas (≤5):** identidade; persistência de perfil; API de onboarding.
   **Rastreio:** [SPEC-identidade.md — Contratos lógicos](../SPEC-identidade.md#contratos-lógicos); [Requisitos](../SPEC-identidade.md#requisitos).
+  **Estado:** criação e leitura foram verificadas pela API em imagem runtime, com dois tenants e sessões de teste preparadas diretamente. O login Google real permanece pendente de cliente OAuth e callback HTTPS registrados; não foi comprovado o primeiro acesso completo com o provedor.
 
 - [ ] **4b — Derivar contexto autenticado no servidor.**
   **Aceite:** (1) cada operação protegida recebe identidade e tenant do contexto server-side; (2) tenant enviado pelo cliente não altera o contexto nem permite acesso cruzado; (3) contexto expirado não é apresentado como identidade válida.
@@ -114,6 +120,13 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 4a, 3b. **Escopo:** fronteira de identidade, sem decidir mecanismo de login além de 2a.
   **Áreas previstas (≤5):** identidade; contexto de requisição; autorização de tenant.
   **Rastreio:** [SPEC-identidade.md — Contratos lógicos](../SPEC-identidade.md#contratos-lógicos); [Fronteiras](../SPEC-identidade.md#fronteiras); [SPEC-autorizacao.md — Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos).
+  **Estado:** isolamento de leitura/escrita, sessão revogada, contexto aninhado e reutilização de conexão foram exercitados com a role runtime; revisão de ponta a ponta com Google real continua pendente.
+
+- [ ] **4c — Implementar interface de onboarding em etapa posterior.**
+  **Aceite:** interface Next.js integra login Google e onboarding ao backend, incluindo OAB principal, secundárias opcionais, escritório opcional e estados de erro/sucesso.
+  **Verificação:** navegar no navegador real e concluir o fluxo autenticado, respeitando as decisões de identidade e acessibilidade.
+  **Dep.:** 4a–4b. **Escopo:** frontend; não iniciar nesta etapa de backend.
+  **Áreas previstas (≤5):** interface de identidade; cliente da API; configuração do frontend.
 
 ### 5. Gestão de usuários e expiração
 
@@ -161,9 +174,16 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 ## Checkpoint 2 — após tarefas 4–6
 - [ ] Onboarding, expiração em sessão ativa, isolamento e regras de autorização demonstrados nos cenários propostos.
-- [ ] Feedback do advisor recebido/tratado e aprovação humana registrada antes de avançar.
+- [ ] Aprovação humana registrada antes de avançar.
 
 ### 7. Cadastro de partes
+
+**Primeiras fatias backend, antes de partes/processos e planejamento:**
+
+- Catálogo DJEN: `backend/test/integration/court_catalog_http_test.rb`, `backend/app/services/court_catalog.rb`, `backend/app/controllers/court_catalogs_controller.rb`, `backend/config/routes.rb`. Validar catálogo atual da fonte; indisponibilidade não vira lista vazia nem catálogo inventado. Durante o desenvolvimento, tráfego DJEN sai pelo nó Tailscale `100.118.186.77`; em produção Tailscale não é requisito e usa-se a saída normal da infraestrutura.
+- Advogado monitorado: `backend/test/integration/lawyer_monitoring_http_test.rb`, `backend/app/controllers/lawyer_monitorings_controller.rb`, `backend/config/routes.rb`. Projeção autenticada do perfil existente, incluindo OABs e tenant derivado no servidor; não duplicar o perfil nem liberar acesso de equipe sem autorização.
+
+Os cadastros de partes/processos e o planejador dependem dessas fronteiras e serão detalhados nas tarefas 7b, 8a e 10; frontend permanece adiado.
 
 - [ ] **7a — Fornecer ao monitoramento o perfil do advogado.**
   **Aceite:** (1) entidade advogado reflete nome e OABs da identidade; (2) não duplica perfil nem transforma escritório em tenant; (3) identidade e tenant ficam disponíveis à coleta.
@@ -172,6 +192,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 4a, 4b, 6b, 3b. **Escopo:** vínculo lógico de identidade ao monitoramento.
   **Áreas previstas (≤5):** identidade; monitoramentos; contrato de coleta.
   **Rastreio:** [SPEC-monitoramentos.md — Escopo e dono dos contratos](../SPEC-monitoramentos.md#escopo-e-dono-dos-contratos); [Requisitos](../SPEC-monitoramentos.md#requisitos); [Critérios observáveis](../SPEC-monitoramentos.md#critérios-observáveis).
+  **Estado:** projeção do perfil existente validada por testes de dois tenants; autorização de equipe e consumo no planejador ainda pendentes.
 
 - [ ] **7b — Cadastrar partes e filtros suportados.**
   **Aceite:** (1) cadastrar/ler nome de parte sob tenant autenticado; (2) oferecer somente filtros de tribunal disponibilizados e suportados pela fonte; (3) fornecer identidade lógica, tenant e dados de busca à coleta sem prometer matching não aprovado.
@@ -180,6 +201,8 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 7a, 3c, 6b. **Escopo:** cadastro e leitura de partes.
   **Áreas previstas (≤5):** monitoramentos; filtros de tribunal; interface de partes; contrato de coleta.
   **Rastreio:** [SPEC-monitoramentos.md — Escopo e dono dos contratos](../SPEC-monitoramentos.md#escopo-e-dono-dos-contratos); [Requisitos](../SPEC-monitoramentos.md#requisitos); [Questões abertas](../SPEC-monitoramentos.md#questões-abertas).
+  **Arquivos previstos:** `backend/test/integration/party_monitorings_http_test.rb`, `backend/db/migrate/20261028000001_create_party_monitorings.rb`, `backend/app/models/party_monitoring.rb`, `backend/app/controllers/party_monitorings_controller.rb`, `backend/config/routes.rb`. Cadastro, leitura, edição e desativação: tenant de sessão; nome canônico único inclusive desativado; filtro `null` equivale a todos, lista explícita não pode ser vazia e deve ser validada pelo catálogo real.
+  **Estado:** cadastro, leitura, edição, desativação e isolamento de dois titulares exercitados por HTTP com catálogo DJEN real; acesso de equipe/autorização 6b e consumo pelo planejador ainda pendentes.
 
 ### 8. Cadastro de processos
 
@@ -190,6 +213,8 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 6b, 3b, 3c. **Escopo:** cadastro e leitura de processos.
   **Áreas previstas (≤5):** monitoramentos; filtros de tribunal; interface de processos; contrato de coleta.
   **Rastreio:** [SPEC-monitoramentos.md — Escopo e dono dos contratos](../SPEC-monitoramentos.md#escopo-e-dono-dos-contratos); [Requisitos](../SPEC-monitoramentos.md#requisitos); [Questões abertas](../SPEC-monitoramentos.md#questões-abertas).
+  **Arquivos previstos:** `backend/test/integration/process_monitorings_http_test.rb`, `backend/db/migrate/20261028000002_create_process_monitorings.rb`, `backend/app/models/process_monitoring.rb`, `backend/app/controllers/process_monitorings_controller.rb`, `backend/config/routes.rb`. Cadastro, leitura, edição e desativação: tenant de sessão; CNJ canônico de 20 dígitos único inclusive desativado; filtros seguem as mesmas regras de 7b.
+  **Estado:** cadastro, leitura, edição, desativação e isolamento de dois titulares exercitados por HTTP com catálogo DJEN real; acesso de equipe/autorização 6b e consumo pelo planejador ainda pendentes.
 
 - [ ] **8b — Disponibilizar páginas e navegação autorizadas.**
   **Aceite:** (1) disponibilizar páginas de cadastro/leitura de partes e processos; (2) navegação entre esses cadastros respeita autorização também em acesso direto; (3) aplicar operações de ciclo de vida somente conforme aprovadas.
@@ -219,7 +244,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 ## Checkpoint 3 — após tarefas 7–9
 - [ ] Monitoramentos de advogado/parte/processo entregam tenant e identidade corretos; Escriba permanece append-only e sem ações/erros técnicos.
-- [ ] Feedback do advisor recebido/tratado e aprovação humana registrada antes de avançar.
+- [ ] Aprovação humana registrada antes de avançar.
 
 ### 10. Planejamento da coleta
 
@@ -230,6 +255,10 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 7a–7b, 8a, 4b, 9a. **Escopo:** trabalho planejado, sem ainda executar a fonte.
   **Áreas previstas (≤5):** planejador; contrato de monitoramentos; contexto de tenant; execução.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
+  **Fatia de persistência e planejamento:** `backend/test/integration/collection_planning_test.rb`, `backend/db/provision_planner.sql`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/planner/collection_planner.rb`, `README.md`. Um processo de confiança usa credencial PostgreSQL própria sem `BYPASSRLS`; somente ele pode ler os monitoramentos de todos os tenants para formar planos. Web continua restrito pela sessão. Cada execução por data/slot possui trabalhos imutáveis por tenant, entidade, tribunal e meio, com critérios fixados ao planejar; falha não é tratada como trabalho vazio.
+  **Fatia de integridade:** `backend/test/integration/collection_planning_test.rb`, `backend/db/migrate/20261028000004_add_collection_job_entity_integrity.rb`. As referências de advogado, parte e processo dos trabalhos devem pertencer ao mesmo tenant no banco, inclusive para escritas da role planner.
+  **Fatia de leitura:** `backend/test/integration/collection_runs_http_test.rb`, `backend/db/migrate/20261028000005_create_collection_run_audiences.rb`, `backend/planner/collection_planner.rb`, `backend/app/controllers/collection_runs_controller.rb`, `backend/config/routes.rb`. Audiência fixada por tenant mesmo sem trabalhos; respostas limitadas ao tenant autenticado. Documentar contrato no README; autorização de equipe permanece pendente de 6b.
+  **Estado:** geração e leitura por tenant verificadas em imagens finais com DJEN real, dois tenants e os três tipos de entidade; integração com Escriba (9a) e autorização de equipe (6b) continua pendente.
 
 - [ ] **10b — Agendar as duas execuções e manter fronteiras lógicas.**
   **Aceite:** (1) configurar dois acionamentos diários conforme horário/fuso/elegibilidade aprovados; (2) manter planner/control plane e ETL como responsabilidades distintas da aplicação central; (3) cada acionamento planejado tem identidade própria e associação à fonte/tribunal, sem executar ETL nesta fatia.
@@ -238,6 +267,10 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 10a, 1c, 3a–3b. **Escopo:** planejamento da agenda; execução completa da coleta em 13a, após 11.
   **Áreas previstas (≤5):** planejador; contrato de acionamento do ETL; execução; configuração da agenda.
   **Rastreio:** [CAPABILITIES.md — Mapa de capacidades: monitoramento jurídico](../CAPABILITIES.md#mapa-de-capacidades-monitoramento-jurídico); [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
+  **Fatia de agenda:** `backend/test/services/collection_schedule_test.rb`, `backend/planner/collection_schedule.rb`, `README.md`. Validar horários sem defaults e calcular slots devidos em `America/Sao_Paulo`. Execução independente: `backend/test/integration/planner_execution_test.rb`, `backend/planner/run.rb`, `backend/Dockerfile`, `README.md`, `tasks/todo.md`; não executar ETL nesta etapa.
+  **Fatia de virada de data:** `backend/test/integration/planner_execution_test.rb`, `backend/db/migrate/20261028000006_add_interrupted_planning_status.rb`, `backend/planner/collection_planner.rb`, `backend/planner/run.rb`, `README.md`. Não publicar nem retomar trabalhos de dia anterior após uma espera externa; identificar a interrupção sem executar coleta retroativa.
+  **Fatia da imagem mínima:** `backend/planner/Gemfile`, `backend/planner/Gemfile.lock`, `backend/planner/run.rb`, `backend/Dockerfile`, `README.md`. Instalar apenas as gems usadas pelo processo de planejamento, manter build em estágio separado e verificar a imagem final em execução como usuário não root.
+  **Estado:** duas execuções distintas foram geradas com o processo independente não root; testes cobriram retomada, concorrência, 429 e virada de data. Execução dos jobs e interrupção de jobs já planejados ao mudar o dia pertencem à tarefa 13, ainda não implementada.
 
 ### 11. Coleta e persistência reais
 
@@ -285,7 +318,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 ## Checkpoint 4 — após tarefas 10–12
 - [ ] Caderno principal, fallback paginado, estado por tribunal, deduplicação conjunta e vínculos demonstrados em cenários propostos, sem coleta histórica.
-- [ ] Feedback do advisor recebido/tratado e aprovação humana registrada antes de avançar.
+- [ ] Aprovação humana registrada antes de avançar.
 
 ### 13. Agenda e falhas
 
@@ -344,7 +377,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 ## Checkpoint 5 — após tarefas 13–15
 - [ ] Recuperação no mesmo dia, consulta, volumetrias, `*`, isolamento e diferença entre falha/zero demonstrados nos cenários propostos.
 - [ ] E-mail e outras fontes seguem fora da entrega.
-- [ ] Feedback do advisor recebido/tratado e aprovação humana registrada antes da verificação integrada.
+- [ ] Aprovação humana registrada antes da verificação integrada.
 
 ### 16. Verificação integrada e carga
 
@@ -356,14 +389,13 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Áreas previstas (≤5):** cenário integrado; monitoramentos/coleta; Escriba/estado; consulta/dashboard; autorização.
   **Rastreio:** [SPEC-identidade.md — Critérios observáveis](../SPEC-identidade.md#critérios-observáveis); [SPEC-autorizacao.md — Critérios observáveis](../SPEC-autorizacao.md#critérios-observáveis); [SPEC-monitoramentos.md — Critérios observáveis](../SPEC-monitoramentos.md#critérios-observáveis); [SPEC-escriba.md — Critérios de sucesso](../SPEC-escriba.md#critérios-de-sucesso); [SPEC-coleta.md — Critérios de sucesso](../SPEC-coleta.md#critérios-de-sucesso); [SPEC-consulta.md — Critérios de sucesso](../SPEC-consulta.md#critérios-de-sucesso); [CAPABILITIES.md — Mapa de capacidades: monitoramento jurídico](../CAPABILITIES.md#mapa-de-capacidades-monitoramento-jurídico).
 
-- [ ] **16b — Comprovar carga de 300 usuários simultâneos.**
-  **Aceite:** (1) medir linha de base e aprovar perfil de carga, duração, ambiente, limites de latência e taxa de erro; (2) exercitar perfil representativo com pelo menos 300 usuários simultâneos e avaliar os limites aprovados; (3) registrar resultado e condições de reprodução sem declarar capacidade antes da medição. Aprovação das metas e teste bloqueiam a entrega.
-  **Verificação comportamental:** executar o perfil aprovado e avaliar cada limite, incluindo operações protegidas e consultas representativas.
-  **Smoke específico:** cenário de carga configurado com exatamente o limite mínimo aprovado e verificação de sucesso/erro e isolamento entre tenants; comando somente após stack/ferramenta aprovadas.
-  **Dep.:** 16a, 2c, 3a. **Escopo:** medição de capacidade, sem inventar perfil, limiares ou comando.
+- [ ] **16b — Avaliar capacidade futuramente (não bloqueia esta entrega).**
+  **Referência:** 300 usuários simultâneos orientam o planejamento, sem constituir meta comprovada ou critério de aceite atual.
+  **Verificação futura:** definir perfil, ambiente, duração e limites; medir e registrar resultados antes de afirmar capacidade.
+  **Dep.:** aplicação implementada. **Escopo:** teste posterior de capacidade.
   **Áreas previstas (≤5):** cenário de carga; ferramenta/configuração aprovada; relatório de resultados.
   **Rastreio:** [SPEC-identidade.md — Questões abertas](../SPEC-identidade.md#questões-abertas); [SPEC-autorizacao.md — Questões abertas](../SPEC-autorizacao.md#questões-abertas); [SPEC-monitoramentos.md — Questões abertas](../SPEC-monitoramentos.md#questões-abertas); [SPEC-consulta.md — Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-consulta.md#questões-abertas-e-bloqueios).
 
 ## Checkpoint final — após tarefa 16
 - [ ] Critérios das seis specs e dependências do mapa demonstrados; registrar resultados e limitações, sem declarar concluído o que não foi exercitado.
-- [ ] Feedback obrigatório do advisor recebido e apontamentos pertinentes tratados; aprovação humana final registrada.
+- [ ] Aprovação humana final registrada.

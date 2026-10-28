@@ -1,12 +1,12 @@
 # Plano de implementação: monitoramento jurídico
 
-**Estado:** aprovado pelo solicitante. O advisor revisou este planejamento sem impedimentos para versionamento. As seis especificações funcionais também foram aprovadas; decisões técnicas e bloqueios abaixo continuam pendentes. A aprovação do plano não dispensa os gates 1–3 antes da implementação.
+**Estado:** plano aprovado; decisões documentais dos gates 1–3 registradas para permitir o início da implementação. Compatibilidade, segurança e capacidade ainda exigem verificação real.
 
 O [checklist canônico](todo.md) contém o aceite, a verificação proposta, as dependências e as áreas de arquivos por tarefa. Este plano organiza os IDs principais, seus gates, sequência, dependências e paralelização, sem duplicar o checklist.
 
 ## Base aprovada e especificações
 
-O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionais aprovadas são a referência de escopo. O solicitante definiu a [stack central](../docs/stack.md): Rails API-only, Next.js e PostgreSQL com RLS. Versões, arquitetura física, ETL, comandos e critérios operacionais continuam pendentes.
+O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionais são a referência de escopo. Stack e arquitetura propostas constam de [stack](../docs/stack.md) e [arquitetura](../docs/arquitetura.md); comandos e caminhos específicos serão verificados em cada fatia.
 
 | Módulo | Especificação aprovada |
 |---|---|
@@ -19,27 +19,27 @@ O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionai
 
 ## Gate antes de qualquer implementação
 
-Os IDs **1–3** são trabalho de validação e decisão, não implementação. Nenhuma tarefa de implementação pode começar até que esses gates estejam concluídos, este plano seja aprovado e o feedback obrigatório do advisor seja recebido.
+Os IDs **1–3** são decisões documentais anteriores à implementação e estão registrados no checklist. Comandos e caminhos exatos serão confirmados por fatia após criação da aplicação.
 
-- **1–2:** resolver as evidências e decisões de fonte, segurança e política de dados descritas no checklist. Os critérios numéricos de capacidade serão aprovados após medir uma linha de base real e bloqueiam a entrega, não o início da implementação.
+- **1–2:** decisões de fonte, segurança e dados registradas no checklist. Capacidade de 300 usuários é referência para avaliação futura, sem bloquear esta entrega.
 - **3:** completar decisões da stack já escolhida, versões, arquitetura física, limites entre componentes, políticas RLS, contratos compartilhados e ferramentas/comandos de desenvolvimento e verificação. Definir estrutura e caminhos concretos somente após essas decisões.
 - Confirmar que os contratos e escopos de cada tarefa permanecem dentro das seis especificações aprovadas. Mudanças de escopo exigem aprovação, não são presumidas pelo plano.
 
 ## Ordem vertical e checkpoints
 
-Executar as fatias em ordem de dependência. IDs são os principais do checklist; se uma fatia exceder o limite de 3–5 arquivos, subdividi-la em subtarefas `a`, `b`, `c` dentro do mesmo ID, sem renumerar os IDs principais. O checklist registra áreas de arquivos; caminhos físicos de código ficam pendentes do gate 3 e não são inventados aqui.
+Executar as fatias em ordem de dependência. IDs são os principais do checklist; se uma fatia exceder 3–5 arquivos, subdividi-la em subtarefas dentro do mesmo ID. Registrar caminhos exatos antes de executar cada fatia.
 
 ### Fase 0 — Resolver bloqueios
 
 - **IDs 1 e 2:** podem avançar parcialmente em paralelo; a decisão do subitem 1c deve estar concluída antes do subitem 2c. Ambos são pré-requisitos do ID 3.
 - **ID 3:** fechar as decisões técnicas e os contratos necessários para as fatias seguintes.
 
-**Checkpoint após 1–3:** registrar decisões e evidências pendentes resolvidas; obter aprovação deste plano e feedback do advisor. Sem isso, não iniciar implementação.
+**Checkpoint após 1–3:** decisões registradas e andamento autorizado pelo solicitante. Verificações de execução e segurança continuam obrigatórias durante a implementação.
 
 ### Fase 1 — Identidade e autorização
 
-- **ID 4:** onboarding do advogado e contexto de identidade/tenant.
-- **ID 5:** usuários e validade da credencial, após ID 4.
+- **ID 4:** endpoints de onboarding do advogado e contexto de identidade/tenant no backend. A interface frontend fica para etapa posterior e não bloqueia as próximas fatias de backend.
+- **ID 5:** usuários e validade da credencial, após os contratos de backend de 4a–4b.
 - **ID 6:** grupos e escopos, após ID 5.
 
 **Checkpoint após 4–6:** rever os contratos de identidade, validade, tenant e autorização antes de liberar os consumidores.
@@ -69,9 +69,9 @@ Executar as fatias em ordem de dependência. IDs são os principais do checklist
 
 ### Fase 5 — Validação integrada
 
-- **ID 16:** validação ponta a ponta, isolamento e requisito de 300 usuários simultâneos, após IDs 14 e 15.
+- **ID 16:** validação ponta a ponta e isolamento após IDs 14 e 15; teste de capacidade fica para o futuro e não bloqueia a entrega.
 
-**Checkpoint final após 16:** avaliar os critérios mensuráveis aprovados, registrar resultados e obter revisão humana. Este checkpoint não presume aprovação enquanto os gates ou feedback obrigatório estiverem pendentes.
+**Checkpoint final após 16a:** avaliar os critérios funcionais, registrar resultados e obter revisão humana; a avaliação futura de capacidade em 16b não bloqueia esta entrega.
 
 ## Grafo de dependências
 
@@ -115,8 +115,8 @@ flowchart LR
 | identidade | 4–5 | Mecanismo de login e identidade para usuários da equipe; aplicação da validade às credenciais e sessões; início, fuso e instante de expiração; validações de nome/OAB. |
 | autorização | 5–6, 14–15 | Composição e conflitos entre grupos; operações e concessões de escrita; escopo de tribunal e dashboard; ações de gestão de usuários/grupos; proteção das respostas e agregações. |
 | monitoramentos | 7–8 | Validação e normalização de nome/OAB/número, duplicidades, ciclo de vida; tribunais realmente disponíveis e semântica de filtros; política de correspondência e homônimos, sem presumir algoritmo. |
-| Escriba | 9 | Esquema lógico e granularidade dos marcos; identificação de execução e dados disponíveis; retenção e tratamento de dados pessoais. Não registrar ações de usuários nem detalhes de erro. |
-| coleta | 1, 10–13 | Evidência do contrato da fonte; critérios de tribunal/meio e elegibilidade; horários, fuso e interrupções; validade do ZIP/JSON e semântica da paginação; acionamento do fallback; limites de tentativas/backoff; estados de falha e tratamento de chaves ausentes/inválidas. |
+| Escriba | 9 | Esquema e granularidade dos marcos; contexto de execução; isolamento e proteção append-only. Não registrar ações de usuários nem detalhes de erro; sem expurgo automático nesta etapa. |
+| coleta | 1, 10–13 | Critérios de tribunal e elegibilidade; horários e interrupções; validação do ZIP/JSON; demais critérios de falha do caderno; configuração de tentativas/backoff; estados de falha e tratamento de chaves ausentes/inválidas. A regra de paginação do fallback está definida na especificação de coleta. |
 | consulta | 14–15 | Definição de métricas, unidade e janelas; comportamento de agregações sob escopo parcial; campos efetivamente fornecidos pela fonte; apresentação de falha distinta de zero e de números sem autorização. |
 | transversal | 3, 16 | Stack central escolhida: Rails API-only, Next.js e PostgreSQL/RLS. Faltam versões, stack de ETL, políticas/roles RLS, caminhos de código, arquitetura/transportes, comandos/ferramentas e metas de carga de 300 usuários. |
 
@@ -139,9 +139,9 @@ Não paralelizar tarefas com dependência direta nem alterações concorrentes a
 | Divergência de nome, homônimos ou filtro por processo pode causar resultados indevidos ou ausentes. | Manter critérios de correspondência e semântica da fonte como decisões explícitas; não inventar normalização nem tratar uma amostra como garantia geral. |
 | `id` e `hash` podem não ter estabilidade/unicidade global comprovada. | Tratar estabilidade como premissa limitada; deduplicar apenas pela combinação conjunta, por tenant e DJEN, preservando vínculos e sem fundir por processo/tribunal. |
 | Horários, fuso, critérios de fallback e política de tentativas ainda não definidos. | Aprovar elegibilidade, condições e limites antes de configurar execução; não inferir quantidade, intervalos ou recuperação de dias anteriores. |
-| Dados pessoais em registros imutáveis e política de retenção pendente. | Resolver retenção no desenho do Escriba; manter o escopo append-only e excluir ações de usuário e detalhes de erro. |
+| Dados pessoais em registros imutáveis, ainda que públicos. | Minimizar dados registrados, manter isolamento e avaliar obrigações legais aplicáveis antes de produção. |
 | Regras de grupo e dashboard podem permitir exposição indevida ou bloquear acesso esperado. | Definir composição e escopos; aplicar decisões no servidor a listas, detalhes, respostas e agregações, preservando as regras funcionais aprovadas. |
-| Requisito de 300 simultâneos não tem perfil ou limites mensuráveis. | Aprovar perfil de carga, latência, erro e ambiente antes do teste; não afirmar conformidade sem resultado reproduzível. |
+| Capacidade para 300 usuários não foi medida. | Tratar 300 como referência e planejar teste futuro; não afirmar capacidade sem medição. |
 | Versões, ETL, políticas RLS, caminhos e comandos ainda não definidos. | Completar ID 3 a partir da stack central escolhida; depois fixar caminhos reais, limitar cada fatia a 3–5 arquivos e subdividir acima desse limite. |
 
 ## Fronteiras e execução
@@ -150,4 +150,6 @@ Manter o escopo das seis especificações: DJEN como fonte lógica, cadernos ZIP
 
 `dev` é a base das features; quando os gates liberarem a implementação, cada feature parte de `dev` em `feature/<nome>` e integra após revisão. Os caminhos físicos de código e comandos ficam pendentes do ID 3; não os inventar neste plano.
 
-As verificações do [checklist](todo.md) são propostas e ainda não foram executadas. Nenhum comando de build, teste, lint ou formatação foi presumido. A conclusão de cada etapa e a entrega final também dependem do feedback do advisor, conforme [AGENTS.md](../AGENTS.md).
+A implementação incremental segue a regra de `source-driven-development` do [checklist](todo.md#regras-de-execução-e-rastreio): verificar versões e documentação oficial antes das decisões dependentes de tecnologia, registrar fontes e validar o comportamento em execução.
+
+As verificações do [checklist](todo.md) são propostas e ainda não foram executadas. Nenhum comando de build, teste, lint ou formatação foi presumido.

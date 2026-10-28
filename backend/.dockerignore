@@ -1,0 +1,16 @@
+.git
+.github
+.agents
+.bundle
+.env
+.env.*
+*.pem
+*.key
+config/master.key
+config/credentials*.yml.enc
+log
+tmp
+vendor
+coverage
+*.md
+Dockerfile*

@@ -7,7 +7,7 @@
 - Banco de dados: PostgreSQL com Row-Level Security (RLS).
 - Tenant: advogado independente, não escritório; RLS deve preservar esse isolamento.
 
-As versões centrais selecionadas estão documentadas abaixo. Bibliotecas adicionais, hospedagem, estrutura de pastas, linguagem dos coletores/ETL, fila e infraestrutura continuam pendentes. Por instrução expressa do solicitante, este trabalho é **somente documental: não instalar runtimes, pacotes, dependências ou containers nesta máquina**. Não gerar a aplicação nem executar instalação, build ou testes de integração.
+As versões centrais selecionadas estão documentadas abaixo. [Arquitetura e contratos propostos](arquitetura.md) escolhem Ruby para planejador e ETL, layout e ferramentas; dependências exatas e deploy continuam sujeitos a validação. Por instrução do solicitante, runtimes e dependências não devem ser instalados no host: a implementação e as verificações usam Docker. O frontend fica para uma etapa posterior.
 
 ## Versões selecionadas
 
@@ -19,11 +19,11 @@ Referência da consulta: 28/10/2026. Seleção de releases estáveis documentada
 | Ruby on Rails | 8.1.4, somente API-only | [Metadados exatos do gem](https://rubygems.org/api/v2/rubygems/rails/versions/8.1.4.json): publicado em 24/09/2026, `prerelease: false`, requisito Ruby `>= 3.2.0` |
 | Next.js | 16.4.1 | [Atualização oficial de segurança de 14/10/2026](https://nextjs.org/blog/nextjs-security-update-october-14-2026): versão corrigida da linha Active LTS |
 | PostgreSQL | 18.6, com RLS | [Política oficial de versões](https://www.postgresql.org/support/versioning/): minor atual da linha 18, suportada até novembro de 2030 |
-| Node.js, referência de runtime do frontend | Linha 24 LTS; patch ainda não fixado | [Estado de suporte](https://nodejs.org/en/about/previous-releases); [requisito do Next.js 16](https://nextjs.org/docs/app/guides/upgrading/version-16): Node.js `>= 20.9.0` |
+| Node.js, referência de runtime do frontend | 24.22.1 LTS | [Anúncio oficial](https://nodejs.org/en/blog/release/v24.22.1); [requisito do Next.js 16](https://nextjs.org/docs/app/guides/upgrading/version-16): Node.js `>= 20.9.0` |
 
-Ruby 4.0.9 satisfaz o requisito numérico do gem Rails 8.1.4. Isso não substitui uma matriz explícita de suporte nem demonstra funcionamento em execução. A linha Node.js 24 LTS satisfaz o mínimo documentado do Next.js 16; a versão exata do runtime e as dependências React/adapter PostgreSQL precisam ser fixadas no futuro contrato de dependências, sem instalar nada agora.
+Ruby 4.0.9 satisfaz o requisito numérico do gem Rails 8.1.4. Isso não substitui uma matriz explícita de suporte. Node.js 24.22.1 satisfaz o mínimo documentado do Next.js 16; suas dependências serão fixadas na etapa de frontend.
 
-Estas são versões de referência para a aplicação central. Não definem versões ou tecnologias do planejador, ETL ou de um Escriba independente. Não houve instalação, inicialização de banco, geração de lockfiles, migration, teste de RLS ou smoke da integração Rails–Next.js–PostgreSQL. A compatibilidade operacional permanece não verificada.
+As versões de referência também se aplicam ao runtime Ruby proposto para planejador e ETL. Em teste local descartável, PostgreSQL 18.6 inicializou como UID 70 e preservou dados após reinicialização; uma aplicação Rails API-only temporária executou teste de persistência contra esse banco. Isso não comprova o funcionamento da aplicação do repositório, da imagem final ou a integração futura com Next.js.
 
 ## Referências oficiais consultadas
 
@@ -37,7 +37,7 @@ RLS não substitui autenticação Google, expiração/revogação de acesso ou p
 
 A documentação PostgreSQL informa que superusuários e roles `BYPASSRLS` ignoram RLS; o proprietário normalmente também ignora as políticas, salvo `FORCE ROW LEVEL SECURITY`. O desenho deve separar administração/migração da role de execução e verificar isolamento usando a role real da aplicação, não uma role que contorne RLS.
 
-O contexto de tenant precisa ser delimitado a cada operação/transação, sem vazar entre requisições ou jobs que reutilizem conexões. Detalhes da integração Rails/pool/worker e das políticas serão definidos no contrato técnico, não nesta escolha de stack.
+O contexto de tenant deve ser delimitado a cada transação, sem vazar entre requisições ou jobs que reutilizem conexões; a proposta de roles e políticas está em [arquitetura](arquitetura.md#isolamento-e-privilégios) e deve ser verificada na implementação.
 
 RLS não protege operações de tabela inteira como `TRUNCATE`, segundo a documentação. Portanto, não é suficiente sozinho para garantir o Escriba append-only: permissões de operação e proteção contra alteração/exclusão precisam de desenho próprio.
 
@@ -48,4 +48,4 @@ RLS não protege operações de tabela inteira como `TRUNCATE`, segundo a docume
 - Ausência de contexto confiável de tenant não deve ampliar acesso.
 - Negação de tribunal/dashboard e revogação/expiração precisam continuar efetivas independentemente de RLS.
 
-São critérios de verificação futura; não há banco, políticas ou aplicação implementados nem testes desses comportamentos executados.
+São critérios de verificação para a aplicação implementada; o teste local descartável mencionado acima não comprova todos esses comportamentos.
