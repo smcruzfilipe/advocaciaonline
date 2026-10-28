@@ -24,7 +24,7 @@ Permitir que usuários autorizados consultem comunicações coletadas para seu t
 3. As comunicações são exibidas individualmente e agrupadas por tribunal. Abrir uma comunicação apresenta tribunal, número de processo e conteúdo que a fonte forneceu.
 4. Ao receber acesso negado à dashboard, a interface apresenta `*` nos números; não revela valores negados por meio de agregação, resposta de dados ou rota alternativa.
 5. Quando uma coleta falha persistentemente, a dashboard identifica o tribunal falho. O evento não é contado nem rotulado como zero publicações.
-6. As volumetrias refletem a definição de período e unidade que vier a ser aprovada; até então não se fixam resultados numéricos nem semântica de contagem.
+6. Mostrar separadamente comunicações novas persistidas e números de processo distintos aos quais essas comunicações pertencem, nos períodos selecionados. Uma comunicação já persistida não volta a contar como novidade quando reencontrada por outro monitoramento, pelo fallback ou por outra execução. As contagens respeitam tenant e tribunais autorizados.
 7. O requisito de 300 usuários simultâneos só pode ser aceito como comprovado depois de definidos critérios de desempenho mensuráveis e exercitado um perfil de carga representativo.
 
 ## Comandos, estrutura e estilo
@@ -53,8 +53,8 @@ Cenários abaixo expressam contratos observáveis, sem assumir framework, comand
 ## Questões abertas e bloqueios
 
 - Decisões resolvidas: concessões de grupos se somam e negação explícita prevalece. Acesso à dashboard não amplia o escopo de tribunais: usuário restrito ao TJSP vê apenas volumetrias e avisos do TJSP, conforme escolha do solicitante. Formatos técnicos das regras permanecem no contrato de autorização.
-- Quais métricas são necessárias e qual a unidade de contagem: comunicação, processo, execução ou outra? Como tratar publicações repetidas?
-- Quais são as janelas de “dia”, “semana” e “últimos sete dias”, seu fuso e limites inclusivos? Essas definições não devem ser presumidas equivalentes.
+- Métricas aprovadas: comunicações novas persistidas e processos distintos associados a elas, sem contar duplicatas como novidades. A referência temporal técnica da primeira persistência deve constar do contrato de consulta.
+- Períodos aprovados no fuso `America/Sao_Paulo`: hoje desde 00h; semana civil desde segunda-feira às 00h; últimos sete dias de calendário incluindo hoje e os seis anteriores. Todos terminam no instante da consulta. A implementação deve delimitar esses intervalos sem dupla contagem nas fronteiras.
 - Qual conteúdo da fonte é exibido integralmente e como o módulo lida com campos ausentes? O detalhe não deve prometer campos não fornecidos pela fonte.
 - Como a consulta distingue coleta parcial, falha persistente e coleta bem-sucedida sem resultados?
 - Para validar 300 usuários simultâneos: quais latências, taxa de erro, perfil de uso, duração e ambiente são aceitáveis?
