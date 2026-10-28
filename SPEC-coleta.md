@@ -17,7 +17,8 @@ Planejar e executar duas coletas diárias de publicações do DJEN para os tenan
 - Meios aprovados pelo solicitante: **Diário Eletrônico (`D`) e Edital (`E`)**, em ambas as coletas diárias, para os tribunais monitorados. Não adicionar configuração de meios por advogado.
 - Se o problema no caderno persistir após esgotar as tentativas do caminho principal, usar a consulta de comunicações paginada como fallback, enviando `dataDisponibilizacaoInicio` e `dataDisponibilizacaoFim` iguais ao dia corrente. Percorrer as páginas necessárias segundo o contrato efetivo da fonte. Cadernos e API são caminhos de acesso à mesma fonte lógica, DJEN. Quantidade de tentativas e intervalos de backoff permanecem pendentes.
 - Normalizar e persistir comunicações, vínculos aos monitoramentos que as encontraram e estado por execução/tribunal. Uma falha persistente deve permanecer distinguível de zero publicações e permitir aviso por tribunal na dashboard. Uma execução posterior no mesmo dia pode recuperar publicações; não há recuperação automática de dias anteriores.
-- Após falhas, fazer novas tentativas com backoff. Não estão definidos quantidade de tentativas, intervalos, limites ou condições exatas de parada; nenhum número fica implícito nesta especificação.
+- Após falhas, fazer novas tentativas com backoff. Limite de tentativas e intervalos são definidos por variáveis de ambiente, conforme decisão do solicitante, sem números fixos no código. Nomes, unidades, formato e validações dessas variáveis permanecem pendentes do contrato técnico.
+- Após reinício do worker ou interrupção, retomar automaticamente as pendências da data corrente em `America/Sao_Paulo`, preservando planejamento, vínculos e deduplicação. Pendências de datas anteriores não são retomadas automaticamente.
 
 ## Deduplicação e vínculos
 
@@ -64,7 +65,7 @@ São cenários propostos de contrato, não repetição de teste da fonte externa
 
 ## Questões abertas e bloqueios
 
-- Quais nomes e formato das variáveis de horários, elegibilidade e comportamento após interrupção? O fuso de agenda e data corrente já está fixado em `America/Sao_Paulo`.
+- Quais nomes, unidades, formato e validações das variáveis de horários, tentativas e backoff? Como determinar elegibilidade e representar pendências de execução? O fuso está fixado em `America/Sao_Paulo` e a retomada automática é limitada às pendências do dia corrente.
 - Quais tribunais são aplicáveis a cada entidade, e como a fonte indica ZIP inválido, indisponível, incompleto ou resposta válida sem itens? Os meios já estão definidos: D e E.
 - Como classificar os problemas do caderno e definir o esgotamento de tentativas antes do fallback? Quais são a semântica de paginação, limites e disponibilidade efetiva da API? O filtro por processo não foi comprovado de forma geral; evidência inconclusiva está documentada na especificação geral.
 - Quais regras de normalização e correspondência resolvem homônimos, acentos, pontuação e variações de nome/OAB/processo sem ampliar indevidamente os resultados?
