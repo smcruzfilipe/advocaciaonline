@@ -52,7 +52,7 @@ Cenários abaixo expressam contratos observáveis, sem assumir framework, comand
 
 ## Questões abertas e bloqueios
 
-- Como se compõem permissões de vários grupos, restrições por operação e tribunal? Como a permissão de dashboard interage com um escopo parcial de tribunais?
+- Decisões resolvidas: concessões de grupos se somam e negação explícita prevalece. Acesso à dashboard não amplia o escopo de tribunais: usuário restrito ao TJSP vê apenas volumetrias e avisos do TJSP, conforme escolha do solicitante. Formatos técnicos das regras permanecem no contrato de autorização.
 - Quais métricas são necessárias e qual a unidade de contagem: comunicação, processo, execução ou outra? Como tratar publicações repetidas?
 - Quais são as janelas de “dia”, “semana” e “últimos sete dias”, seu fuso e limites inclusivos? Essas definições não devem ser presumidas equivalentes.
 - Qual conteúdo da fonte é exibido integralmente e como o módulo lida com campos ausentes? O detalhe não deve prometer campos não fornecidos pela fonte.

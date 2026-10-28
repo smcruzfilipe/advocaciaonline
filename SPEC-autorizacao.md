@@ -21,7 +21,7 @@ A administração por usuário advogado e o conceito de grupos são requisitos. 
 - **Dashboard negada:** quando o advogado negar acesso à dashboard, os números correspondentes aparecem como `*`; o valor numérico não pode vazar por API, agregação, cache ou outra resposta ao usuário sem acesso.
 - **Fronteiras:** identidade determina quem é o ator e a qual tenant pertence; autorização determina o acesso; cada módulo consumidor continua responsável por filtrar as próprias respostas segundo a decisão recebida.
 
-A regra de composição de grupos ainda não foi decidida. A descrição de `Consulta TJSP` acima não resolve o efeito de outros grupos simultâneos.
+Composição aprovada pelo solicitante: somar as permissões concedidas pelos grupos, com **negação explícita prevalecendo** sobre concessões para a mesma operação e escopo. Ausência de concessão não é negação explícita. Com grupos associados, a leitura ampla padrão de usuários sem grupo não é somada às permissões. Exemplo: leitura TJSP e leitura TJRJ permitem ambos; uma negação explícita de dashboard prevalece mesmo que outro grupo conceda esse acesso. Nenhuma combinação ultrapassa o tenant autenticado.
 
 ## Requisitos
 
@@ -42,6 +42,8 @@ A regra de composição de grupos ainda não foi decidida. A descrição de `Con
 - Para uma identidade sem acesso à dashboard, os números são mostrados como `*`, e inspeção das respostas de servidor não revela os números numéricos protegidos.
 - Uma tentativa de consultar recurso de outro tenant não tem sucesso, mesmo que o cliente conheça ou envie um identificador válido desse recurso.
 - Uma restrição por tribunal continua efetiva ao abrir detalhe, consultar API e receber agregações, e não apenas na listagem inicial.
+- Grupos de leitura TJSP e TJRJ juntos permitem ambos; adicionar negação explícita de leitura TJRJ mantém apenas TJSP. Não confundir ausência de concessão de um grupo com negação explícita.
+- Se um grupo concede dashboard e outro a nega explicitamente, os números permanecem protegidos e aparecem como `*`.
 
 ## Ambiente de implementação e teste: pendências bloqueantes
 
@@ -50,21 +52,21 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 - **Comandos:** build, execução de testes, lint e desenvolvimento local — não definidos; nenhum comando é proposto.
 - **Estrutura:** diretórios de aplicação, testes e configuração — não definidos.
 - **Estilo:** não há código real que sirva de referência. Convenções e snippet só podem ser definidos após a escolha da stack e do repositório de implementação.
-- **Estratégia de teste:** framework, localização e comandos são pendências. Os testes de aceitação devem cobrir isolamento por tenant, decisão de acesso por tribunal/operação, regra sem grupo, grupo `Consulta TJSP`, dashboard com `*` e não exposição dos valores em respostas e agregações. Testar também combinações de grupos após a regra de composição ser decidida. Não inventar os testes antes de resolver essa regra.
+- **Estratégia de teste:** framework, localização e comandos são pendências. Cobrir isolamento por tenant, decisão por tribunal/operação, padrão sem grupo, `Consulta TJSP`, união de concessões e precedência de negação explícita, inclusive dashboard com `*` sem exposição por respostas ou agregações.
 - **Limite de desempenho compartilhado:** a aplicação central deve suportar ao menos 300 usuários simultâneos; perfil, latências-alvo, ambiente e taxa de erro continuam pendentes na [especificação geral](docs/especificacao.md).
 
 ## Fronteiras
 
 - **Sempre:** aplicar autorização no servidor e ao conjunto de dados; manter a leitura ampla sem grupo sem convertê-la em escrita implícita; garantir o escopo TJSP do grupo `Consulta TJSP`; não revelar números de dashboard negada; usar tenant autenticado de identidade.
-- **Pedir aprovação:** definir composição e conflito de grupos, operações e concessões de escrita, escopo das métricas/dashboard, ciclo de vida de usuários/grupos e apresentação/contrato técnico das decisões.
+- **Pedir aprovação:** alterar união de concessões com prevalência de negação explícita; definir operações e concessões de escrita, escopo das métricas/dashboard, ciclo de vida de usuários/grupos e apresentação/contrato técnico das decisões.
 - **Nunca:** inventar níveis fixos, roles ou permissões; confiar em IDs/tenant enviados pelo cliente para conceder acesso; tratar controles ocultos como autorização; vazar números de dashboard negada; ampliar o grupo `Consulta TJSP` para outros tribunais ou escrita.
 
 ## Questões abertas
 
-1. Como se compõem vários grupos, resolvem-se conflitos e tratam-se usuários sem grupo que recebam regras diretas?
+1. Existirão regras atribuídas diretamente a usuários além das regras de grupos? Esse mecanismo e sua precedência não foram aprovados; a composição entre grupos já está definida.
 2. Quais operações existem e quais concessões de leitura/escrita cada uma exige? Qual regra se aplica à escrita até essa matriz ser definida?
-3. O que exatamente compõe o escopo da dashboard e das métricas quando há acesso a apenas alguns tribunais? Como agregações parciais são calculadas?
+3. Escopo parcial definido pelo solicitante: dashboard, métricas e avisos respeitam os tribunais autorizados; acesso à dashboard não concede acesso a agregados de outros tribunais. Quais métricas e janelas serão usadas ainda precisa ser definido.
 4. Quais ações de ciclo de vida o advogado pode executar para usuários e grupos? Como usuários de equipe obtêm identidade e credencial, sem presumir fluxo de convite?
 5. O acesso `*` cobre todos os números da dashboard ou somente indicadores definidos? Como distinguir valores indisponíveis por autorização de zero/falha sem vazar dados?
-6. Como a regra sem grupo interage com `Consulta TJSP` se existirem outros grupos ou regras simultâneas?
+6. Qual representação distinguirá concessão, negação explícita e ausência de regra, preservando a leitura ampla somente para usuários sem grupo?
 7. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
