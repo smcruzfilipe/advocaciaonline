@@ -9,19 +9,21 @@ Manter um registro imutável e consultável do fluxo de coleta, com os marcos de
 ## Escopo e contratos lógicos
 
 - **Responsabilidade:** aceitar e acrescentar registros do fluxo de coleta; não os alterar nem excluir.
-- **Dependência do mapa:** `identidade`. O contexto de execução deve estar vinculado ao usuário/tenant autenticado e imposto no servidor. Tenant enviado pelo cliente, isoladamente, não comprova acesso. RLS é uma camada adicional: não substitui autorização/RBAC nem a derivação server-side do tenant.
+- **Dependência do mapa:** `identidade`. Chamadas humanas usam usuário e tenant autenticados no servidor; o worker usa identidade de serviço com privilégios mínimos e deriva o tenant de trabalho persistido, reivindicado por interface controlada, nunca de parâmetro externo isolado. A transação estabelece esse tenant antes de gravar; trabalho inexistente ou inconsistente é recusado. RLS complementa, mas não substitui autorização ou contexto confiável.
 - **Consumidor lógico:** `coleta` (`SPEC-coleta.md`). A fronteira não exige serviço, processo, armazenamento ou transporte independente.
-- **Dados mínimos do fluxo, quando disponíveis:** início ou término, execução, tenant, fonte lógica, entidade/monitoramento, advogado, tribunal e processos associados. Fonte e execução devem permitir distinguir ocorrências; o formato e a cardinalidade desses dados não estão definidos.
-- O Escriba registra cada marco como nova informação. Não sobrescreve um registro anterior para refletir estado posterior. O prazo de retenção será configurável por variável de ambiente; seu nome, formato, valor padrão e procedimento de expurgo ainda serão definidos na implementação. Imutabilidade nas operações normais não impede o tratamento administrativo de retenção.
-- Não recebe ações de usuários nem detalhes de erro. Tratamento de falhas técnicas e seu estado por execução/tribunal pertencem a outros contratos; um registro do Escriba não substitui esse estado.
+- **Dados mínimos:** cada marco usa instante de registro confiável e, quando disponíveis, execução, tenant, fonte lógica, referência interna da entidade/monitoramento, advogado, tribunal e processos associados. Não registrar nomes, números de OAB ou de processo em claro, conteúdo da comunicação, e-mail, segredo ou dado desnecessário.
+- **Acréscimo e retenção:** marcos não são sobrescritos ou removidos por operações normais. Por decisão do solicitante, não há prazo automático de retenção ou expurgo nesta etapa; não presumir exclusão de registros ou cópias por tempo.
+- **Cópias:** backup, restauração e acesso seguem os controles de segurança e isolamento do ambiente. A ausência de prazo automático não implica que dados públicos deixem de ser dados pessoais nem determina sua situação jurídica.
+- **Consulta:** apenas o advogado titular pode consultar marcos do próprio tenant; não há acesso de equipe nem concessão por grupo nesta entrega. Listas, detalhes e agregações aplicam o mesmo controle server-side, inclusive para referências sem tribunal.
 
 ## Requisitos e critérios observáveis
 
-1. Ao iniciar e concluir um fluxo de coleta, cada marco ocorrido é registrado como acréscimo, com os dados relevantes disponíveis enumerados acima.
-2. Um tenant não pode ser escolhido como prova de autorização por dado controlado pelo cliente; o contexto confiável deve vir da identidade imposta pelo servidor.
-3. Depois de gravado, um registro não pode ser editado ou removido por operações normais do produto. Uma nova informação não modifica o histórico anterior. RLS, por si só, não assegura essa imutabilidade; permissões e operações capazes de alterar ou remover registros precisam de proteção própria antes da implementação (ver [stack](docs/stack.md)).
-4. Registros do Escriba não contêm ações de usuários nem detalhes de erro técnico. A ocorrência e o estado da falha são tratados separadamente.
-5. A ausência de um marco de término não deve ser preenchida por inferência ou por alteração retroativa do registro de início.
+1. Cada marco de início ou término ocorrido é acrescentado com instante de registro e dados mínimos de rastreio disponíveis; nenhum marco anterior é sobrescrito.
+2. Tenant é derivado do contexto confiável no servidor. Tenant enviado pelo cliente não autoriza nem desloca um registro.
+3. Uma vez gravado, o registro não pode ser editado ou removido por operações normais do produto. RLS não basta para assegurar append-only; operações e permissões capazes de alterar/remover exigem proteção própria (ver [stack](docs/stack.md)).
+4. Registros não contêm ações de usuários, conteúdo de comunicações, identificadores pessoais diretos ou detalhes técnicos de erro. Referências internas necessárias podem constituir dados pessoais e permanecem protegidas.
+5. Marco sem término permanece sem término; o estado de falha é mantido separadamente, sem inferência retroativa nem inclusão de detalhe de erro no Escriba.
+6. Nenhum prazo automático de expurgo é exigido para os marcos nesta etapa; acessos e cópias permanecem sujeitos a controle de tenant e segurança.
 
 ## Comandos, estrutura e estilo
 
@@ -33,26 +35,31 @@ Manter um registro imutável e consultável do fluxo de coleta, com os marcos de
 
 Os cenários abaixo descrevem resultados observáveis, não comandos nem uma decisão de framework. A stack da aplicação central está definida, mas ferramenta, local dos testes, cobertura e execução permanecem pendentes; a tecnologia do Escriba independente também não foi decidida.
 
-- Iniciar e concluir uma coleta produz marcos acrescentados com os dados de contexto e rastreio disponíveis.
-- Uma tentativa de alterar ou excluir um registro já gravado não muda nem remove seu conteúdo.
-- Não se encontra, nos registros do Escriba, uma ação de usuário ou detalhe de erro técnico; o estado de falha consultável é mantido fora deste módulo.
-- Contexto de tenant autenticado no servidor prevalece; enviar outro tenant pelo cliente não desloca o registro para esse tenant.
-- Uma execução sem marco de término permanece sem término registrado, em vez de receber um evento fabricado.
+- Iniciar e concluir uma coleta produz marcos acrescentados com os dados de contexto e rastreio disponíveis, sem nomes/OAB/processos em claro, conteúdo de comunicações, ações de usuário ou detalhes de erro.
+- Uma tentativa normal de alterar ou excluir registro não muda nem remove seu conteúdo; não há expurgo automático por tempo nesta etapa.
+- O contexto de tenant autenticado no servidor prevalece; enviar outro tenant pelo cliente não desloca o registro.
+- Uma execução sem marco de término permanece sem término registrado, em vez de receber evento fabricado; estado de falha consultável permanece fora do Escriba.
+
+Exemplos verificáveis da política 2c:
+
+| Caso | Decisão |
+|---|---|
+| Marco existente após 90 dias | Permanece disponível ao titular autorizado; não existe expurgo automático por tempo. |
+| Tentativa normal de editar ou excluir marco | Negada; o conteúdo permanece inalterado. |
 
 ## Fronteiras
 
-- **Sempre:** acrescentar registros do fluxo; manter os dados de rastreio disponíveis; usar contexto de identidade/tenant confiável do servidor; não registrar ações de usuários nem detalhes de erro.
-- **Pedir aprovação:** mudar o conjunto de dados, granularidade ou semântica dos marcos; estabelecer retenção, expurgo, anonimização, exportação ou mecanismo excepcional de remoção; tornar obrigatório dado hoje apenas disponível quando houver.
-- **Nunca:** editar ou apagar registros como operação ordinária; registrar ações de usuário, segredos ou detalhes de erro; aceitar tenant informado pelo cliente como autorização.
+- **Sempre:** acrescentar registros do fluxo; manter apenas referências mínimas; usar tenant confiável; não registrar ações de usuários, conteúdo, identificadores pessoais diretos, segredos ou detalhes de erro.
+- **Pedir aprovação:** alterar dados ou granularidade dos marcos, instituir expurgo ou tornar obrigatório dado hoje apenas disponível.
+- **Nunca:** editar ou apagar registros por operação normal; registrar ações de usuários, conteúdo de comunicações, identificadores pessoais diretos, segredos ou detalhes de erro; aceitar tenant informado pelo cliente como autorização.
 
 ## Questões abertas e bloqueios
 
-- Qual o esquema lógico mínimo, a identificação da execução e a granularidade dos marcos de início/término?
-- Quais campos de identidade precisam constar do registro sem transformá-lo em log de ações de usuário?
-- Como implementar e validar o prazo de retenção configurável e o tratamento administrativo dos dados pessoais, mantendo a exigência append-only nas operações normais?
+- O conjunto semântico de campos está definido como referências internas do tenant, execução, fonte, entidade/monitoramento, advogado, tribunal e processos disponíveis; esquema físico, identificação e granularidade técnica dos marcos permanecem para o contrato de implementação.
+- O solicitante dispensou prazo automático de retenção e expurgo nesta etapa. Dados públicos podem conter dados pessoais; a aplicação deve preservar isolamento e avaliar obrigações legais aplicáveis antes do uso em produção.
 - Onde o estado de falha será mantido e como a consulta o relacionará à execução/tribunal sem expor detalhes de erro no Escriba?
 - O Escriba será implementado dentro da aplicação central ou como componente independente? No segundo caso, qual será sua tecnologia? Versões, runtime, bibliotecas, comandos, estrutura física, estilo real, framework/localização de testes e cobertura continuam pendentes antes da implementação.
 
 ## Critérios de sucesso
 
-O fluxo de coleta deixa registros somente de acréscimo com marcos e contexto disponíveis; os registros anteriores permanecem inalterados; ações de usuários e detalhes de erro ficam fora do Escriba; a retenção e os bloqueios técnicos são resolvidos antes de implementar.
+O fluxo acrescenta marcos mínimos, sem alteração ou exclusão por operação normal e sem prazo automático de expurgo. Ações de usuários, identificadores diretos, conteúdo e erros técnicos ficam fora do Escriba; isolamento e segurança devem ser verificados.

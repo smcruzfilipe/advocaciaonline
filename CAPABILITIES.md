@@ -15,4 +15,4 @@ Ordem: identidade → autorização e Escriba → monitoramentos → coleta → 
 
 Contratos compartilhados de especificação: contexto autenticado identifica usuário e tenant no servidor, respeita expiração e não aceita tenant enviado pelo cliente como prova de acesso. Autorização decide operação e escopo por tribunal/dashboard. Monitoramentos fornecem identidade da entidade e seu tenant; coleta persiste publicações com vínculos e status por execução/tribunal; Escriba recebe registros de fluxo append-only. Formatos técnicos e transportes ainda não foram escolhidos.
 
-O plano e checklist existentes em `tasks/` foram aprovados pelo solicitante e revisados pelo advisor; as decisões técnicas bloqueantes continuam pendentes antes da implementação. `dev` é a branch padrão; cada feature nasce de `dev`. Toda conclusão depende de feedback do advisor conforme [regras do projeto](AGENTS.md).
+O plano e checklist existentes em `tasks/` foram aprovados pelo solicitante e revisados pelo advisor; as decisões técnicas bloqueantes continuam pendentes antes da implementação. `dev` é a branch padrão; cada feature nasce de `dev`.
