@@ -18,8 +18,9 @@ Este módulo é dono da identidade lógica dos monitoramentos e de sua associaç
 - **Matching do advogado:** uma publicação corresponde ao advogado se o nome completo normalizado corresponder **ou** se houver igualdade do par númeroOAB+UF com qualquer OAB principal ou secundária do perfil.
 - **Parte:** cadastro com nome informado pelo usuário autorizado, associado ao tenant autenticado. A publicação corresponde à parte pelo nome completo normalizado.
 - **Equivalência de nomes para matching:** comparar nomes completos após ignorar diferenças de maiúsculas/minúsculas e acentos, remover espaços no início/fim e reduzir sequências internas de espaços a um só. Correspondência exige igualdade após essa normalização; não há matching por aproximação, apelidos ou abreviações. O critério não define tratamento de pontuação.
-- **Processo:** cadastro com número informado pelo usuário autorizado, associado ao tenant autenticado. Normalização do número e alcance real do filtro na fonte não estão decididos.
-- **Tribunais:** filtros de tribunal são associados a monitoramentos de partes e processos somente entre tribunais disponibilizados pela fonte, sujeitos à capacidade real dessa fonte. A lista, representação, seleção inicial e semântica de lista vazia não são especificadas.
+- **Processo:** comparar pelos dígitos do número sem máscara, preservando zeros iniciais e sem conversão para inteiro. Cadastro e dados da fonte usam a mesma regra de comparação.
+- **OAB:** comparar número e UF separadamente, sem conversão do identificador para inteiro. Não remover sufixos de OAB; qualquer tratamento deles exige regra específica.
+- **Tribunais:** ausência de filtro em parte ou processo significa todos os tribunais disponíveis na fonte. Se houver seleção, limitar o monitoramento aos tribunais selecionados. O escopo de coleta não amplia a permissão de consulta dos usuários.
 - **Saída para coleta:** cada monitoramento disponibiliza ao consumidor sua identidade lógica e o tenant dono, além dos dados de busca definidos para o tipo de entidade. Formato de ID, persistência, serialização e transporte são decisões técnicas pendentes.
 - **Acesso:** cadastro, leitura e qualquer outra ação dependem da decisão de autorização. O servidor vincula o registro ao tenant do contexto autenticado e não aceita tenant enviado pelo cliente como prova de propriedade.
 
@@ -65,8 +66,8 @@ Não há aplicação, stack, convenção de comandos, estrutura de código, fram
 ## Questões abertas
 
 1. Que validações ou tratamento de pontuação se aplicam a nomes sem alterar o critério de equivalência nominal já definido?
-2. Como serão normalizados/validados os valores e a representação de OAB e números de processo, e como serão identificados cadastros duplicados?
-3. Quais tribunais a fonte disponibiliza para cada tipo de monitoramento e qual é a semântica de filtro ausente, conjunto vazio ou alteração posterior?
+2. Como validar representações inválidas, sufixos de OAB e cadastros duplicados? Processo sem máscara com zeros preservados e OAB/UF separadas já foram definidos.
+3. Quais tribunais estão efetivamente disponíveis e como tratar alterações posteriores do filtro? Ausência de filtro já significa todos os tribunais disponíveis na fonte.
 4. Quais operações de ciclo de vida existem além do cadastro e leitura, inclusive edição e remoção?
 5. Qual referência lógica de entidade e contrato de saída serão necessários para coleta, sem acoplar a escolha a um formato de armazenamento/transportes ainda não decidido?
 6. Quais stack, layout de código, comandos, estilo real e ferramentas/locais de teste serão escolhidos antes da implementação?
