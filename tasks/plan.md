@@ -13,11 +13,11 @@ Base: [especificação](../docs/especificacao.md). Plano proposto, sujeito à ap
 
 ## Dependências e riscos
 
-Identidade precede permissões e monitoramentos; estes precedem planejamento e coleta. Escriba precisa estar disponível durante a primeira coleta real. Consulta depende de resultados persistidos e autorização. Contrato da fonte é bloqueante: a documentação retornou 403 no ambiente; não presumir identificadores ou filtros. Outros riscos: homônimos, resultados duplicados, falta de histórico da fonte, dados pessoais em registros imutáveis, permissões amplas por padrão e critérios de carga ainda indefinidos.
+Identidade precede permissões e monitoramentos; estes precedem planejamento e coleta. Escriba precisa estar disponível durante a primeira coleta real. Consulta depende de resultados persistidos e autorização. A documentação oficial foi acessada pela máquina local; a estabilidade dos identificadores é premissa aceita e a deduplicação usa conjuntamente `id` e `hash`, por fonte e tenant. Cadernos e comunicações pertencem à mesma fonte lógica DJEN. A coleta principal baixa cadernos ZIP e lê seus JSONs; comunicações paginadas são fallback. Ambas usam somente a data corrente, sem recuperação automática de dias anteriores. Outros riscos: homônimos, divergências observadas no filtro por processo, dados pessoais em registros imutáveis, permissões amplas por padrão e critérios de carga indefinidos.
 
 ## Fluxo de branches
 
-`dev` é a base; criar `feature/<nome>` a partir de `dev` para cada feature e integrar após revisão. A branch padrão remota deve ser configurada no provedor, após a criação da branch remota e com autorização administrativa.
+`dev` é a base e a branch padrão remota; criar `feature/<nome>` a partir de `dev` para cada feature e integrar após revisão.
 
 ## Verificações
 
