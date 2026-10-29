@@ -359,6 +359,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 10b, 11a–11c, 1c, 9b. **Escopo:** execução da agenda, tentativas e estado operacional.
   **Áreas previstas (≤5):** execução; política de retries; estado por tribunal; consulta de falhas.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
+  **Plano da branch:** definir a seleção segura dos trabalhos e o acionamento do processador existente; exercitar dois slots, concorrência e reinício com roles reais. A interface de seleção e o transporte serão escolhidos após inspeção das permissões e dos contratos já existentes, sem antecipar configuração não implementada.
 
 - [ ] **13b — Recuperar no mesmo dia sem retroatividade.**
   **Aceite:** (1) execução posterior no mesmo dia pode persistir publicações após falha anterior; (2) deduplicação preserva chave/vínculos entre as execuções; (3) nenhuma execução busca automaticamente data anterior.
@@ -367,6 +368,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 13a, 12a–12b, 1c. **Escopo:** recuperação pela execução posterior, não reprocessamento retroativo.
   **Áreas previstas (≤5):** execução; persistência; deduplicação; política de datas.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Deduplicação e vínculos](../SPEC-coleta.md#deduplicação-e-vínculos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
+  **Plano da branch:** simular falha no primeiro slot, sucesso no segundo e reinício no mesmo dia; verificar trabalho concluído, vínculos e identidade preservados. Simular mudança de data local e confirmar que nenhuma chamada consulta o dia anterior.
 
 ### 14. Consulta de comunicações
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 require "bundler/setup"
 require "json"
-require_relative "../lib/processador/runner"
+require_relative "../lib/processador/worker"
 
 def positive_integer(name, default, maximum: nil)
   value = ENV.fetch(name, default.to_s)
@@ -12,16 +12,21 @@ def positive_integer(name, default, maximum: nil)
 end
 
 begin
-  raise ArgumentError, "usage: processador JOB_UUID" unless ARGV.length == 1
+  raise ArgumentError, "usage: processador [JOB_UUID]" if ARGV.length > 1
+  database_url = ENV.fetch("PROCESSADOR_DATABASE_URL")
   runner = Processador::Runner.new(
-    database_url: ENV.fetch("PROCESSADOR_DATABASE_URL"),
+    database_url: database_url,
     attempts: positive_integer("COLETA_TENTATIVAS_POR_CAMINHO", 3, maximum: 3),
     backoff_first: positive_integer("COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS", 60),
     backoff_second: positive_integer("COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS", 300)
   )
-  result = runner.call(ARGV.fetch(0))
-  puts JSON.generate(result)
-  exit(result.fetch("state") == "succeeded" ? 0 : 1)
+  if ARGV.empty?
+    Processador::Worker.new(database_url: database_url, runner: runner).run
+  else
+    result = runner.call(ARGV.fetch(0))
+    puts JSON.generate(result)
+    exit(result.fetch("state") == "succeeded" ? 0 : 1)
+  end
 rescue KeyError, ArgumentError => error
   warn error.message
   exit 1

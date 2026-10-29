@@ -11,14 +11,15 @@ require_relative "matcher"
 require_relative "sanitizer"
 
 module Processador
-  # Each invocation handles exactly one frozen job. Scheduling multiple jobs is
-  # the despachante's responsibility; callers cannot supply a tenant.
+  # Each invocation handles one frozen job, either explicitly claimed here or
+  # atomically selected by the worker. Callers cannot supply a tenant.
   class Runner
     API_BASE = "https://comunicaapi.pje.jus.br/api/v1".freeze
     TIMEZONE = TZInfo::Timezone.get("America/Sao_Paulo")
     # Any longer delay crosses the current local day, where work is interrupted.
     MAX_WAIT_FOR_CURRENT_DAY = 172_800
     DateChanged = Class.new(StandardError)
+    LeaseLost = Class.new(StandardError)
 
     def initialize(database_url:, http: Http.new, base_url: API_BASE, attempts: 3, backoff_first: 60, backoff_second: 300, date_source: -> { TIMEZONE.now.to_date })
       raise ArgumentError, "invalid attempts" unless (1..3).cover?(attempts)
@@ -39,26 +40,39 @@ module Processador
     def call(job_id)
       PG.connect(@database_url) do |db|
         claim = db.exec_params("SELECT * FROM app_private.processor_claim($1::uuid)", [job_id]).first
-        state, token = claim.fetch("state"), claim.fetch("token")
-        return { "state" => state } if %w[succeeded failed].include?(state)
+        process_claimed(db, job_id, claim.fetch("token"), claim.fetch("state"))
+      end
+    end
 
-        job = json_call(db, "processor_job", "$1::uuid, $2::text", [job_id, token])
-        return record_failure(db, job_id, token, "interrupted") unless current_date?(job)
-
-        db.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [job_id, token])
-        previous_callback = @http.on_retry_after
-        @http.on_retry_after = ->(seconds) {
-          db.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, $3::integer)", [job_id, token, [seconds, MAX_WAIT_FOR_CURRENT_DAY].min])
-        }
-        begin
-          with_lease(job_id, token) { |lease| execute(db, job_id, token, job, lease) }
-        ensure
-          @http.on_retry_after = previous_callback
-        end
+    def call_claimed(job_id, token, state)
+      PG.connect(@database_url) do |db|
+        process_claimed(db, job_id, token, state)
       end
     end
 
     private
+
+    def process_claimed(db, job_id, token, state)
+      return { "state" => state } if %w[succeeded failed].include?(state)
+
+      job = json_call(db, "processor_job", "$1::uuid, $2::text", [job_id, token])
+      return record_failure(db, job_id, token, "interrupted") unless current_date?(job)
+
+      db.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [job_id, token])
+      previous_callback = @http.on_retry_after
+      @http.on_retry_after = ->(seconds) {
+        db.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, $3::integer)", [job_id, token, [seconds, MAX_WAIT_FOR_CURRENT_DAY].min])
+      }
+      begin
+        with_lease(job_id, token) { |lease| execute(db, job_id, token, job, lease) }
+      ensure
+        @http.on_retry_after = previous_callback
+      end
+    rescue PG::InvalidAuthorizationSpecification
+      # The selector and processor use separate connections. Expiry or a newer
+      # owner must stop this invocation, never write a failure for that owner.
+      raise LeaseLost, "Processor operation unavailable", cause: nil
+    end
 
     def execute(db, job_id, token, job, lease)
       progress = job
@@ -109,13 +123,21 @@ module Processador
         rescue SourceError => error
           progress = fail_attempt(db, job_id, token, error.retry_after || 0)
         rescue PG::Error => error
-          begin
-            return record_failure(db, job_id, token, current_date?(job) ? "processing_failed" : "interrupted")
-          rescue PG::Error
-            raise error
-          end
+          raise if fatal_database_error?(error)
+          return record_failure(db, job_id, token, current_date?(job) ? "processing_failed" : "interrupted")
+        rescue StandardError
+          return record_failure(db, job_id, token, current_date?(job) ? "processing_failed" : "interrupted")
         end
       end
+    end
+
+    def fatal_database_error?(error)
+      return true if error.is_a?(PG::ConnectionBad) || error.is_a?(PG::UnableToSend)
+
+      state = error.result&.error_field(PG::Result::PG_DIAG_SQLSTATE)
+      # Broken connections, authorization, missing schema/functions, resource
+      # exhaustion and invalid configuration require operator intervention.
+      state.nil? || %w[08 28 3D 3F 42 53 54 57 58 XX].include?(state[0, 2]) || state == "22023"
     end
 
     def current_date?(job)

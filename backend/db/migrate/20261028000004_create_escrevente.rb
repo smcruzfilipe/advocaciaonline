@@ -131,6 +131,31 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         RETURN NEXT;
       END $fn$;
 
+      CREATE FUNCTION app_private.processor_next()
+      RETURNS TABLE(job_id uuid, token text, state text)
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      DECLARE next_job_id uuid;
+      BEGIN
+        SELECT execution.job_id INTO next_job_id
+          FROM public.collection_job_executions AS execution
+          JOIN public.collection_jobs AS job
+            ON job.id = execution.job_id AND job.tenant_id = execution.tenant_id
+          JOIN public.collection_runs AS run ON run.id = job.run_id
+          WHERE run.status = 'planned'
+            AND run.collection_date <= (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+            AND execution.state IN ('pending', 'running')
+            AND (execution.claim_digest IS NULL OR execution.lease_expires_at <= clock_timestamp())
+          ORDER BY run.collection_date, run.slot, execution.job_id
+          LIMIT 1 FOR UPDATE OF execution SKIP LOCKED;
+        IF NOT FOUND THEN
+          RETURN;
+        END IF;
+        -- The row remains locked until this transaction commits. Reuse the
+        -- claim generator without exposing tenant data or releasing that lock.
+        RETURN QUERY SELECT next_job_id, claim.token, claim.state
+          FROM app_private.processor_claim(next_job_id) AS claim;
+      END $fn$;
+
       CREATE FUNCTION app_private.processor_renew(p_job_id uuid, p_token text)
       RETURNS TABLE(expires_at timestamptz)
       LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
@@ -224,12 +249,14 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         RETURN QUERY SELECT 'failed'::text;
       END $fn$;
 
-      REVOKE ALL ON FUNCTION app_private.processor_claim(uuid), app_private.processor_renew(uuid,text),
-        app_private.processor_start(uuid,text), app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
+      REVOKE ALL ON FUNCTION app_private.processor_next(), app_private.processor_claim(uuid),
+        app_private.processor_renew(uuid,text), app_private.processor_start(uuid,text),
+        app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
         FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       GRANT USAGE ON SCHEMA app_private TO advocacia_processador;
-      GRANT EXECUTE ON FUNCTION app_private.processor_claim(uuid), app_private.processor_renew(uuid,text),
-        app_private.processor_start(uuid,text), app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
+      GRANT EXECUTE ON FUNCTION app_private.processor_next(), app_private.processor_claim(uuid),
+        app_private.processor_renew(uuid,text), app_private.processor_start(uuid,text),
+        app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
         TO advocacia_processador;
     SQL
 
@@ -308,8 +335,8 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         ADD CONSTRAINT collection_failure_job_same_tenant FOREIGN KEY (tenant_id, job_id)
           REFERENCES public.collection_jobs (tenant_id, id);
 
-      -- Only migration-owned definers may read a claimed job without a human
-      -- session. Every entry point proves the claim before returning its data.
+      -- Only migration-owned definers may read a job without a human session.
+      -- Selection returns its ID and lease proof; tenant data requires that proof.
       CREATE POLICY processor_owner_read ON public.collection_jobs
         FOR SELECT TO advocacia_migrator USING (true);
       CREATE POLICY processor_owner_read ON public.collection_runs

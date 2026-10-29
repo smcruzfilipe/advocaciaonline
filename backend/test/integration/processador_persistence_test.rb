@@ -10,6 +10,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   LAWYER_NAME = "Guilherme Curcelli Guimarães".freeze
   TABLES = %w[collection_communications collection_communication_links collection_job_results collection_job_failures].freeze
   FUNCTIONS = {
+    "processor_next()" => ["SELECT * FROM app_private.processor_next()", 0],
     "processor_job(uuid,text)" => ["SELECT app_private.processor_job($1, $2)", 2],
     "processor_commit(uuid,text,text,jsonb)" => ["SELECT app_private.processor_commit($1, $2, $3, $4::jsonb)", 4],
     "processor_record_failure(uuid,text,text)" => ["SELECT app_private.processor_record_failure($1, $2, $3)", 3],
@@ -73,6 +74,189 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     assert_unavailable { commit(@job_a, proof, []) }
     assert_unavailable { record_failure(@job_a, proof, "interrupted") }
     assert_empty communications(@lawyer_a)
+  end
+
+  test "next returns only a claimed job identity and never trusts a forged tenant context" do
+    claim(@job_b)
+    with_processor_queue(@job_a, @job_b) do
+      @processor.exec_params("SELECT set_config('app.tenant_id', $1, false)", [@lawyer_b.tenant_id])
+      @processor.exec_params("SELECT set_config('app.session_hash', $1, false)", [IdentityStore.digest(@session_b)])
+      result = @processor.exec("SELECT * FROM app_private.processor_next()")
+      assert_equal %w[job_id token state], result.fields
+      assert_equal [2950, 25, 25], result.nfields.times.map { |index| result.ftype(index) }
+      assert_equal 1, result.ntuples
+      selected = result.first
+      assert_equal @job_a, selected.fetch("job_id")
+      assert_equal "pending", selected.fetch("state")
+      assert_match(/\A[0-9a-f]{64}\z/, selected.fetch("token"))
+      persisted = @migrator.exec_params(<<~SQL, [@job_a]).first
+        SELECT claim_digest, lease_expires_at > clock_timestamp() AS active,
+          lease_expires_at <= clock_timestamp() + interval '15 minutes' AS bounded
+        FROM public.collection_job_executions WHERE job_id = $1
+      SQL
+      assert_equal Digest::SHA256.hexdigest(selected.fetch("token")), persisted.fetch("claim_digest")
+      assert_equal "t", persisted.fetch("active")
+      assert_equal "t", persisted.fetch("bounded")
+      assert_equal @lawyer_a.tenant_id, processor_job(@job_a, selected.fetch("token")).fetch("tenant_id")
+      assert_unavailable { processor_job(@job_b, selected.fetch("token")) }
+      assert_empty event_types(@job_a)
+      assert_empty next_jobs
+    end
+  end
+
+  test "next skips locked work and acquires each lease atomically with rollback restoring eligibility" do
+    with_processor_queue(@job_a, @job_b) do
+      PG.connect(@processor_url) do |other|
+        other.exec("SET statement_timeout = '5s'")
+        @processor.exec("BEGIN")
+        @processor.exec("SET LOCAL statement_timeout = '5s'")
+        first = next_jobs.fetch(0)
+        assert_equal [@job_a, @job_b].min, first.fetch("job_id")
+        assert_nil @migrator.exec_params("SELECT claim_digest FROM public.collection_job_executions WHERE job_id = $1",
+          [first.fetch("job_id")]).getvalue(0, 0), "the uncommitted lease must not escape its transaction"
+        assert_equal "pending", processor_job(first.fetch("job_id"), first.fetch("token")).fetch("state")
+        other.exec("BEGIN")
+        second = next_jobs(other).fetch(0)
+        assert_equal [@job_a, @job_b].max, second.fetch("job_id")
+        assert_not_equal first.fetch("token"), second.fetch("token")
+        assert_empty next_jobs
+        assert_empty next_jobs(other)
+        @processor.exec("ROLLBACK")
+        replacement = next_jobs.fetch(0)
+        assert_equal first.fetch("job_id"), replacement.fetch("job_id")
+        assert_not_equal first.fetch("token"), replacement.fetch("token")
+        assert_unavailable { processor_job(first.fetch("job_id"), first.fetch("token")) }
+        other.exec("COMMIT")
+        assert_empty next_jobs
+        [replacement, second].each do |selected|
+          assert_equal "pending", processor_job(selected.fetch("job_id"), selected.fetch("token")).fetch("state")
+        end
+      end
+    end
+  ensure
+    @processor.exec("ROLLBACK") if @processor.transaction_status != PG::PQTRANS_IDLE
+  end
+
+  test "next orders all eligible days and slots while excluding active leases future work and terminal states" do
+    today = Date.iso8601(@date)
+    earlier_first = create_job(@lawyer_a, run_id: create_run((today - 2).to_s, 1))
+    earlier_second = create_job(@lawyer_a, run_id: create_run((today - 2).to_s, 2))
+    yesterday = create_job(@lawyer_a, run_id: create_run((today - 1).to_s, 1))
+    second_slot = create_job(@lawyer_a, run_id: create_run(@date, 2))
+    tomorrow = create_job(@lawyer_a, run_id: create_run((today + 1).to_s, 1))
+    tomorrow_running = create_job(@lawyer_a, run_id: create_run((today + 1).to_s, 2))
+    start(tomorrow_running, claim(tomorrow_running))
+    expire(tomorrow_running)
+    start(yesterday, claim(yesterday))
+    expire(yesterday)
+    active_proof = claim(@job_b)
+    succeeded = create_party_job
+    failed = create_job(@lawyer_b, run_id: create_run(@date, 2))
+    commit_started(succeeded, [])
+    record_failure(failed, claim(failed), "source_unavailable")
+    expire(succeeded)
+    eligible = [earlier_first, earlier_second, yesterday, @job_a, second_slot]
+    with_processor_queue(*eligible, @job_b, tomorrow, tomorrow_running, succeeded, failed) do
+      selected = eligible.map { next_jobs.fetch(0) }
+      assert_equal eligible, selected.map { |job| job.fetch("job_id") }
+      assert_equal %w[pending pending running pending pending], selected.map { |job| job.fetch("state") }
+      assert_empty next_jobs
+      assert_equal "pending", processor_job(@job_b, active_proof).fetch("state")
+      assert_nil @migrator.exec_params("SELECT claim_digest FROM public.collection_job_executions WHERE job_id = $1",
+        [tomorrow]).getvalue(0, 0)
+      assert_equal "running", state(tomorrow_running)
+      assert_equal "succeeded", state(succeeded)
+      assert_equal "failed", state(failed)
+    end
+  end
+
+  test "next uses the Brasilia day independently of the processor session time zone" do
+    tomorrow = create_job(@lawyer_a, run_id: create_run((Date.iso8601(@date) + 1).to_s, 1))
+    with_processor_queue(@job_a, tomorrow) do
+      %w[Pacific/Kiritimati Etc/GMT+12].each do |zone|
+        @processor.exec_params("SELECT set_config('TimeZone', $1, false)", [zone])
+        selected = next_jobs.fetch(0)
+        assert_equal @job_a, selected.fetch("job_id"), zone
+        assert_empty next_jobs
+        expire(@job_a)
+      end
+      assert_nil @migrator.exec_params("SELECT claim_digest FROM public.collection_job_executions WHERE job_id = $1",
+        [tomorrow]).getvalue(0, 0)
+    end
+  end
+
+  test "next ignores every non planned run without changing its pending work" do
+    original_statuses = []
+    ignored = %w[no_work planning_failed interrupted].each_with_index.map do |status, index|
+      run_id = create_run((Date.iso8601(@date) - index - 3).to_s, 1)
+      job = create_job(@lawyer_a, run_id: run_id)
+      original_statuses << [run_id, @despachante.exec_params("SELECT status FROM public.collection_runs WHERE id = $1",
+        [run_id]).getvalue(0, 0)]
+      @despachante.exec_params("UPDATE public.collection_runs SET status = $2 WHERE id = $1", [run_id, status])
+      job
+    end
+    with_processor_queue(@job_a, *ignored) do
+      assert_equal @job_a, next_jobs.fetch(0).fetch("job_id")
+      assert_empty next_jobs
+      ignored.each do |job|
+        row = @migrator.exec_params("SELECT state, claim_digest FROM public.collection_job_executions WHERE job_id = $1", [job]).first
+        assert_equal({ "state" => "pending", "claim_digest" => nil }, row)
+      end
+    end
+  ensure
+    original_statuses&.each do |run_id, status|
+      @despachante.exec_params("UPDATE public.collection_runs SET status = $2 WHERE id = $1", [run_id, status])
+    end
+  end
+
+  test "next resumes expired running work without resetting progress or repeating a completed job" do
+    original = claim(@job_a)
+    start(@job_a, original)
+    attempt_begin(@job_a, original)
+    @processor.exec_params("SELECT app_private.processor_defer($1, $2, 200)", [@job_a, original])
+    before = processor_job(@job_a, original)
+    expire(@job_a)
+    with_processor_queue(@job_a) do
+      selected = next_jobs.fetch(0)
+      assert_equal @job_a, selected.fetch("job_id")
+      assert_equal "running", selected.fetch("state")
+      assert_not_equal original, selected.fetch("token")
+      resumed = processor_job(@job_a, selected.fetch("token"))
+      %w[phase caderno_attempts fallback_attempts attempt_in_flight attempt_started_at next_attempt_at].each do |key|
+        assert_equal before.fetch(key), resumed.fetch(key), key
+      end
+      assert_unavailable { processor_job(@job_a, original) }
+      assert_empty next_jobs
+      attempt_failed(@job_a, selected.fetch("token"), 0)
+      allow_retry(@job_a)
+      attempt_begin(@job_a, selected.fetch("token"))
+      commit(@job_a, selected.fetch("token"), [publication])
+      expire(@job_a)
+      assert_empty next_jobs
+      assert_equal %w[started completed], event_types(@job_a)
+      assert_equal 1, communications(@lawyer_a).length
+      assert_equal "1", @migrator.exec_params("SELECT count(*) FROM public.collection_communication_links WHERE job_id = $1",
+        [@job_a]).getvalue(0, 0)
+    end
+  end
+
+  test "next grants old work only for interruption and never selects that failure again" do
+    previous_date = (Date.iso8601(@date) - 1).to_s
+    old = create_job(@lawyer_a, run_id: create_run(previous_date, 1))
+    with_processor_queue(old) do
+      selected = next_jobs.fetch(0)
+      assert_equal old, selected.fetch("job_id")
+      assert_equal previous_date, processor_job(old, selected.fetch("token")).fetch("collection_date")
+      start(old, selected.fetch("token"))
+      assert_unavailable { attempt_begin(old, selected.fetch("token")) }
+      assert_unavailable { commit(old, selected.fetch("token"), []) }
+      assert_equal({ "state" => "failed", "code" => "interrupted" },
+        record_failure(old, selected.fetch("token"), "interrupted"))
+      assert_empty next_jobs
+      assert_equal ["started"], event_types(old)
+      assert_empty communications(@lawyer_a)
+      assert_equal "0", @migrator.exec_params("SELECT count(*) FROM public.collection_job_results WHERE job_id = $1", [old]).getvalue(0, 0)
+    end
   end
 
   test "second slot starts directly in fallback and never consumes a caderno attempt" do
@@ -151,6 +335,30 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     end
     assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT * FROM public.collection_jobs") }
     assert_raises(PG::InsufficientPrivilege) { @runtime.exec("SELECT caderno_attempts FROM public.collection_job_executions") }
+  end
+
+  test "selection tables retain forced RLS and only the isolated processor can execute next" do
+    %w[collection_job_executions collection_jobs collection_runs].each do |table|
+      flags = @migrator.exec_params(<<~SQL, ["public.#{table}"]).first
+        SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = $1::regclass
+      SQL
+      assert_equal({ "relrowsecurity" => "t", "relforcerowsecurity" => "t" }, flags)
+      assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT * FROM public.#{table}") }
+      assert_equal "1", @migrator.exec_params(<<~SQL, [table]).getvalue(0, 0)
+        SELECT count(*) FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = $1 AND policyname = 'processor_owner_read'
+          AND cmd = 'SELECT' AND roles = ARRAY['advocacia_migrator']::name[] AND qual = 'true'
+      SQL
+    end
+    assert_equal "t", @processor.exec("SELECT has_function_privilege(current_user, 'app_private.processor_next()', 'EXECUTE')").getvalue(0, 0)
+    [@processor, @runtime, @despachante].each do |connection|
+      flags = connection.exec("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user").first
+      assert_equal({ "rolsuper" => "f", "rolbypassrls" => "f" }, flags)
+    end
+    assert_equal "0", @migrator.exec(<<~SQL).getvalue(0, 0)
+      SELECT count(*) FROM pg_auth_members
+      WHERE member = 'advocacia_processador'::regrole OR roleid = 'advocacia_processador'::regrole
+    SQL
   end
 
   test "complete joint identity deduplicates sources entities and runs while preserving first version and every link" do
@@ -597,6 +805,25 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
 
   def claim(job)
     @processor.exec_params("SELECT * FROM app_private.processor_claim($1)", [job]).first.fetch("token")
+  end
+
+  def next_jobs(connection = @processor)
+    connection.exec("SELECT * FROM app_private.processor_next()").to_a
+  end
+
+  def with_processor_queue(*jobs)
+    PG.connect(ENV.fetch("MIGRATION_DATABASE_URL")) do |queue_lock|
+      queue_lock.exec("BEGIN")
+      # Other integration cases keep their fixtures. Lock them rather than
+      # mutating global queue state or adding a tenant filter to the service API.
+      queue_lock.exec_params(<<~SQL, ["{#{jobs.join(',')}}"])
+        SELECT job_id FROM public.collection_job_executions
+        WHERE NOT job_id = ANY($1::uuid[]) FOR UPDATE
+      SQL
+      yield
+    ensure
+      queue_lock.exec("ROLLBACK") if queue_lock.transaction_status != PG::PQTRANS_IDLE
+    end
   end
 
   def start(job, proof)
