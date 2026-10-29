@@ -4,17 +4,17 @@ require "open3"
 require "pg"
 require "rbconfig"
 require "time"
-require_relative "../../planner/run"
+require_relative "../../despachante/run"
 
-class PlannerExecutionTest < ActiveSupport::TestCase
+class DespachanteExecutionTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
   CATALOG = [{ code: "TJAC", name: "Tribunal de Justiça do Estado do Acre" }].freeze
 
   setup do
-    @planner_url = ENV.fetch("PLANNER_DATABASE_URL")
-    @database = PG.connect(@planner_url)
-    assert_equal "advocacia_planner", @database.exec("SELECT current_user").getvalue(0, 0)
+    @despachante_url = ENV.fetch("DESPACHANTE_DATABASE_URL")
+    @database = PG.connect(@despachante_url)
+    assert_equal "advocacia_despachante", @database.exec("SELECT current_user").getvalue(0, 0)
     # Reserve unused local dates without deleting immutable plans from other integration tests.
     @date = Date.iso8601(@database.exec(<<~SQL).getvalue(0, 0))
       SELECT COALESCE(MAX(collection_date) + 3, DATE '2060-01-01')::text FROM public.collection_runs
@@ -37,20 +37,20 @@ class PlannerExecutionTest < ActiveSupport::TestCase
 
     invalid_times.each do |first, second|
       assert_raises(ArgumentError, "invalid schedule must fail independently of database availability") do
-        PlannerRunner.new(planner_url: unusable_url, first: first, second: second)
+        DespachanteRunner.new(despachante_url: unusable_url, first: first, second: second)
       end
     end
-    assert_raises(ArgumentError) { PlannerRunner.new(planner_url: unusable_url) }
-    assert_raises(ArgumentError) { PlannerRunner.new(planner_url: unusable_url, first: "04:00") }
-    assert_raises(ArgumentError) { PlannerRunner.new(planner_url: unusable_url, second: "16:00") }
+    assert_raises(ArgumentError) { DespachanteRunner.new(despachante_url: unusable_url) }
+    assert_raises(ArgumentError) { DespachanteRunner.new(despachante_url: unusable_url, first: "04:00") }
+    assert_raises(ArgumentError) { DespachanteRunner.new(despachante_url: unusable_url, second: "16:00") }
     assert_empty runs(@date)
   end
 
-  test "an explicit nonempty planner connection is required without a runtime connection fallback" do
+  test "an explicit nonempty despachante connection is required without a runtime connection fallback" do
     [nil, "", " "].each do |url|
-      assert_raises(ArgumentError) { PlannerRunner.new(planner_url: url, first: "04:00", second: "16:00") }
+      assert_raises(ArgumentError) { DespachanteRunner.new(despachante_url: url, first: "04:00", second: "16:00") }
     end
-    assert_raises(ArgumentError) { PlannerRunner.new(first: "04:00", second: "16:00") }
+    assert_raises(ArgumentError) { DespachanteRunner.new(first: "04:00", second: "16:00") }
     assert_empty runs(@date)
   end
 
@@ -330,7 +330,7 @@ class PlannerExecutionTest < ActiveSupport::TestCase
   private
 
   def runner
-    PlannerRunner.new(planner_url: @planner_url, first: "04:00", second: "16:00")
+    DespachanteRunner.new(despachante_url: @despachante_url, first: "04:00", second: "16:00")
   end
 
   def utc_on(date, hour, minute = 0, second = 0)
@@ -375,7 +375,7 @@ class PlannerExecutionTest < ActiveSupport::TestCase
 
   def run_in_separate_process(now:)
     environment = {
-      "PLANNER_DATABASE_URL" => @planner_url,
+      "DESPACHANTE_DATABASE_URL" => @despachante_url,
       "COLETA_HORARIO_1" => "04:00", "COLETA_HORARIO_2" => "16:00",
       "DATABASE_URL" => nil, "MIGRATION_DATABASE_URL" => nil, "RAILS_ENV" => nil,
       "APP_ORIGIN" => nil, "GOOGLE_CLIENT_ID" => nil, "GOOGLE_CLIENT_SECRET" => nil,
@@ -389,23 +389,23 @@ class PlannerExecutionTest < ActiveSupport::TestCase
       require "minitest/mock"
       require ARGV.fetch(0)
       if defined?(Rails) && Rails.respond_to?(:application) && Rails.application
-        abort "The standalone planner must not boot the web application."
+        abort "The standalone despachante must not boot the web application."
       end
-      runner = PlannerRunner.new(planner_url: ENV.fetch("PLANNER_DATABASE_URL"),
+      runner = DespachanteRunner.new(despachante_url: ENV.fetch("DESPACHANTE_DATABASE_URL"),
         first: ENV.fetch("COLETA_HORARIO_1"), second: ENV.fetch("COLETA_HORARIO_2"))
       catalog = JSON.parse(ARGV.fetch(2), symbolize_names: true)
       ids = CourtCatalog.stub(:fetch, catalog) { runner.run_once(now: Time.iso8601(ARGV.fetch(1))) }
       STDOUT.write(JSON.generate(ids))
     RUBY
     stdout, stderr, status = Open3.capture3(environment, RbConfig.ruby, "-e", script,
-      Rails.root.join("planner/run.rb").to_s, now.iso8601, JSON.generate(CATALOG), chdir: Rails.root.to_s)
-    assert status.success?, "Standalone planner failed: #{stderr}"
+      Rails.root.join("despachante/run.rb").to_s, now.iso8601, JSON.generate(CATALOG), chdir: Rails.root.to_s)
+    assert status.success?, "Standalone despachante failed: #{stderr}"
     JSON.parse(stdout)
   end
 
   def run_cli_with_clock(first:, second:, now:, mode:, observed_date: @date)
     environment = {
-      "PLANNER_DATABASE_URL" => @planner_url,
+      "DESPACHANTE_DATABASE_URL" => @despachante_url,
       "COLETA_HORARIO_1" => first, "COLETA_HORARIO_2" => second,
       "DATABASE_URL" => nil, "MIGRATION_DATABASE_URL" => nil, "RAILS_ENV" => nil,
       "APP_ORIGIN" => nil, "GOOGLE_CLIENT_ID" => nil, "GOOGLE_CLIENT_SECRET" => nil,
@@ -423,7 +423,7 @@ class PlannerExecutionTest < ActiveSupport::TestCase
       catalog = JSON.parse(catalog_json, symbolize_names: true)
       clock = { wall: Time.iso8601(initial_time), monotonic: 0.0 }
       report = { "requests" => [], "waits" => [] }
-      database = PG.connect(ENV.fetch("PLANNER_DATABASE_URL"))
+      database = PG.connect(ENV.fetch("DESPACHANTE_DATABASE_URL"))
       source = -> do
         throw :finished if report.fetch("requests").length >= 4
         request = { "requested_at" => clock.fetch(:wall).iso8601(6) }
@@ -463,7 +463,7 @@ class PlannerExecutionTest < ActiveSupport::TestCase
         clock[:monotonic] += seconds
         seconds
       end
-      # Replace only time/wait primitives; the actual CLI, planner, PostgreSQL role and writes remain real.
+      # Replace only time/wait primitives; the actual CLI, despachante, PostgreSQL role and writes remain real.
       Kernel.module_eval do
         define_method(:sleep, &wait)
         private :sleep
@@ -485,7 +485,7 @@ class PlannerExecutionTest < ActiveSupport::TestCase
         clock.fetch(:wall)
       end
       publication_clock = TracePoint.new(:return) do |event|
-        next unless event.method_id == :insert_work && event.defined_class.name == "CollectionPlanner"
+        next unless event.method_id == :insert_work && event.defined_class.name == "CollectionDespachante"
         next if report.key?("inserted_at")
 
         # Observe the real INSERT completing, then move only the clocks across midnight before COMMIT.
@@ -510,9 +510,9 @@ class PlannerExecutionTest < ActiveSupport::TestCase
       STDOUT.write(JSON.generate(report))
     RUBY
     stdout, stderr, status = Open3.capture3(environment, RbConfig.ruby, "-e", script,
-      Rails.root.join("planner/run.rb").to_s, now.iso8601, observed_date.iso8601, mode, JSON.generate(CATALOG),
+      Rails.root.join("despachante/run.rb").to_s, now.iso8601, observed_date.iso8601, mode, JSON.generate(CATALOG),
       chdir: Rails.root.to_s)
-    assert status.success?, "Controlled-clock planner CLI failed: #{stderr}"
+    assert status.success?, "Controlled-clock despachante CLI failed: #{stderr}"
     JSON.parse(stdout).merge("stderr" => stderr)
   end
 end

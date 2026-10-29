@@ -37,7 +37,7 @@ Este módulo é dono da identidade lógica dos monitoramentos e de sua associaç
 7. O matching usa igualdade dos nomes completos após normalizar caixa, diacríticos e espaços em branco; pontuação permanece significativa, e não se aceitam aproximações, trechos, apelidos ou abreviações. Para advogado, igualdade de nome **ou** de um par OAB elegível principal/secundário estabelece correspondência. Homônimos não são desambiguados.
 8. O cadastro de parte exige nome não vazio após trim/colapso de espaços. Processo deve ser um número CNJ de 20 dígitos, mascarado no formato `NNNNNNN-DD.AAAA.J.TR.OOOO` ou sem máscara; somente `-` e `.` do formato são removidos. OAB para matching exige número textual não vazio e UF brasileira reconhecida; o perfil continua sob responsabilidade de Identidade.
 9. Parte/processo duplicado no mesmo tenant é definido por chave canônica de busca, inclusive se desativado e independentemente do filtro; edição ou reativação reutiliza o alvo existente. A chave não declara identidade única de pessoa, e tenants diferentes podem manter a mesma chave.
-10. Na primeira entrega, o advogado pode editar e desativar monitoramentos de partes e processos. Desativar interrompe novas coletas do alvo, preservando comunicações já coletadas, vínculos históricos e registros imutáveis do Escriba. Não implementar exclusão do cadastro como substituta da desativação.
+10. Na primeira entrega, o advogado pode editar e desativar monitoramentos de partes e processos. Desativar interrompe novas coletas do alvo, preservando comunicações já coletadas, vínculos históricos e registros imutáveis do Escrevente. Não implementar exclusão do cadastro como substituta da desativação.
 
 ## Critérios observáveis
 

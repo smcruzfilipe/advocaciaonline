@@ -1,24 +1,24 @@
 ENV["BUNDLE_GEMFILE"] ||= File.expand_path("Gemfile", __dir__)
 require "bundler/setup"
 require_relative "collection_schedule"
-require_relative "collection_planner"
+require_relative "collection_despachante"
 
-class PlannerRunner
+class DespachanteRunner
   RECONCILE_INTERVAL = 60
   CATALOG_RETRY_SECONDS = 60
 
-  def initialize(planner_url:, first:, second:)
+  def initialize(despachante_url:, first:, second:)
     @schedule = CollectionSchedule.new(first: first, second: second)
-    unless planner_url.is_a?(String) && !planner_url.strip.empty?
-      raise ArgumentError, "PLANNER_DATABASE_URL é obrigatória para o processo de planejamento."
+    unless despachante_url.is_a?(String) && !despachante_url.strip.empty?
+      raise ArgumentError, "DESPACHANTE_DATABASE_URL é obrigatória para o processo de planejamento."
     end
-    @planner = CollectionPlanner.new(url: planner_url)
+    @despachante = CollectionDespachante.new(url: despachante_url)
   end
 
   def run_once(now:)
     started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     clock = -> { now + (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) }
-    @planner.interrupt_before(now: clock.call)
+    @despachante.interrupt_before(now: clock.call)
     catalog = round_catalog
     failure = nil
     ids = []
@@ -28,13 +28,13 @@ class PlannerRunner
         break unless @schedule.due(now: current).include?(due_slot)
 
         begin
-          ids << @planner.plan(slot: due_slot.fetch(:slot), now: current, catalog: catalog)
+          ids << @despachante.plan(slot: due_slot.fetch(:slot), now: current, catalog: catalog)
         rescue CourtCatalog::Unavailable => error
           failure ||= error
         end
       end
     ensure
-      @planner.interrupt_before(now: clock.call)
+      @despachante.interrupt_before(now: clock.call)
     end
     raise failure if failure
 
@@ -58,7 +58,7 @@ class PlannerRunner
     resolved = false
     result = nil
     failure = nil
-    # The planner invokes this only for unfinished slots; finalized plans need no source access.
+    # The despachante invokes this only for unfinished slots; finalized plans need no source access.
     lambda do
       unless resolved
         resolved = true
@@ -94,7 +94,7 @@ end
 
 if $PROGRAM_NAME == __FILE__
   begin
-    runner = PlannerRunner.new(planner_url: ENV.fetch("PLANNER_DATABASE_URL"),
+    runner = DespachanteRunner.new(despachante_url: ENV.fetch("DESPACHANTE_DATABASE_URL"),
       first: ENV.fetch("COLETA_HORARIO_1"), second: ENV.fetch("COLETA_HORARIO_2"))
 
     loop do
@@ -107,7 +107,7 @@ if $PROGRAM_NAME == __FILE__
       sleep runner.next_wait(reconciled_at: reconciled_at, now: Time.now)
     end
   rescue StandardError, SecurityError => error
-    warn "Planejador encerrado: #{error.class}."
+    warn "Despachante encerrado: #{error.class}."
     exit 1
   end
 end

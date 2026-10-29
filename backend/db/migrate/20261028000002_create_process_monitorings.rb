@@ -22,6 +22,7 @@ class CreateProcessMonitorings < ActiveRecord::Migration[8.1]
       t.timestamps
     end
     add_index :process_monitorings, [:tenant_id, :number], unique: true, name: "unique_tenant_process_number"
+    add_index :process_monitorings, [:tenant_id, :id], unique: true, name: "unique_process_tenant_identity"
     add_check_constraint :process_monitorings, "length(number) = 20 AND number !~ '[^0-9]'",
       name: "process_canonical_number"
     add_check_constraint :process_monitorings,
@@ -32,15 +33,19 @@ class CreateProcessMonitorings < ActiveRecord::Migration[8.1]
       ALTER TABLE public.process_monitorings ENABLE ROW LEVEL SECURITY;
       ALTER TABLE public.process_monitorings FORCE ROW LEVEL SECURITY;
       CREATE POLICY tenant_isolation ON public.process_monitorings
+        TO advocacia_runtime, advocacia_migrator
         USING (tenant_id = (SELECT app_private.current_tenant_id()))
         WITH CHECK (tenant_id = (SELECT app_private.current_tenant_id()));
-      REVOKE ALL ON public.process_monitorings FROM PUBLIC, advocacia_runtime;
+      CREATE POLICY collection_despachante_read ON public.process_monitorings
+        FOR SELECT TO advocacia_despachante USING (true);
+      REVOKE ALL ON public.process_monitorings FROM PUBLIC, advocacia_runtime, advocacia_despachante;
       GRANT SELECT, INSERT ON public.process_monitorings TO advocacia_runtime;
       GRANT UPDATE (number, courts, active, updated_at) ON public.process_monitorings TO advocacia_runtime;
+      GRANT SELECT ON public.process_monitorings TO advocacia_despachante;
     SQL
   end
 
   def down
-    drop_table :process_monitorings
+    raise ActiveRecord::IrreversibleMigration
   end
 end

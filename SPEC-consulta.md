@@ -80,7 +80,7 @@ Cenários abaixo expressam contratos observáveis, sem assumir framework, comand
 
 - **Resolvido na decisão 2b/2c:** concessões de grupos se somam e negação explícita prevalece; leitura ampla e dashboard sem grupos; concessão de dashboard não amplia tribunais legíveis; escopo de métricas/avisos, `*`, unidades, períodos, timestamp de primeira persistência e distinção entre zero, falha, resultado parcial e estado indisponível estão definidos nesta especificação e em [autorização](SPEC-autorizacao.md).
 - **Pendente de evidência da fonte:** quais campos do conteúdo são fornecidos em todos os casos e como apresentar cada campo ausente. O detalhe só promete o que a fonte efetivamente forneceu.
-- **Pendente do contrato operacional/técnico:** códigos e armazenamento do estado por execução/tribunal e mapeamento para os estados observáveis desta especificação; não incluir detalhes técnicos de erro no Escriba.
+- **Pendente do contrato operacional/técnico:** códigos e armazenamento do estado por execução/tribunal e mapeamento para os estados observáveis desta especificação; não incluir detalhes técnicos de erro no Escrevente.
 - **Futuro:** definir e medir desempenho sob perfil representativo; 300 usuários simultâneos são referência e não bloqueiam a entrega.
 - A stack da aplicação central está definida em [docs/stack.md](docs/stack.md). Versões, runtime, bibliotecas, comandos, estilo real, caminhos físicos, framework/localização/cobertura de testes e ferramenta de teste de carga ainda precisam ser definidos.
 

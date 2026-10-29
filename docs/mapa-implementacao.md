@@ -1,17 +1,28 @@
-# Mapa físico previsto para as fatias
+# Mapa físico do monorepo para as fatias
 
-Os caminhos abaixo são uma proposta de alocação, não arquivos já existentes. Testes ficam nos caminhos correspondentes sob `backend/test/`, `frontend/tests/`, `planner/test/` e `etl/test/`. Antes de iniciar cada fatia, confirmar os arquivos exatos no checklist e subdividir quando exceder cinco arquivos; geradores, migrations e configuração podem acrescentar arquivos. Nunca marcar uma fatia pronta apenas por criar esses diretórios.
+Este mapa reúne caminhos existentes e previstos dentro do mesmo repositório; o estado de cada componente está na [estrutura do monorepo](../README.md#estrutura-do-monorepo). `backend/`, `backend/despachante/` e `backend/test/` já existem; `frontend/` e `etl/` ainda são previstos. Testes do backend e do despachante ficam em `backend/test/`; testes futuros de frontend e ETL estão previstos em `frontend/tests/` e `etl/test/`. Antes de iniciar cada fatia, confirmar os arquivos exatos no checklist e subdividir quando exceder cinco arquivos; geradores, migrations e configuração podem acrescentar arquivos. Nunca marcar uma fatia pronta apenas por criar diretórios.
 
-| IDs | Áreas físicas previstas | Responsabilidade |
+| IDs | Áreas físicas existentes ou previstas | Responsabilidade |
 |---|---|---|
 | 4 | `backend/app/models/`, `backend/app/controllers/`, `backend/app/services/`, `frontend/app/` | onboarding, identidade e tenant |
 | 5–6 | `backend/app/models/`, `backend/app/services/`, `backend/app/controllers/`, `frontend/app/` | credenciais, grupos e autorização |
 | 7–8 | `backend/app/models/`, `backend/app/services/`, `backend/app/controllers/`, `frontend/app/` | monitoramentos, filtros e navegação |
-| 9 | `backend/app/models/`, `backend/app/services/`, `backend/db/migrate/` | Escriba, permissões e retenção |
-| 10 | `planner/`, `backend/app/models/`, `backend/db/migrate/` | planejamento e agenda persistente |
+| 9 | `backend/app/models/`, `backend/app/services/`, `backend/db/migrate/` | Escrevente, permissões e retenção |
+| 10 | `backend/despachante/`, `backend/app/models/`, `backend/db/migrate/` | planejamento e agenda persistente |
 | 11–12 | `etl/`, `backend/app/models/`, `backend/db/migrate/` | DJEN, persistência, deduplicação e vínculos |
-| 13 | `planner/`, `etl/`, `backend/app/models/` | execução, tentativas e estado |
+| 13 | `backend/despachante/`, `etl/`, `backend/app/models/` | execução, tentativas e estado |
 | 14–15 | `backend/app/controllers/`, `backend/app/services/`, `frontend/app/`, `frontend/components/` | consulta, métricas e dashboard |
-| 16 | `backend/test/`, `frontend/tests/`, `planner/test/`, `etl/test/` | integração e carga |
+| 16 | `backend/test/`, `frontend/tests/`, `etl/test/` | integração e carga |
 
-As rotas, nomes de modelos, migrations e bibliotecas ainda não foram gerados. Por isso não se afirma que estes caminhos ou comandos existam, nem se presume o conjunto final de arquivos por fatia. A garantia de isolamento e a análise de impacto para uma fatia são verificadas antes de implementá-la, não substituídas por este mapa.
+O mapa não implica que todas as rotas, modelos, migrations ou bibliotecas das fatias estejam implementados. Confirmar os arquivos e comandos de cada componente antes da execução, sem tratar caminhos previstos como existentes. A garantia de isolamento e a análise de impacto são verificadas por fatia, não substituídas por este mapa.
+
+## Migrations iniciais consolidadas
+
+As migrations em `backend/db/migrate/` destinam-se somente à criação de novos bancos de desenvolvimento e definem diretamente o estado final do schema, sem reproduzir alterações intermediárias ou backfills da sequência anterior:
+
+- `20261028000003_create_collection_planning.rb`: planejamento, integridade das entidades dos trabalhos, audiência por tenant e estado `interrupted`; integra as antigas migrations 04–06.
+- `20261028000004_create_escrevente.rb`: marcos append-only e estado operacional dos trabalhos; substitui a antiga `07_create_escrevente`.
+
+A consolidação deve preservar funções, constraints, nomes, grants, RLS, colunas, índices e comportamento existentes. Não há rollback destrutivo nem upgrade automático de banco pré-existente. Um banco descartável criado pela sequência anterior precisa ser recriado explicitamente antes de receber a sequência consolidada; o provisionamento e a execução estão descritos no [README](../README.md#imagens-docker-da-api-e-do-despachante).
+
+As verificações registradas no README, nas specs e no checklist são evidências históricas anteriores à consolidação, não resultados desta alteração nem comprovação da sequência consolidada.

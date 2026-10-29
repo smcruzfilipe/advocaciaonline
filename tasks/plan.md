@@ -13,7 +13,7 @@ O [mapa de capacidades](../CAPABILITIES.md) e as seis especificações funcionai
 | identidade | [SPEC-identidade.md](../SPEC-identidade.md) |
 | autorização | [SPEC-autorizacao.md](../SPEC-autorizacao.md) |
 | monitoramentos | [SPEC-monitoramentos.md](../SPEC-monitoramentos.md) |
-| Escriba | [SPEC-escriba.md](../SPEC-escriba.md) |
+| Escrevente | [SPEC-escrevente.md](../SPEC-escrevente.md) |
 | coleta | [SPEC-coleta.md](../SPEC-coleta.md) |
 | consulta | [SPEC-consulta.md](../SPEC-consulta.md) |
 
@@ -47,9 +47,9 @@ Executar as fatias em ordem de dependência. IDs são os principais do checklist
 ### Fase 2 — Monitoramentos e registro do fluxo
 
 - **IDs 7 e 8:** cadastros de partes e processos, em paralelo após os contratos do ID 3 e o ID 6.
-- **ID 9:** Escriba append-only; depende dos contratos técnicos e do contexto de identidade, não dos cadastros de monitoramento.
+- **ID 9:** Escrevente append-only; depende dos contratos técnicos e do contexto de identidade, não dos cadastros de monitoramento.
 
-**Checkpoint após 7–9:** confirmar os contratos de identidade/tenant dos monitoramentos e o limite do Escriba antes de planejar coletas.
+**Checkpoint após 7–9:** confirmar os contratos de identidade/tenant dos monitoramentos e o limite do Escrevente antes de planejar coletas.
 
 ### Fase 3 — Coleta e estado de execução
 
@@ -115,7 +115,7 @@ flowchart LR
 | identidade | 4–5 | Mecanismo de login e identidade para usuários da equipe; aplicação da validade às credenciais e sessões; início, fuso e instante de expiração; validações de nome/OAB. |
 | autorização | 5–6, 14–15 | Composição e conflitos entre grupos; operações e concessões de escrita; escopo de tribunal e dashboard; ações de gestão de usuários/grupos; proteção das respostas e agregações. |
 | monitoramentos | 7–8 | Validação e normalização de nome/OAB/número, duplicidades, ciclo de vida; tribunais realmente disponíveis e semântica de filtros; política de correspondência e homônimos, sem presumir algoritmo. |
-| Escriba | 9 | Esquema e granularidade dos marcos; contexto de execução; isolamento e proteção append-only. Não registrar ações de usuários nem detalhes de erro; sem expurgo automático nesta etapa. |
+| Escrevente | 9 | Esquema e granularidade dos marcos; contexto de execução; isolamento e proteção append-only. Não registrar ações de usuários nem detalhes de erro; sem expurgo automático nesta etapa. |
 | coleta | 1, 10–13 | Critérios de tribunal e elegibilidade; horários e interrupções; validação do ZIP/JSON; demais critérios de falha do caderno; configuração de tentativas/backoff; estados de falha e tratamento de chaves ausentes/inválidas. A regra de paginação do fallback está definida na especificação de coleta. |
 | consulta | 14–15 | Definição de métricas, unidade e janelas; comportamento de agregações sob escopo parcial; campos efetivamente fornecidos pela fonte; apresentação de falha distinta de zero e de números sem autorização. |
 | transversal | 3, 16 | Stack central escolhida: Rails API-only, Next.js e PostgreSQL/RLS. Faltam versões, stack de ETL, políticas/roles RLS, caminhos de código, arquitetura/transportes, comandos/ferramentas e metas de carga de 300 usuários. |
@@ -129,7 +129,7 @@ flowchart LR
 | IDs 7 e 8 | Após os contratos do ID 3 e o ID 6, com a definição compartilhada de identidade de monitoramento, tenant e filtro de tribunal; limitar cada fatia à sua entidade e áreas de arquivo próprias. |
 | IDs 13 e 14 | Após ID 12 e a estabilização do contrato de estado da coleta, podem avançar em módulos distintos; ID 15 aguarda ambos. |
 
-Não paralelizar tarefas com dependência direta nem alterações concorrentes a um mesmo contrato ou arquivo. Antes de dividir o trabalho, fixar: contexto autenticado e tenant derivado no servidor; decisão de autorização por operação/tribunal/dashboard; identidade e tenant do monitoramento fornecidos à coleta; registros append-only do Escriba sem detalhes de erro; estado por execução/tribunal; e identidade de publicação pela combinação conjunta `id` + `hash`, escopada por tenant e fonte lógica DJEN.
+Não paralelizar tarefas com dependência direta nem alterações concorrentes a um mesmo contrato ou arquivo. Antes de dividir o trabalho, fixar: contexto autenticado e tenant derivado no servidor; decisão de autorização por operação/tribunal/dashboard; identidade e tenant do monitoramento fornecidos à coleta; registros append-only do Escrevente sem detalhes de erro; estado por execução/tribunal; e identidade de publicação pela combinação conjunta `id` + `hash`, escopada por tenant e fonte lógica DJEN.
 
 ## Riscos e mitigação
 

@@ -16,4 +16,6 @@ Rails.application.routes.draw do
   patch "/api/monitorings/processes/:id", to: "process_monitorings#update", defaults: { format: :json }
   get "/api/collection-runs", to: "collection_runs#index", defaults: { format: :json }
   get "/api/collection-runs/:id/jobs", to: "collection_runs#jobs", defaults: { format: :json }
+  get "/api/collection-runs/:id/events", to: "escrevente#events", defaults: { format: :json }
+  get "/api/collection-runs/:id/execution", to: "escrevente#execution", defaults: { format: :json }
 end
