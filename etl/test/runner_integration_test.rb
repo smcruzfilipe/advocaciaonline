@@ -36,7 +36,7 @@ class RunnerIntegrationTest < Minitest::Test
     @admin&.close
   end
 
-  def test_caderno_matches_three_entities_and_persists_one_sanitized_communication_with_all_links
+  def test_caderno_matches_three_entities_and_preserves_the_publication_with_all_links
     jobs = [
       job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }),
       job("party", @party, { "name" => "Parte Exemplo" }),
@@ -56,11 +56,7 @@ class RunnerIntegrationTest < Minitest::Test
     end
     rows = @admin.exec_params("SELECT payload FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
     assert_equal 1, rows.ntuples
-    text = JSON.parse(rows.first.fetch("payload")).fetch("texto")
-    assert_includes text, "Guilherme Curcelli Guimarães & partes"
-    assert_includes text, "Intimação"
-    refute_includes text, "não executar"
-    refute_includes text, "<p>"
+    assert_equal pub.fetch("texto"), JSON.parse(rows.first.fetch("payload")).fetch("texto")
     assert_equal "3", scalar("SELECT count(*)::text FROM public.collection_communication_links WHERE tenant_id = $1", [@tenant])
   end
 
@@ -90,7 +86,7 @@ class RunnerIntegrationTest < Minitest::Test
 
   def test_empty_is_success_but_exhausted_source_is_failure_without_completed_event
     empty_job = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, medium: "D")
-    failed_job = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, medium: "E")
+    failed_job = job("party", @party, { "name" => "Parte Exemplo" })
     responses = [ { body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0, "numero_paginas" => 0) },
       { body: JSON.generate("status" => "Cancelado") }, { status: 503, body: "indisponível" } ]
     with_server(responses) do |origin, _requests|
@@ -185,16 +181,39 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal ["started"], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1", [id]).column_values(0)
   end
 
+  def test_large_retry_after_is_preserved_until_the_collection_day_changes
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    calls = 0
+    clock = -> { calls += 1; calls <= 3 ? @date : @date + 1 }
+    with_server([{ status: 503, headers: { "Retry-After" => "2147483648" } }]) do |origin, requests|
+      assert_equal "failed", runner(origin, date_source: clock).call(id).fetch("state")
+      assert_equal 1, requests.length
+    end
+    assert_equal "interrupted", scalar("SELECT code FROM public.collection_job_failures WHERE job_id = $1", [id])
+  end
+
+  def test_second_slot_uses_paginated_api_directly_and_sanitizes_its_text
+    run = run_for(@date, slot: 2)
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run)
+    item = publication(501).merge("texto" => "<p>Texto&nbsp;da API &amp; parte</p><script>remover</script>")
+    with_server([page([item]), page([])]) do |origin, requests|
+      assert_equal "succeeded", runner(origin).call(id).fetch("state")
+      assert_equal 2, requests.length
+      assert requests.all? { |request| request.fetch(:target).start_with?("/api/v1/comunicacao?") }
+    end
+    assert_equal "Texto da API & parte", JSON.parse(scalar("SELECT payload::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])).fetch("texto")
+  end
+
   private
 
   def scalar(sql, params = [])
     @admin.exec_params(sql, params).getvalue(0, 0)
   end
 
-  def run_for(date)
-    created = @admin.exec_params("INSERT INTO public.collection_runs (collection_date, slot, status, created_at, updated_at) VALUES ($1, 1, 'planned', now(), now()) ON CONFLICT DO NOTHING RETURNING id", [date.iso8601])
+  def run_for(date, slot: 1)
+    created = @admin.exec_params("INSERT INTO public.collection_runs (collection_date, slot, status, created_at, updated_at) VALUES ($1, $2, 'planned', now(), now()) ON CONFLICT DO NOTHING RETURNING id", [date.iso8601, slot])
     @created_runs << created.getvalue(0, 0) if created.ntuples == 1
-    run = scalar("SELECT id FROM public.collection_runs WHERE collection_date = $1 AND slot = 1", [date.iso8601])
+    run = scalar("SELECT id FROM public.collection_runs WHERE collection_date = $1 AND slot = $2", [date.iso8601, slot])
     @admin.exec_params("INSERT INTO public.collection_run_audiences (run_id, tenant_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [run, @tenant])
     run
   end

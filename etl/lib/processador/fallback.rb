@@ -20,8 +20,8 @@ module Processador
     def each(court:, date:, medium:, before_request: nil)
       return enum_for(__method__, court: court, date: date, medium: medium, before_request: before_request) unless block_given?
 
-      unless court.is_a?(String) && !court.strip.empty? && date.instance_of?(Date) && %w[D E].include?(medium)
-        raise SourceError, "DJEN fallback requires a court, execution date and D or E medium", cause: nil
+      unless court.is_a?(String) && !court.strip.empty? && date.instance_of?(Date) && medium == "D"
+        raise SourceError, "DJEN collection requires a court, execution date and D medium", cause: nil
       end
       page = 1
       loop do

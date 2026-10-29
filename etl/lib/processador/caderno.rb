@@ -18,6 +18,8 @@ module Processador
 
     def each(court:, date:, medium:, before_request: nil)
       return enum_for(__method__, court: court, date: date, medium: medium, before_request: before_request) unless block_given?
+      raise SourceError, "DJEN collection requires D medium", cause: nil unless medium == "D"
+
 
       path = [court, date.iso8601, medium].map { |part| URI.encode_www_form_component(part) }.join("/")
       before_request&.call
@@ -137,6 +139,21 @@ module Processador
       if input.pos + entry.compressed_size > input.stat.size
         source_failure("caderno_truncated_member")
       end
+      validate_descriptor(input, entry) if descriptor
+    end
+
+    def validate_descriptor(input, entry)
+      input.seek(input.pos + entry.compressed_size)
+      bytes = input.read(24) || "".b
+      offsets = [0]
+      offsets << 4 if bytes.bytesize >= 4 && bytes.unpack1("V") == 0x08074b50
+      expected = [entry.crc, entry.compressed_size, entry.size]
+      valid = offsets.any? do |offset|
+        remaining = bytes.byteslice(offset..)
+        (remaining.bytesize >= 12 && remaining.unpack("V3") == expected) ||
+          (remaining.bytesize >= 20 && remaining.unpack("VQ<Q<") == expected)
+      end
+      source_failure("caderno_invalid_descriptor") unless valid
     end
 
     def read_entry(path, entry)

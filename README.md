@@ -1,8 +1,8 @@
 # Monitoramento jurídico — monorepo
 
-Monorepo da plataforma de monitoramento de publicações judiciais voltada a advogados independentes e suas equipes, reunindo backend Rails API-only e frontend Next.js no mesmo repositório. A fonte inicial prevista é o Diário de Justiça Eletrônico Nacional (DJEN), com consulta a cadernos como caminho principal e à API paginada de comunicações como fallback.
+Monorepo da plataforma de monitoramento de publicações judiciais voltada a advogados independentes e suas equipes, reunindo backend Rails API-only e frontend Next.js no mesmo repositório. A fonte inicial é o Diário de Justiça Eletrônico Nacional (DJEN), exclusivamente Diário Eletrônico (`D`), sem coleta de editais (`E`): na primeira coleta, cadernos com fallback paginado; na segunda, API paginada diretamente.
 
-> **Estado atual:** o backend contém onboarding, identidade de equipe, grupos, permissões, cadastros de monitoramento, geração de planos de coleta e Escrevente. Frontend, executor ETL, execução real da coleta, consulta de comunicações, dashboard e Swagger UI ainda não estão implementados.
+> **Estado atual:** o backend contém onboarding, identidade de equipe, grupos, permissões, cadastros de monitoramento, geração de planos de coleta e Escrevente. O processador ETL executa os trabalhos de coleta; frontend, consulta de comunicações, dashboard e Swagger UI ainda não estão implementados.
 
 ## Estrutura do monorepo
 
@@ -26,7 +26,7 @@ A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha 
 
 - Login Google para advogado e equipe; o contrato de identidade não prevê senha local para usuários da aplicação.
 - Isolamento por tenant do advogado, autorização por grupos e tribunal, monitoramentos de advogados/partes/processos e consulta de comunicações.
-- Coleta diária do DJEN, com cadernos como fonte principal, API paginada como fallback e deduplicação pela combinação de `id` e `hash`.
+- Duas coletas diárias do DJEN, somente Diário Eletrônico (`D`), sem editais (`E`): cadernos e fallback paginado na primeira execução, API paginada diretamente na segunda e deduplicação pela combinação de `id` e `hash`.
 - Dashboard e registros append-only do fluxo de coleta.
 
 O mapa de módulos e a ordem de dependências estão em [`CAPABILITIES.md`](CAPABILITIES.md). Requisitos detalhados: [`docs/especificacao.md`](docs/especificacao.md) e as seis especificações `SPEC-*.md` na raiz.
@@ -145,7 +145,7 @@ No cadastro de parte, `name` é obrigatório e sua chave de equivalência ignora
 
 ### Planejamento de coleta
 
-O despachante é um processo separado da API: usa uma conexão PostgreSQL exclusiva, consulta o catálogo DJEN e registra uma execução por data de Brasília e horário configurado. Para cada advogado, parte e processo elegível, fixa os critérios e gera trabalhos por tribunal e meio `D`/`E`. Editar ou desativar um cadastro posteriormente não altera o plano já registrado. A leitura da API é limitada ao tenant autenticado:
+O despachante é um processo separado da API: usa uma conexão PostgreSQL exclusiva, consulta o catálogo DJEN e registra uma execução por data de Brasília e horário configurado. Para cada advogado, parte e processo elegível, fixa os critérios e gera trabalhos por tribunal somente no meio `D`; não planeja coleta de editais (`E`). Editar ou desativar um cadastro posteriormente não altera o plano já registrado. A leitura da API é limitada ao tenant autenticado:
 
 | Método e caminho | Comportamento |
 |---|---|
@@ -158,7 +158,7 @@ O despachante é um processo separado da API: usa uma conexão PostgreSQL exclus
 
 **Verificação histórica dos contratos 10a/10b, anterior à renomeação para processador:** com as migrations então vigentes em PostgreSQL 18.6 isolado e roles separadas, `ruby bin/rails test test/integration/collection_planning_test.rb test/integration/despachante_execution_test.rb test/services/collection_schedule_test.rb test/integration/collection_runs_http_test.rb` passou com 72 testes e 1.248 assertions, sem falhas, erros ou skips. O teste de perfil sem OAB principal verifica falha integral do planejamento, ausência de trabalhos parciais e recuperação da mesma execução após restauração do perfil. A suíte completa passou com 383 testes e 9.267 assertions, sem falhas, erros ou skips.
 
-Um smoke separado na imagem final do despachante usou catálogo TJAC controlado e dois tenants: os dois slots terminaram em `planned`, com advogado, parte e processo, meios D/E, critérios e vínculos conferidos para cada tenant. Repetir a execução reutilizou os mesmos slots; o despachante executou como UID/GID `1000:1000` e o PostgreSQL como `70:70`. Não houve coleta de publicações.
+**Smoke histórico, anterior à restrição ao meio D:** na imagem final do despachante então vigente, usou catálogo TJAC controlado e dois tenants: os dois slots terminaram em `planned`, com advogado, parte e processo, meios D/E, critérios e vínculos conferidos para cada tenant. Repetir a execução reutilizou os mesmos slots; o despachante executou como UID/GID `1000:1000` e o PostgreSQL como `70:70`. Não houve coleta de publicações. Esse registro preserva a evidência anterior, não autoriza trabalhos E na regra vigente.
 
 O workflow `.github/workflows/backend.yml` constrói as imagens da API, do despachante e do processador e executa as suítes contra PostgreSQL descartável em rede isolada; também exercita a imagem final do despachante com catálogo controlado. O banco e os processos das imagens iniciam sem root; a autenticação `trust` é restrita à rede de teste descartável e não é configuração de produção. A verificação automatizada não comprova login Google real nem cobertura global do DJEN.
 
@@ -166,13 +166,17 @@ O workflow `.github/workflows/backend.yml` constrói as imagens da API, do despa
 
 O processo em `etl/` executa um trabalho já planejado, identificado pelo UUID, com a role exclusiva `advocacia_processador`. Para uma imagem construída por `docker build -t advocacia-processador etl`, execute `docker run --rm --network <rede> -e PROCESSADOR_DATABASE_URL advocacia-processador <UUID-do-trabalho>`, fornecendo a URL pelo ambiente protegido. O processador não seleciona nem agenda trabalhos automaticamente; o acionamento periódico e a recuperação de slots continuam na tarefa 13.
 
-Cada trabalho usa o dia corrente de `America/Sao_Paulo`, valida integralmente o ZIP do caderno e, após esgotar as tentativas, percorre o fallback até a primeira página vazia válida. Contadores, etapa e espera são persistidos; falha posterior não publica páginas parciais. Antes da gravação, Loofah converte o campo `texto` em texto simples, removendo HTML, scripts e estilos e decodificando entidades. O texto continua não confiável e deve ser escapado pelo consumidor na renderização.
+Cada trabalho consulta somente Diário Eletrônico (`D`) no dia corrente de `America/Sao_Paulo`. Na primeira coleta, valida integralmente o ZIP do caderno e, após esgotar as tentativas, percorre a API paginada até a primeira página vazia válida; na segunda, inicia diretamente pela API, sem caderno. Contadores, etapa e espera são persistidos; falha posterior não publica páginas parciais. Somente para resultados da API, Loofah converte o campo `texto` em texto simples, removendo HTML, scripts e estilos e decodificando entidades; cadernos são persistidos sem essa sanitização. Como a primeira versão é preservada na deduplicação, uma comunicação inicialmente obtida de caderno pode continuar contendo HTML mesmo se também aparecer na API. Todo texto da fonte deve ser escapado pelo consumidor na renderização.
 
 `collection_communications`, `collection_communication_links`, `collection_job_results` e `collection_job_failures` armazenam resultados, vínculos e falhas fora dos marcos do Escrevente. A função `app_private.collection_court_states(uuid)` agrega o estado do tribunal sob a sessão autenticada; contagens ficam `NULL` quando o tribunal não terminou integralmente. As telas e APIs de consulta de comunicações ainda não existem.
 
 Para os testes de integração isolados, forneça também `PROCESSADOR_TEST_ADMIN_DATABASE_URL` de um PostgreSQL descartável e execute `docker run --rm --network <rede-de-teste> -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL <imagem-de-teste-do-processador>`. A conexão administrativa é exclusiva da preparação de dados sintéticos; não deve ser fornecida ao processador de produção.
 
-Em PostgreSQL 18.6 isolado, `ruby bin/rails test` passou com 402 testes e 9.775 assertions; a imagem de teste do processador passou com 98 testes e 1.004 assertions, sem falhas, erros ou skips. No smoke controlado, seis trabalhos planejados concluíram por caderno e fallback e geraram uma comunicação sanitizada com seis vínculos. O comando definitivo consultou o caderno TJAC/D real e terminou com zero correspondências; isso não comprova cobertura global.
+**Verificação histórica, anterior à API direta na segunda coleta e à restrição ao meio D:** em PostgreSQL 18.6 isolado, `ruby bin/rails test` passou com 402 testes e 9.775 assertions; a imagem de teste do processador passou com 98 testes e 1.004 assertions, sem falhas, erros ou skips. No smoke controlado anterior, seis trabalhos planejados concluíram por caderno e fallback e geraram uma comunicação com seis vínculos. O comando definitivo consultou o caderno TJAC/D real e terminou com zero correspondências; isso não comprova cobertura global nem verifica as decisões vigentes.
+
+**Verificação do contrato vigente:** em PostgreSQL 18.6 descartável com migrations recriadas, a suíte Rails executou 405 testes e 9.648 assertions; a suíte do processador executou 103 testes e 1.030 assertions, ambas sem falhas, erros ou skips. Os testes incluem rejeição de edital, paginação direta no segundo slot e sanitização somente da API.
+
+No smoke definitivo, o despachante planejou seis trabalhos `D` em dois slots para advogado, parte e processo no TJAC. A imagem final executou o trabalho do advogado no segundo slot contra a API DJEN real pelo exit node informado: `succeeded`, zero correspondências, uma tentativa da API e nenhuma do caderno. A amostra não comprova cobertura global.
 
 A imagem runtime do processador mediu 201.991.669 bytes e executou com UID/GID 1000:1000; a base `ruby:4.0.9-alpine3.23` mediu 147.221.451 bytes e foi escolhida por compartilhar a versão Ruby do projeto com runtime Alpine enxuto. PostgreSQL local executou com UID/GID 70:70 e preservou dados após reinicialização. A imagem final não inclui ferramentas de compilação ou testes.
 

@@ -81,7 +81,7 @@ jobs:
             --entrypoint ruby advocacia-ci:despachante -e '
               require "./despachante/run"
               require "pg"
-              CourtCatalog.define_singleton_method(:fetch) { [{ code: "TJAC" }] }
+              CourtCatalog.define_singleton_method(:fetch) { [{ code: "TJAC" }, { code: "TRF1" }] }
               runner = DespachanteRunner.new(despachante_url: ENV.fetch("DESPACHANTE_DATABASE_URL"),
                 first: "04:00", second: "16:00")
               now = Time.utc(2200, 1, 1, 20)
@@ -90,15 +90,17 @@ jobs:
                 runner.run_once(now: now) == ids
               PG.connect(ENV.fetch("DESPACHANTE_DATABASE_URL")) do |db|
                 ids.each do |id|
-                  row = db.exec_params(<<~SQL, [id, "lawyer", "name", "CI Despachante Runtime"]).first
-                    SELECT r.status, count(j.id) AS jobs, count(DISTINCT j.medium) AS media
+                  row = db.exec_params(<<~SQL, [id, "lawyer", "name", "CI Despachante Runtime", "D"]).first
+                    SELECT r.status, count(j.id) AS jobs, count(DISTINCT j.court) AS courts,
+                      bool_and(j.medium = $5) AS diary_only
                     FROM public.collection_runs r
                     LEFT JOIN public.collection_jobs j ON j.run_id = r.id AND j.entity_type = $2
                       AND j.criteria ->> $3 = $4
                     WHERE r.id = $1 GROUP BY r.status
                   SQL
-                  raise "planning did not produce both media" unless row && row["status"] == "planned" &&
-                    row["jobs"].to_i == 2 && row["media"].to_i == 2
+                  raise "planning did not produce distinct court work only for Diario Eletronico" unless
+                    row && row["status"] == "planned" && row["jobs"].to_i == 2 &&
+                    row["courts"].to_i == 2 && row["diary_only"] == "t"
                 end
               end
               raise "despachante must run non-root" if Process.uid.zero?

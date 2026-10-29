@@ -301,6 +301,28 @@ class CadernoTest < Minitest::Test
     assert_same error, actual
   end
 
+  def test_rejects_edital_without_requesting_a_caderno
+    http = ControlledHttp.new(metadata: {})
+    source = Processador::Caderno.new(http: http, base_url: BASE_URL)
+    assert_raises(Processador::SourceError) { source.each(court: "TJSP", date: DATE, medium: "E").to_a }
+    assert_empty http.requests
+  end
+
+  def test_literal_nul_cannot_hide_invalid_json_suffix
+    content = "{\"items\":[]}\x00invalid"
+    package = zip_bytes([["pagina.json", content]])
+    assert_rejected(metadata(package, pages: 1, total: 0), package: package)
+  end
+
+  def test_valid_data_descriptors_are_accepted_and_corruption_is_rejected
+    [false, true].product([false, true]).each do |signed, zip64|
+      package = zip_with_descriptor(signed: signed, zip64: zip64)
+      assert_equal [publication(1)], collect(ControlledHttp.new(metadata: metadata(package, pages: 1, total: 1), package: package))
+      corrupt = zip_with_descriptor(signed: signed, zip64: zip64, corrupt: true)
+      assert_rejected(metadata(corrupt, pages: 1, total: 1), package: corrupt)
+    end
+  end
+
   private
 
   def publication(id)
@@ -328,6 +350,25 @@ class CadernoTest < Minitest::Test
         output.write(content)
       end
     end.string
+  end
+
+  def zip_with_descriptor(signed:, zip64:, corrupt: false)
+    package = zip_bytes([["pagina.json", page([publication(1)])]], stored: true).b
+    ending = package.rindex("PK\x05\x06".b)
+    central = package.byteslice(ending + 16, 4).unpack1("V")
+    entry = nil
+    Zip::File.open_buffer(package) { |archive| entry = archive.first }
+    crc, compressed, size = entry.crc, entry.compressed_size, entry.size
+    crc ^= 1 if corrupt
+    descriptor = [crc, compressed, size].pack(zip64 ? "VQ<Q<" : "V3")
+    descriptor = [0x08074b50].pack("V") + descriptor if signed
+    package.insert(central, descriptor)
+    central += descriptor.bytesize
+    ending += descriptor.bytesize
+    package[6, 2] = [package.byteslice(6, 2).unpack1("v") | 8].pack("v")
+    package[central + 8, 2] = [package.byteslice(central + 8, 2).unpack1("v") | 8].pack("v")
+    package[ending + 16, 4] = [central].pack("V")
+    package
   end
 
   def metadata(package, pages:, total:)

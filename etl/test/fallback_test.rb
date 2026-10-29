@@ -118,21 +118,19 @@ class FallbackTest < Minitest::Test
     end
   end
 
-  def test_uses_only_court_medium_same_day_and_pagination_filters_for_both_media
-    %w[D E].each do |medium|
-      with_server([page([publication(1)]), page([])]) do |origin, requests|
-        assert_equal [publication(1)], query_items(source_for(origin), medium: medium)
-        requests.each_with_index do |request, index|
-          target = URI(request.fetch(:target))
-          assert_equal "GET", request.fetch(:method)
-          assert_equal "/api/v1/comunicacao", target.path
-          assert_equal({
-            "siglaTribunal" => "TJAC", "meio" => medium,
-            "dataDisponibilizacaoInicio" => "2026-10-29",
-            "dataDisponibilizacaoFim" => "2026-10-29",
-            "pagina" => (index + 1).to_s, "itensPorPagina" => "100"
-          }, URI.decode_www_form(target.query).to_h)
-        end
+  def test_uses_only_court_d_medium_same_day_and_pagination_filters
+    with_server([page([publication(1)]), page([])]) do |origin, requests|
+      assert_equal [publication(1)], query_items(source_for(origin))
+      requests.each_with_index do |request, index|
+        target = URI(request.fetch(:target))
+        assert_equal "GET", request.fetch(:method)
+        assert_equal "/api/v1/comunicacao", target.path
+        assert_equal({
+          "siglaTribunal" => "TJAC", "meio" => "D",
+          "dataDisponibilizacaoInicio" => "2026-10-29",
+          "dataDisponibilizacaoFim" => "2026-10-29",
+          "pagina" => (index + 1).to_s, "itensPorPagina" => "100"
+        }, URI.decode_www_form(target.query).to_h)
       end
     end
   end
@@ -223,7 +221,7 @@ class FallbackTest < Minitest::Test
   def test_rejects_invalid_medium_date_or_court_before_requesting_the_source
     with_server([]) do |origin, requests|
       source = source_for(origin)
-      [["TJAC", QUERY_DATE, "X"], ["TJAC", "2026-10-29", "D"],
+      [["TJAC", QUERY_DATE, "X"], ["TJAC", QUERY_DATE, "E"], ["TJAC", "2026-10-29", "D"],
         [nil, QUERY_DATE, "D"], ["", QUERY_DATE, "D"]].each do |court, date, medium|
         assert_raises(Processador::SourceError) do
           source.each(court: court, date: date, medium: medium).to_a

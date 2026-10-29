@@ -143,9 +143,10 @@ class EscreventeHttpTest < ActionDispatch::IntegrationTest
 
   test "running succeeded failed and unstarted jobs remain distinct without fabricating completion" do
     token, lawyer = create_lawyer
+    create_monitorings(token, lawyer, name: "Parte com estados distintos")
     run_id = plan(slot: 1)
     jobs = persisted_jobs(run_id, lawyer.tenant_id)
-    assert_operator jobs.length, :>=, 4
+    assert_equal 5, jobs.length
     pending, running, succeeded, failed = jobs.first(4).map { |job| job.fetch("id") }
     start_job(running)
     finish_job(succeeded, start_job(succeeded))

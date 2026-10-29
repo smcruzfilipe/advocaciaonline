@@ -61,7 +61,7 @@ class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
     first_jobs = persisted_jobs(shared_id, first.tenant_id)
     second_jobs = persisted_jobs(shared_id, second.tenant_id)
     assert_equal %w[lawyer party process], first_jobs.map { |job| job.fetch("entity_type") }.uniq.sort
-    assert_equal %w[D E], first_jobs.map { |job| job.fetch("medium") }.uniq.sort
+    assert_equal ["D"], first_jobs.map { |job| job.fetch("medium") }.uniq.sort
     assert_equal %w[TJAC TRF1], first_jobs.map { |job| job.fetch("court") }.uniq.sort
     assert_empty first_jobs.map { |job| job.fetch("id") } & second_jobs.map { |job| job.fetch("id") }
 

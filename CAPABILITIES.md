@@ -8,10 +8,12 @@ Mapa e seis especificações aprovados pelo solicitante como base funcional, man
 | autorizacao | Usuários, grupos, operações, escopos | identidade | [autorizacao](SPEC-autorizacao.md) |
 | monitoramentos | Advogado, partes, processos, filtros | identidade, autorizacao | [monitoramentos](SPEC-monitoramentos.md) |
 | escrevente | Registros imutáveis do fluxo de coleta | identidade | [escrevente](SPEC-escrevente.md) |
-| coleta | Planejamento, cadernos, fallback, normalização, deduplicação | monitoramentos, escrevente | [coleta](SPEC-coleta.md) |
+| coleta | Planejamento somente D, caderno/fallback no primeiro slot, API direta no segundo, sanitização da API e deduplicação | monitoramentos, escrevente | [coleta](SPEC-coleta.md) |
 | consulta | Comunicações, detalhes, volumetrias, avisos | autorizacao, coleta | [consulta](SPEC-consulta.md) |
 
 Ordem: identidade → autorização e Escrevente → monitoramentos → coleta → consulta. Dependências expressam contratos lógicos, não exigem um serviço por módulo. A coleta inclui despachante/control plane e microaplicações de ETL separadas da aplicação central.
+
+Regra vigente da coleta: somente Diário Eletrônico (`D`), sem editais (`E`), usando exclusivamente a data corrente. Primeiro slot: caderno com fallback API; segundo slot: API diretamente, sem caderno. Sanitizar apenas `texto` da API, não dos cadernos. A deduplicação conserva a primeira versão, que pode conter HTML; todo consumidor deve escapar o conteúdo na renderização. Evidências antigas com `E` não ampliam esse contrato.
 
 Contratos compartilhados de especificação: contexto autenticado identifica usuário e tenant no servidor, respeita expiração e não aceita tenant enviado pelo cliente como prova de acesso. Autorização decide operação e escopo por tribunal/dashboard. Monitoramentos fornecem identidade da entidade e seu tenant; coleta persiste publicações com vínculos e status por execução/tribunal; Escrevente recebe registros de fluxo append-only. Formatos técnicos e transportes ainda não foram escolhidos.
 

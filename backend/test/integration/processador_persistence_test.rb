@@ -75,6 +75,38 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     assert_empty communications(@lawyer_a)
   end
 
+  test "second slot starts directly in fallback and never consumes a caderno attempt" do
+    second_run = create_run(@date, 2)
+    job = create_job(@lawyer_a, run_id: second_run)
+    proof = claim(job)
+    initial = processor_job(job, proof)
+    assert_equal "D", initial.fetch("medium")
+    assert_equal "fallback", initial.fetch("phase")
+    assert_equal 0, initial.fetch("caderno_attempts")
+    assert_equal 0, initial.fetch("fallback_attempts")
+    assert_equal false, initial.fetch("attempt_in_flight")
+    start(job, proof)
+    assert_unavailable { commit(job, proof, [], source: "fallback") }
+
+    attempt = attempt_begin(job, proof)
+    assert_equal "fallback", attempt.fetch("phase")
+    assert_equal 0, attempt.fetch("caderno_attempts")
+    assert_equal 1, attempt.fetch("fallback_attempts")
+    assert_unavailable { commit(job, proof, [publication], source: "caderno") }
+    result = commit(job, proof, [publication], source: "fallback")
+    assert_equal "succeeded", result.fetch("state")
+    assert_equal 1, result.fetch("matched_count")
+    persisted = @migrator.exec_params(<<~SQL, [job]).first
+      SELECT execution.phase, execution.caderno_attempts, execution.fallback_attempts, result.source_path
+      FROM public.collection_job_executions AS execution
+      JOIN public.collection_job_results AS result ON result.job_id = execution.job_id
+      WHERE execution.job_id = $1
+    SQL
+    assert_equal({ "phase" => "fallback", "caderno_attempts" => "0", "fallback_attempts" => "1",
+      "source_path" => "fallback" }, persisted)
+    assert_equal %w[started completed], event_types(job)
+  end
+
   test "service functions have fixed definer ACLs while tenant tables force RLS and deny direct mutation" do
     FUNCTIONS.each do |signature, (sql, arity)|
       metadata = @migrator.exec_params(<<~SQL, ["app_private.#{signature}"]).first
@@ -122,16 +154,13 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   end
 
   test "complete joint identity deduplicates sources entities and runs while preserving first version and every link" do
-    party = DatabaseContext.with_session(@session_a) do
-      PartyMonitoring.create!(tenant_id: @lawyer_a.tenant_id, name: "Parte controlada")
-    end
-    party_job = create_job(@lawyer_a, entity_type: "party", entity_id: party.id, criteria: { "name" => party.name })
+    party_job = create_party_job
     second_run = create_run(@date, 2)
     later_job = create_job(@lawyer_a, run_id: second_run)
     first = publication.merge("texto" => "Primeira versão")
     commit_started(@job_a, [first])
     commit_started(party_job, [publication.merge("texto" => "Alteração que não substitui a primeira")], source: "fallback")
-    commit_started(later_job, [publication], source: "caderno")
+    commit_started(later_job, [publication], source: "fallback")
     commit_started(@job_b, [first])
     own = communications(@lawyer_a)
     assert_equal 1, own.length
@@ -162,7 +191,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
       publication.merge("id" => huge_id, "hash" => long_hash),
       publication.merge("id" => huge_id + 1, "hash" => long_hash)]
     commit_started(@job_a, items)
-    extra = create_job(@lawyer_a, medium: "E")
+    extra = create_party_job
     commit_started(extra, [items[3]])
     rows = communications(@lawyer_a)
     assert_equal 5, rows.length
@@ -199,7 +228,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
       publication.merge("hash" => nil)]
     result = commit_started(@job_a, invalid + [invalid.first])
     assert_equal invalid.length + 1, result.fetch("pending_identity_count")
-    extra = create_job(@lawyer_a, medium: "E")
+    extra = create_party_job
     commit_started(extra, invalid)
     rows = communications(@lawyer_a)
     assert_equal invalid.length * 2 + 1, rows.length
@@ -278,8 +307,18 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     assert_equal %w[started completed], event_types(@job_a)
   end
 
+  test "a failed attempt cannot finish without persisting its result" do
+    proof = claim(@job_a)
+    start(@job_a, proof)
+    attempt_begin(@job_a, proof)
+    attempt_failed(@job_a, proof, 0)
+    assert_unavailable { @processor.exec_params("SELECT * FROM app_private.processor_finish($1, $2)", [@job_a, proof]) }
+    assert_equal "running", state(@job_a)
+    assert_equal ["started"], event_types(@job_a)
+  end
+
   test "concurrent jobs keep one complete communication with both links" do
-    second_job = create_job(@lawyer_a, medium: "E")
+    second_job = create_party_job
     proofs = [@job_a, second_job].map do |job|
       proof = claim(job)
       start(job, proof)
@@ -371,7 +410,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   end
 
   test "failure remains queryable outside minimal Escrevente and empty success is not failure or missing work" do
-    extra = create_job(@lawyer_a, medium: "E")
+    extra = create_party_job
     runtime_as(@session_a) do
       assert_equal "running", court_state.fetch("state")
       assert_nil court_state.fetch("matched_count")
@@ -536,12 +575,19 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     @despachante.exec_params("SELECT id FROM public.collection_runs WHERE collection_date = $1 AND slot = $2", [date, slot]).getvalue(0, 0)
   end
 
-  def create_job(lawyer, run_id: @run_id, medium: "D", entity_type: "lawyer", entity_id: lawyer.id, criteria: { "name" => LAWYER_NAME })
+  def create_job(lawyer, run_id: @run_id, entity_type: "lawyer", entity_id: lawyer.id, criteria: { "name" => LAWYER_NAME })
     @despachante.exec_params("INSERT INTO public.collection_run_audiences (run_id, tenant_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [run_id, lawyer.tenant_id])
-    @despachante.exec_params(<<~SQL, [run_id, lawyer.tenant_id, entity_type, entity_id, medium, JSON.generate(criteria)]).getvalue(0, 0)
+    @despachante.exec_params(<<~SQL, [run_id, lawyer.tenant_id, entity_type, entity_id, JSON.generate(criteria)]).getvalue(0, 0)
       INSERT INTO public.collection_jobs (run_id, tenant_id, entity_type, entity_id, source, court, medium, criteria)
-      VALUES ($1, $2, $3, $4, 'DJEN', 'TJAC', $5, $6::jsonb) RETURNING id
+      VALUES ($1, $2, $3, $4, 'DJEN', 'TJAC', 'D', $5::jsonb) RETURNING id
     SQL
+  end
+
+  def create_party_job
+    party = DatabaseContext.with_session(@session_a) do
+      PartyMonitoring.create!(tenant_id: @lawyer_a.tenant_id, name: "Parte controlada")
+    end
+    create_job(@lawyer_a, entity_type: "party", entity_id: party.id, criteria: { "name" => party.name })
   end
 
   def publication
@@ -568,7 +614,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   def commit_started(job, items, source: "caderno")
     proof = claim(job)
     start(job, proof)
-    if source == "fallback"
+    if source == "fallback" && processor_job(job, proof).fetch("phase") == "caderno"
       attempt_begin(job, proof, limit: 1)
       attempt_failed(job, proof, 0, limit: 1)
     end

@@ -60,7 +60,7 @@ class CollectionPlanningTest < ActiveSupport::TestCase
     assert_raises(PG::InsufficientPrivilege) { @database.exec("SELECT * FROM app_private.sessions") }
   end
 
-  test "plans durable separate tenant entity court and D E work without a human session" do
+  test "plans durable separate tenant entity court and only D work without a human session" do
     token_a, lawyer_a = create_lawyer
     token_b, lawyer_b = create_lawyer(name: "Bruno Lima", number: "00999", uf: "RO", secondary_oabs: [])
     party_a = create_party(token_a, name: "José, da Silva")
@@ -93,11 +93,33 @@ class CollectionPlanningTest < ActiveSupport::TestCase
     PG.connect(@despachante_url) do |reopened|
       assert_equal run_id, reopened.exec_params(
         "SELECT id FROM public.collection_runs WHERE id = $1", [run_id]).getvalue(0, 0)
-      assert_equal 10, reopened.exec_params(
+      assert_equal 5, reopened.exec_params(
         "SELECT count(*) FROM public.collection_jobs WHERE run_id = $1 AND tenant_id = $2",
         [run_id, lawyer_a.tenant_id]).getvalue(0, 0).to_i
     end
     assert_equal [], Lawyer.pluck(:id)
+  end
+
+  test "both slots plan only Diario Eletronico work and the database rejects editais" do
+    _, lawyer = create_lawyer
+
+    [1, 2].each do |slot|
+      run_id = with_catalog { despachante.plan(slot: slot, now: @now) }
+      planned_jobs = jobs(run_id)
+      assert_equal ["D"], planned_jobs.map { |job| job.fetch("medium") }.uniq
+      own_job = planned_jobs.find { |job| job.fetch("tenant_id") == lawyer.tenant_id }
+      assert own_job
+
+      error = assert_raises(PG::CheckViolation) do
+        @database.exec_params(<<~SQL, [own_job.fetch("id")])
+          INSERT INTO public.collection_jobs (run_id, tenant_id, entity_type, entity_id, source, court, medium, criteria)
+          SELECT run_id, tenant_id, entity_type, entity_id, source, court, 'E', criteria
+          FROM public.collection_jobs WHERE id = $1
+        SQL
+      end
+      assert_equal "collection_job_medium", error.result.error_field(PG::Result::PG_DIAG_CONSTRAINT_NAME)
+      assert_equal planned_jobs, jobs(run_id)
+    end
   end
 
   test "resolves current catalog at planning time without expanding a saved unavailable selection" do
@@ -589,9 +611,9 @@ class CollectionPlanningTest < ActiveSupport::TestCase
   def assert_tenant_work(run_id, tenant_id, entities)
     expected = entities.flat_map do |type, entity_id, courts, criteria|
       criteria["oabs"]&.sort_by! { |oab| [oab.fetch("number"), oab.fetch("uf")] }
-      courts.product(%w[D E]).map do |court, medium|
+      courts.map do |court|
         { "run_id" => run_id, "tenant_id" => tenant_id, "entity_type" => type, "entity_id" => entity_id,
-          "source" => "DJEN", "court" => court, "medium" => medium, "criteria" => criteria, "status" => "pending" }
+          "source" => "DJEN", "court" => court, "medium" => "D", "criteria" => criteria, "status" => "pending" }
       end
     end
     actual = jobs(run_id, tenant_id: tenant_id)

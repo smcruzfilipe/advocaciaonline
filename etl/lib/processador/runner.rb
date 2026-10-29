@@ -16,6 +16,8 @@ module Processador
   class Runner
     API_BASE = "https://comunicaapi.pje.jus.br/api/v1".freeze
     TIMEZONE = TZInfo::Timezone.get("America/Sao_Paulo")
+    # Any longer delay crosses the current local day, where work is interrupted.
+    MAX_WAIT_FOR_CURRENT_DAY = 172_800
     DateChanged = Class.new(StandardError)
 
     def initialize(database_url:, http: Http.new, base_url: API_BASE, attempts: 3, backoff_first: 60, backoff_second: 300, date_source: -> { TIMEZONE.now.to_date })
@@ -46,7 +48,7 @@ module Processador
         db.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [job_id, token])
         previous_callback = @http.on_retry_after
         @http.on_retry_after = ->(seconds) {
-          db.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, $3::integer)", [job_id, token, seconds])
+          db.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, $3::integer)", [job_id, token, [seconds, MAX_WAIT_FOR_CURRENT_DAY].min])
         }
         begin
           with_lease(job_id, token) { |lease| execute(db, job_id, token, job, lease) }
@@ -96,7 +98,7 @@ module Processador
             medium: job.fetch("medium"), before_request: before_request) do |publication|
             lease.check!
             if Matcher.match?(entity_type: job.fetch("entity_type"), criteria: job.fetch("criteria"), publication: publication)
-              matches << Sanitizer.publication(publication)
+              matches << (source_path == "fallback" ? Sanitizer.publication(publication) : publication)
             end
           end
           lease.check!
@@ -122,7 +124,7 @@ module Processador
 
     def fail_attempt(db, job_id, token, retry_after)
       json_call(db, "processor_attempt_failed", "$1::uuid, $2::text, $3::integer, $4::integer, $5::integer, $6::integer",
-        [job_id, token, retry_after.ceil, @attempts, @backoff_first, @backoff_second])
+        [job_id, token, [retry_after.ceil, MAX_WAIT_FOR_CURRENT_DAY].min, @attempts, @backoff_first, @backoff_second])
     end
 
     def record_failure(db, job_id, token, code)

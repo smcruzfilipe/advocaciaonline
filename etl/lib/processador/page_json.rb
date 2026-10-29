@@ -21,8 +21,20 @@ module Processador
 
     def self.read(io, &consumer)
       handler = new(&consumer)
-      Oj.sc_parse(handler, io)
+      Oj.sc_parse(handler, JsonInput.new(io))
       handler.finish
+    end
+
+    class JsonInput
+      def initialize(io)
+        @io = io
+      end
+
+      def readpartial(*args)
+        chunk = @io.readpartial(*args)
+        raise InvalidPage if chunk.include?("\0")
+        chunk
+      end
     end
 
     def initialize(&consumer)

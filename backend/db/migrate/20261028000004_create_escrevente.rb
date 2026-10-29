@@ -96,7 +96,9 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
       CREATE FUNCTION app_private.initialize_collection_execution() RETURNS trigger
       LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
       BEGIN
-        INSERT INTO public.collection_job_executions (job_id, tenant_id) VALUES (NEW.id, NEW.tenant_id);
+        INSERT INTO public.collection_job_executions (job_id, tenant_id, phase)
+          SELECT NEW.id, NEW.tenant_id, CASE WHEN run.slot = 2 THEN 'fallback' ELSE 'caderno' END
+          FROM public.collection_runs AS run WHERE run.id = NEW.run_id;
         RETURN NULL;
       END $fn$;
       REVOKE ALL ON FUNCTION app_private.initialize_collection_execution()
@@ -190,7 +192,7 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         -- A collection attempt may only finish through the transaction that
         -- persisted its result. The existing standalone Escrevente contract
         -- remains available for work that has not started a source attempt.
-        IF execution.state = 'running' AND execution.attempt_in_flight
+        IF execution.state = 'running' AND (execution.caderno_attempts > 0 OR execution.fallback_attempts > 0)
           AND NOT EXISTS (SELECT 1 FROM public.collection_job_results AS result
             WHERE result.job_id = execution.job_id AND result.tenant_id = execution.tenant_id) THEN
           RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';

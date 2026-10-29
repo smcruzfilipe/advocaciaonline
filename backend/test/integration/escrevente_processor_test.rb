@@ -100,7 +100,7 @@ class EscreventeProcessorTest < ActiveSupport::TestCase
     rolled_back_id = nil
     @despachante.exec("BEGIN")
     begin
-      rolled_back_id = insert_job(@lawyer_a, medium: "E")
+      rolled_back_id = insert_job(@lawyer_a, court: "TRF1")
       @despachante.exec("ROLLBACK")
     ensure
       @despachante.exec("ROLLBACK") if @despachante.transaction_status != PG::PQTRANS_IDLE
@@ -470,10 +470,10 @@ class EscreventeProcessorTest < ActiveSupport::TestCase
     insert_job(lawyer)
   end
 
-  def insert_job(lawyer, medium: "D")
-    @despachante.exec_params(<<~SQL, [@run_id, lawyer.tenant_id, lawyer.id, medium]).getvalue(0, 0)
+  def insert_job(lawyer, court: "TJAC")
+    @despachante.exec_params(<<~SQL, [@run_id, lawyer.tenant_id, lawyer.id, court]).getvalue(0, 0)
       INSERT INTO public.collection_jobs (run_id, tenant_id, entity_type, entity_id, source, court, medium, criteria)
-      VALUES ($1, $2, 'lawyer', $3, 'DJEN', 'TJAC', $4, '{"name":"Fixture sem cópia para os marcos"}') RETURNING id
+      VALUES ($1, $2, 'lawyer', $3, 'DJEN', $4, 'D', '{"name":"Fixture sem cópia para os marcos"}') RETURNING id
     SQL
   end
 
