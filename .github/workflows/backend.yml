@@ -57,6 +57,19 @@ jobs:
             -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL advocacia-ci:test ruby bin/rails test
       - name: Smoke final despachante image
         run: |
+          docker run --rm --network advocacia-ci \
+            -e RAILS_ENV -e DATABASE_URL -e APP_ORIGIN -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL \
+            advocacia-ci:test ruby bin/rails runner '
+              require "securerandom"
+              token = SecureRandom.urlsafe_base64(32)
+              IdentityStore.authenticate(subject: SecureRandom.uuid, email: "ci@example.test",
+                token: token, csrf: SecureRandom.urlsafe_base64(32))
+              LawyerOnboarding.call(token: token, input: {
+                "full_name" => "CI Despachante Runtime",
+                "primary_oab" => { "number" => "12345", "uf" => "SP" }, "secondary_oabs" => []
+              })
+              IdentityStore.revoke(token)
+            '
           docker run --rm --network advocacia-ci -e DESPACHANTE_DATABASE_URL \
             --entrypoint ruby advocacia-ci:despachante -e '
               require "./despachante/run"
@@ -70,12 +83,15 @@ jobs:
                 runner.run_once(now: now) == ids
               PG.connect(ENV.fetch("DESPACHANTE_DATABASE_URL")) do |db|
                 ids.each do |id|
-                  row = db.exec_params(<<~SQL, [id]).first
-                    SELECT r.status, count(j.id) AS jobs
-                    FROM public.collection_runs r LEFT JOIN public.collection_jobs j ON j.run_id = r.id
+                  row = db.exec_params(<<~SQL, [id, "lawyer", "name", "CI Despachante Runtime"]).first
+                    SELECT r.status, count(j.id) AS jobs, count(DISTINCT j.medium) AS media
+                    FROM public.collection_runs r
+                    LEFT JOIN public.collection_jobs j ON j.run_id = r.id AND j.entity_type = $2
+                      AND j.criteria ->> $3 = $4
                     WHERE r.id = $1 GROUP BY r.status
                   SQL
-                  raise "planning did not produce work" unless row && row["status"] == "planned" && row["jobs"].to_i > 0
+                  raise "planning did not produce both media" unless row && row["status"] == "planned" &&
+                    row["jobs"].to_i == 2 && row["media"].to_i == 2
                 end
               end
               raise "despachante must run non-root" if Process.uid.zero?
