@@ -1,6 +1,6 @@
 require "test_helper"
 require "pg"
-require_relative "../../planner/collection_planner"
+require_relative "../../despachante/collection_despachante"
 
 class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
   self.use_transactional_tests = false
@@ -14,9 +14,9 @@ class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
     https!
     host! URI(AppSettings.origin).host
     assert_equal "advocacia_runtime", ApplicationRecord.connection.select_value("SELECT current_user")
-    @planner_url = ENV.fetch("PLANNER_DATABASE_URL")
-    @database = PG.connect(@planner_url)
-    assert_equal "advocacia_planner", @database.exec("SELECT current_user").getvalue(0, 0)
+    @despachante_url = ENV.fetch("DESPACHANTE_DATABASE_URL")
+    @database = PG.connect(@despachante_url)
+    assert_equal "advocacia_despachante", @database.exec("SELECT current_user").getvalue(0, 0)
     @date = Date.iso8601(@database.exec(<<~SQL).getvalue(0, 0))
       SELECT COALESCE(MAX(collection_date) + 1, DATE '2040-01-01')::text FROM public.collection_runs
     SQL
@@ -171,7 +171,7 @@ class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
     assert_equal true, table.fetch("relrowsecurity")
     assert_equal true, table.fetch("relforcerowsecurity")
     assert_not_equal "advocacia_runtime", table.fetch("owner")
-    assert_not_equal "advocacia_planner", table.fetch("owner")
+    assert_not_equal "advocacia_despachante", table.fetch("owner")
     assert_equal [], connection.select_values("SELECT tenant_id FROM public.collection_run_audiences")
     assert_equal [], connection.select_values("SELECT id FROM app_private.collection_runs_for_session()")
     assert_equal false, connection.select_value(
@@ -183,7 +183,7 @@ class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
         query = "SELECT tenant_id FROM public.collection_run_audiences WHERE run_id = #{quoted_run}"
         assert_equal [lawyer.tenant_id], connection.select_values(query)
         connection.execute("SELECT set_config('app.tenant_id', #{connection.quote(first.tenant_id)}, true)")
-        connection.execute("SELECT set_config('app.planner', 'true', true)")
+        connection.execute("SELECT set_config('app.despachante', 'true', true)")
         assert_equal [lawyer.tenant_id], connection.select_values(query)
         %w[INSERT UPDATE DELETE TRUNCATE].each do |privilege|
           assert_equal false, connection.select_value(
@@ -259,7 +259,7 @@ class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
 
   def plan(slot:, catalog: CATALOG)
     CourtCatalog.stub(:fetch, catalog) do
-      CollectionPlanner.new(url: @planner_url).plan(slot: slot, now: @now)
+      CollectionDespachante.new(url: @despachante_url).plan(slot: slot, now: @now)
     end
   end
 
@@ -267,7 +267,7 @@ class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
     unavailable = -> { raise CourtCatalog::Unavailable, "DJEN indisponível" }
     CourtCatalog.stub(:fetch, unavailable) do
       assert_raises(CourtCatalog::Unavailable) do
-        CollectionPlanner.new(url: @planner_url).plan(slot: slot, now: @now)
+        CollectionDespachante.new(url: @despachante_url).plan(slot: slot, now: @now)
       end
     end
     rows = @database.exec_params(

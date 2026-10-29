@@ -35,7 +35,32 @@ Catálogo lógico fechado para as ações já previstas; não define nomes de en
 
 Para ações de escrita de equipe sujeitas a grupos, cada operação requer concessão própria; conceder cadastro não concede edição ou desativação. Operações não listadas não são autorizadas por inferência. As ações de administração do tenant pelo advogado titular são exclusivas e não delegáveis. Administração de grupos inclui criar, alterar e remover grupos e suas concessões/associações, sempre no tenant do titular. Se a remoção da última associação deixar uma identidade sem grupos, aplica-se o padrão aprovado de leitura ampla; para encerrar seu acesso, o advogado revoga a credencial antes de remover a associação.
 
-O advogado titular pode cadastrar, editar e desativar os monitoramentos do próprio tenant por propriedade, independentemente de grupos; negações de grupo não restringem esse poder do titular. Essa exceção não se estende à equipe. Somente o titular consulta marcos do Escriba do próprio tenant; nenhum grupo concede essa consulta à equipe.
+O advogado titular pode cadastrar, editar e desativar os monitoramentos do próprio tenant por propriedade, independentemente de grupos; negações de grupo não restringem esse poder do titular. Essa exceção não se estende à equipe. Somente o titular consulta marcos do Escrevente do próprio tenant; nenhum grupo concede essa consulta à equipe.
+
+### Extensão aprovada: agenda
+
+A matriz de [SPEC-agenda.md](SPEC-agenda.md#identidade-e-autorização) foi aprovada pelo solicitante e incorporada ao catálogo por AG02. Esta extensão não altera concessões de monitoramentos, comunicações, dashboard, administração de usuários/grupos ou Escrevente; não representa autorização já implementada.
+
+| Operação lógica | Ações incluídas | Escopo e decisão |
+|---|---|---|
+| `consultar_agenda` | Listar e abrir detalhes de compromissos | Agenda do advogado no tenant reconhecido no servidor; titular consulta por propriedade, equipe exige concessão própria por grupo. |
+| `cadastrar_compromisso` | Confirmar compromisso presencial ou online | Agenda do advogado no tenant reconhecido no servidor; titular opera por propriedade, equipe exige concessão própria por grupo. Não concede consulta, remarcação ou cancelamento. |
+| `remarcar_compromisso` | Alterar o horário de compromisso futuro | Mesmo escopo e fronteira de propriedade/concessão; exige decisão específica, sem inferir acesso por cadastro ou consulta. |
+| `cancelar_compromisso` | Cancelar compromisso antes do início | Mesmo escopo e fronteira de propriedade/concessão; exige decisão específica, sem inferir acesso por cadastro ou remarcação. |
+| Configuração da agenda pelo titular | Alterar disponibilidade, duração única, intervalo e antecedência | Exclusiva do advogado titular da agenda; não delegável por grupo nem concedida por permissões operacionais de compromissos. |
+
+Para estas operações, o alvo agenda/compromisso é reconhecido no servidor e permanece no tenant confiável; permissões de tribunal/dashboard não substituem autorização de agenda. A equipe sem grupos, sem concessão aplicável ou com apenas permissão de monitoramento não recebe leitura nem escrita de agenda. Concessões por grupos se somam, e negação explícita prevalece para a mesma operação e escopo. As exceções de propriedade acima não se estendem à equipe.
+
+A decisão sobre sessão, vínculo, validade e operação é reavaliada no ponto protegido, inclusive depois de espera pelo lock e em sessão já aberta. Não usar contexto previamente memoizado como substituto dessa decisão. Expiração/revogação impede nova operação protegida. Autorização não remove duração, intervalo, antecedência nem conflito de horário para titular ou equipe.
+
+Cada mutação devolve somente o resultado autorizado da própria ação: referência do compromisso, início, término, modalidade, situação local e marcador do estado resultante. Não exige GET de lista/detalhe e não revela dados de outros compromissos. Por decisão explícita do solicitante em AG02, quem pode cadastrar ou remarcar pode consultar somente horários livres como parte dessa ação, sem lista de compromissos, identidade de ocupantes, participantes, assunto ou motivo da indisponibilidade. Não há concessão de `consultar_agenda` por inferência: essa operação continua necessária para lista/detalhe.
+
+Para a disponibilidade mínima, avaliar as decisões de cadastro e remarcação separadamente: basta uma ação permitida; uma negação de cadastro não bloqueia remarcação concedida, e vice-versa. Se nenhuma das duas ações é permitida, elas não concedem disponibilidade. Esta decisão não altera a composição de concessões/negações da mesma operação. Consulta por `consultar_agenda` permanece uma via de leitura própria. Falta de vínculo/validade ou tenant errado nega todas as vias. O cliente externo continua sujeito a contexto limitado próprio, não a este catálogo de equipe.
+
+Revisão documental de AG02: titular consulta e opera no tenant próprio; equipe sem grupos ou só com monitoramentos não acessa agenda; equipe com apenas cadastro acessa disponibilidade mínima e recebe o resultado da própria confirmação, mas não lista/detalhe; negação explícita do cadastro impede esse caminho; remarcação ainda concedida pode habilitar sua própria disponibilidade; expiração/revogação invalida todas essas decisões. Esta revisão de contrato não é teste de autorização em execução.
+
+Cliente sem conta não herda este catálogo de equipe. O contexto limitado do link e sua associação confiável à agenda pertencem ao contrato de reservas-clientes; não cadastrar cliente como equipe ou aceitar tenant enviado como prova de acesso.
+
 
 ## Requisitos
 

@@ -1,7 +1,7 @@
 require "date"
 require "time"
 require "minitest/autorun"
-require_relative "../../planner/collection_schedule"
+require_relative "../../despachante/collection_schedule"
 
 class CollectionScheduleTest < Minitest::Test
   LOCAL_DATE = Date.new(2026, 10, 28)

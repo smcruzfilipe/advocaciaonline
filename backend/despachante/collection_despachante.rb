@@ -4,7 +4,7 @@ require "pg"
 require "tzinfo"
 require_relative "../app/services/court_catalog"
 
-class CollectionPlanner
+class CollectionDespachante
   class InvalidProfile < StandardError; end
   class DayExpired < StandardError; end
   private_constant :DayExpired
@@ -23,7 +23,7 @@ class CollectionPlanner
     clock = -> { now + (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) }
 
     PG.connect(@url) do |connection|
-      assert_planner!(connection)
+      assert_despachante!(connection)
       existing = connection.exec_params(<<~SQL, [date, slot]).first
         SELECT id, status FROM public.collection_runs WHERE collection_date = $1 AND slot = $2
       SQL
@@ -46,7 +46,7 @@ class CollectionPlanner
   def interrupt_before(now:)
     date = TIME_ZONE.to_local(now).to_date
     PG.connect(@url) do |connection|
-      assert_planner!(connection)
+      assert_despachante!(connection)
       connection.exec_params(<<~SQL, [date])
         UPDATE public.collection_runs SET status = 'interrupted', updated_at = CURRENT_TIMESTAMP
         WHERE collection_date < $1 AND status = 'planning_failed'
@@ -56,16 +56,16 @@ class CollectionPlanner
 
   private
 
-  def assert_planner!(connection)
+  def assert_despachante!(connection)
     safe = connection.exec(<<~SQL).getvalue(0, 0)
-      SELECT current_user = 'advocacia_planner' AND session_user = current_user
+      SELECT current_user = 'advocacia_despachante' AND session_user = current_user
         AND rolcanlogin AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreatedb
         AND NOT rolcreaterole AND NOT rolreplication
         AND NOT EXISTS (SELECT 1 FROM pg_auth_members WHERE member = pg_roles.oid)
         AND NOT pg_has_role('advocacia_runtime', current_user, 'MEMBER')
       FROM pg_roles WHERE rolname = current_user
     SQL
-    raise SecurityError, "O planejamento exige o login isolado advocacia_planner." unless safe == "t"
+    raise SecurityError, "O planejamento exige o login isolado advocacia_despachante." unless safe == "t"
   end
 
   def persist_plan(connection, date, slot, courts, source_failure, clock)

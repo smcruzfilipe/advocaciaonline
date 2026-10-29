@@ -45,38 +45,38 @@ FROM application AS test
 ENV RAILS_ENV=test BUNDLE_WITHOUT="" BUNDLE_GEMFILE=/app/Gemfile
 COPY --link --from=dependencies --chown=1000:1000 /bundle /bundle
 COPY --link --chown=1000:1000 test ./test
-COPY --link --chown=1000:1000 planner ./planner
+COPY --link --chown=1000:1000 despachante ./despachante
 CMD ["ruby", "bin/rails", "test"]
 
-FROM ruby:4.0.9-alpine3.23 AS planner_base
+FROM ruby:4.0.9-alpine3.23 AS despachante_base
 WORKDIR /app
 RUN apk add --no-cache libpq tzdata \
     && addgroup -g 1000 app \
     && adduser -D -u 1000 -G app app \
-    && mkdir -p /bundle /app/planner \
+    && mkdir -p /bundle /app/despachante \
     && chown -R 1000:1000 /bundle /app
 ENV BUNDLE_PATH=/bundle \
     BUNDLE_FROZEN=true \
     BUNDLE_DEPLOYMENT=true \
-    BUNDLE_GEMFILE=/app/planner/Gemfile \
+    BUNDLE_GEMFILE=/app/despachante/Gemfile \
     HOME=/home/app
 USER 1000:1000
 
-FROM planner_base AS planner_dependencies
+FROM despachante_base AS despachante_dependencies
 USER root
 RUN apk add --no-cache build-base postgresql-dev
 USER 1000:1000
-COPY --link --chown=1000:1000 planner/Gemfile planner/Gemfile.lock ./planner/
+COPY --link --chown=1000:1000 despachante/Gemfile despachante/Gemfile.lock ./despachante/
 RUN bundle install --jobs 4 \
     && rm -rf /bundle/ruby/*/cache /bundle/ruby/*/bundler/gems/*/.git
 
-FROM planner_base AS planner
-COPY --link --from=planner_dependencies --chown=1000:1000 /bundle /bundle
-COPY --link --chown=1000:1000 planner ./planner
+FROM despachante_base AS despachante
+COPY --link --from=despachante_dependencies --chown=1000:1000 /bundle /bundle
+COPY --link --chown=1000:1000 despachante ./despachante
 COPY --link --chown=1000:1000 app/services/court_catalog.rb ./app/services/court_catalog.rb
-LABEL org.opencontainers.image.title="Advocacia Online Collection Planner" \
+LABEL org.opencontainers.image.title="Advocacia Online Collection Despachante" \
       org.opencontainers.image.description="Standalone collection planning with an isolated PostgreSQL login"
 USER 1000:1000
-CMD ["ruby", "planner/run.rb"]
+CMD ["ruby", "despachante/run.rb"]
 
 FROM application AS runtime

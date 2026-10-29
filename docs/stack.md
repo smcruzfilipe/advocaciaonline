@@ -7,7 +7,7 @@
 - Banco de dados: PostgreSQL com Row-Level Security (RLS).
 - Tenant: advogado independente, não escritório; RLS deve preservar esse isolamento.
 
-As versões centrais selecionadas estão documentadas abaixo. [Arquitetura e contratos propostos](arquitetura.md) escolhem Ruby para planejador e ETL, layout e ferramentas; dependências exatas e deploy continuam sujeitos a validação. Por instrução do solicitante, runtimes e dependências não devem ser instalados no host: a implementação e as verificações usam Docker. O frontend fica para uma etapa posterior.
+As versões centrais selecionadas estão documentadas abaixo. [Arquitetura e contratos propostos](arquitetura.md) escolhem Ruby para despachante e ETL, layout e ferramentas; dependências exatas e deploy continuam sujeitos a validação. Por instrução do solicitante, runtimes e dependências não devem ser instalados no host: a implementação e as verificações usam Docker. O frontend fica para uma etapa posterior.
 
 ## Versões selecionadas
 
@@ -23,7 +23,7 @@ Referência da consulta: 28/10/2026. Seleção de releases estáveis documentada
 
 Ruby 4.0.9 satisfaz o requisito numérico do gem Rails 8.1.4. Isso não substitui uma matriz explícita de suporte. Node.js 24.22.1 satisfaz o mínimo documentado do Next.js 16; suas dependências serão fixadas na etapa de frontend.
 
-As versões de referência também se aplicam ao runtime Ruby proposto para planejador e ETL. Em teste local descartável, PostgreSQL 18.6 inicializou como UID 70 e preservou dados após reinicialização; uma aplicação Rails API-only temporária executou teste de persistência contra esse banco. Isso não comprova o funcionamento da aplicação do repositório, da imagem final ou a integração futura com Next.js.
+As versões de referência também se aplicam ao runtime Ruby proposto para despachante e ETL. Em teste local descartável, PostgreSQL 18.6 inicializou como UID 70 e preservou dados após reinicialização; uma aplicação Rails API-only temporária executou teste de persistência contra esse banco. Isso não comprova o funcionamento da aplicação do repositório, da imagem final ou a integração futura com Next.js.
 
 ## Referências oficiais consultadas
 
@@ -39,7 +39,7 @@ A documentação PostgreSQL informa que superusuários e roles `BYPASSRLS` ignor
 
 O contexto de tenant deve ser delimitado a cada transação, sem vazar entre requisições ou jobs que reutilizem conexões; a proposta de roles e políticas está em [arquitetura](arquitetura.md#isolamento-e-privilégios) e deve ser verificada na implementação.
 
-RLS não protege operações de tabela inteira como `TRUNCATE`, segundo a documentação. Portanto, não é suficiente sozinho para garantir o Escriba append-only: permissões de operação e proteção contra alteração/exclusão precisam de desenho próprio.
+RLS não protege operações de tabela inteira como `TRUNCATE`, segundo a documentação. Portanto, não é suficiente sozinho para garantir o Escrevente append-only: permissões de operação e proteção contra alteração/exclusão precisam de desenho próprio.
 
 ## Verificações futuras obrigatórias
 

@@ -1,8 +1,26 @@
-# Monitoramento jurídico
+# Monitoramento jurídico — monorepo
 
-Plataforma de monitoramento de publicações judiciais voltada a advogados independentes e suas equipes. A fonte inicial prevista é o Diário de Justiça Eletrônico Nacional (DJEN), com consulta a cadernos como caminho principal e à API paginada de comunicações como fallback.
+Monorepo da plataforma de monitoramento de publicações judiciais voltada a advogados independentes e suas equipes, reunindo backend Rails API-only e frontend Next.js no mesmo repositório. A fonte inicial prevista é o Diário de Justiça Eletrônico Nacional (DJEN), com consulta a cadernos como caminho principal e à API paginada de comunicações como fallback.
 
-> **Estado atual:** o backend contém onboarding, cadastros de monitoramento e geração de planos de coleta. Frontend, equipe/grupos, Escriba, execução da coleta, dashboard e Swagger UI ainda não estão implementados.
+> **Estado atual:** o backend contém onboarding, cadastros de monitoramento, geração de planos de coleta e Escrevente com consulta por tenant e interface SQL controlada para o coletor. Frontend, equipe/grupos, executor ETL, execução real da coleta, dashboard e Swagger UI ainda não estão implementados.
+
+## Estrutura do monorepo
+
+A raiz é compartilhada pelo produto inteiro; não é a raiz de uma aplicação Rails nem de uma aplicação Next.js isolada. Cada componente mantém suas dependências, comandos e artefatos de execução. Diretórios previstos abaixo ainda não existem e não representam implementação concluída.
+
+| Caminho relativo à raiz | Responsabilidade | Situação |
+|---|---|---|
+| `backend/` | API Rails, domínio, persistência e testes; dependências em `backend/Gemfile` e `backend/Gemfile.lock`. | Existente. |
+| `backend/despachante/` | Despachante de coletas, processo Ruby separado da API, com `Gemfile` e lockfile próprios. | Existente; pertence ao backend e ao mesmo monorepo, mas não executa dentro do servidor Rails. |
+| `frontend/` | Interface Next.js com TypeScript e App Router; páginas, componentes e estilos do produto. | Previsto, ainda não criado. |
+| `etl/` | Execução da coleta, em processo separado da API e do despachante. | Previsto, ainda não criado. |
+| `docs/` | Especificação geral, arquitetura, contratos técnicos e direção visual compartilhados. | Existente. |
+| `tasks/` | Plano, gates e checklist de implementação do monorepo. | Existente. |
+| `SPEC-*.md` e `CAPABILITIES.md` | Contratos funcionais e mapa de capacidades do produto. | Existentes na raiz. |
+
+Frontend e API terão imagens Docker separadas. O despachante já tem target próprio `despachante` em `backend/Dockerfile`; o target da API é `runtime`. Processos e imagens separados não significam repositórios separados. PostgreSQL é infraestrutura compartilhada: imagem separada somente para testes locais e instância já existente no deploy.
+
+A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha as fronteiras. O [guia visual](docs/design-system.md#escopo-no-monorepo) orienta a interface de `frontend/`, não uma aplicação independente deste repositório.
 
 ## Escopo funcional
 
@@ -29,19 +47,20 @@ Requisito registrado: a documentação interativa da API será publicada com Swa
 
 ## Variáveis de ambiente
 
-As variáveis abaixo são lidas pelo backend ou configuradas em sua imagem. Forneça valores sem default pelo gerenciador de segredos ou ambiente do deploy; não versione credenciais nem URLs contendo senhas. As credenciais Google exigem um cliente OAuth web registrado externamente, com URI de redirecionamento exatamente `APP_ORIGIN/auth/google/callback`.
+As variáveis abaixo são lidas pelo backend, por seus testes ou configuradas nas imagens e nos processos indicados; a conexão do futuro executor é exclusiva dessa fronteira. Forneça valores sem default pelo gerenciador de segredos ou ambiente protegido do deploy; não versione credenciais nem URLs contendo senhas. As credenciais Google exigem um cliente OAuth web registrado externamente, com URI de redirecionamento exatamente `APP_ORIGIN/auth/google/callback`.
 
 | Variável | Default | Obrigatória? | Finalidade |
 |---|---|---|---|
 | `DATABASE_URL` | Nenhum | Sim, para API e testes | Conexão PostgreSQL com a role `advocacia_runtime`, sem propriedade das tabelas nem bypass de RLS. |
 | `MIGRATION_DATABASE_URL` | Nenhum | Sim, para migration e teste administrativo de sessão; não fornecer à API web | Conexão com `advocacia_migrator`, separada da role de execução. |
-| `PLANNER_DATABASE_URL` | Nenhum | Sim, no planejador e nos testes do planejador; não fornecer à API web | Conexão PostgreSQL da role `advocacia_planner`, exclusiva do processo confiável de planejamento. |
-| `COLETA_HORARIO_1` | Nenhum | Sim, no planejador | Primeiro horário diário em `HH:MM`, fuso `America/Sao_Paulo`, a partir de `04:00`; fornecer pela configuração do processo. |
-| `COLETA_HORARIO_2` | Nenhum | Sim, no planejador | Segundo horário diário em `HH:MM`, posterior ao primeiro; fornecer pela configuração do processo. |
-| `APP_ORIGIN` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo planejador | Origem pública HTTPS da API, sem caminho ou credenciais; valida origem de operações mutáveis e compõe o callback Google. |
+| `DESPACHANTE_DATABASE_URL` | Nenhum | Sim, no despachante e nos testes do despachante; não fornecer à API web | Conexão PostgreSQL isolada com a role `advocacia_despachante`, exclusiva do processo confiável de planejamento; fornecer externamente por ambiente protegido ou gerenciador de segredos. |
+| `COLETOR_DATABASE_URL` | Nenhum | Sim, para o futuro executor e os testes de fronteira do Escrevente; não fornecer à API nem ao despachante | Conexão PostgreSQL exclusiva com a role `advocacia_coletor`, provisionada administrativamente por `backend/db/provision_coletor.sql` antes da migration do Escrevente. Fornecer credencial e URL externamente por ambiente protegido ou gerenciador de segredos, sem registrar segredo no repositório. Não representa executor ETL já implementado. |
+| `COLETA_HORARIO_1` | Nenhum | Sim, no despachante | Primeiro horário diário em `HH:MM`, fuso `America/Sao_Paulo`, a partir de `04:00`; fornecer pela configuração do processo. |
+| `COLETA_HORARIO_2` | Nenhum | Sim, no despachante | Segundo horário diário em `HH:MM`, posterior ao primeiro; fornecer pela configuração do processo. |
+| `APP_ORIGIN` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS da API, sem caminho ou credenciais; valida origem de operações mutáveis e compõe o callback Google. |
 | `GOOGLE_CLIENT_ID` | Nenhum | Sim, para autenticação Google | Identificador do cliente OAuth web. |
 | `GOOGLE_CLIENT_SECRET` | Nenhum | Sim, para autenticação Google | Segredo do cliente OAuth web; fornecer por mecanismo de segredos. |
-| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo planejador | Segredo Rails usado para proteção de tentativas de autenticação; gerar e fornecer externamente. |
+| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails usado para proteção de tentativas de autenticação; gerar e fornecer externamente. |
 | `RAILS_ENV` | `production` na imagem runtime; `test` na imagem de testes | Não | Seleciona o ambiente Rails. |
 | `RAILS_LOG_LEVEL` | `info` | Não | Nível de logging. |
 | `PORT` | `3000` | Não | Porta do servidor Puma. |
@@ -50,10 +69,10 @@ As variáveis abaixo são lidas pelo backend ou configuradas em sua imagem. Forn
 | `BUNDLE_FROZEN` | `true` na imagem | Não | Impede alteração do lockfile pelo Bundler. |
 | `BUNDLE_DEPLOYMENT` | `true` na imagem | Não | Ativa o modo de implantação do Bundler. |
 | `BUNDLE_WITHOUT` | `test` no runtime; vazio no target de testes | Não | Exclui as dependências de testes da imagem de execução. |
-| `BUNDLE_GEMFILE` | `/app/planner/Gemfile` na imagem do planejador; caminho do `Gemfile` da API no boot Rails | Não | Seleciona o manifesto próprio de dependências de cada processo. |
+| `BUNDLE_GEMFILE` | `/app/despachante/Gemfile` na imagem do despachante; caminho do `Gemfile` da API no boot Rails | Não | Seleciona o manifesto próprio de dependências de cada processo. |
 | `HOME` | `/home/app` na imagem | Não | Diretório inicial do usuário não root da imagem. |
 
-Configurações futuras, ainda não implementadas: `COLETA_TENTATIVAS_POR_CAMINHO` terá default `3`, `COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS` default `60` e `COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS` default `300`, conforme [`SPEC-coleta.md`](SPEC-coleta.md). Não há prazo automático de retenção do Escriba nesta etapa. As configurações de SMTP e Swagger permanecem por nomear.
+Configurações futuras, ainda não implementadas: `COLETA_TENTATIVAS_POR_CAMINHO` terá default `3`, `COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS` default `60` e `COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS` default `300`, conforme [`SPEC-coleta.md`](SPEC-coleta.md). Não há prazo automático de retenção do Escrevente nesta etapa. As configurações de SMTP e Swagger permanecem por nomear.
 
 **Regra de manutenção:** toda variável de ambiente introduzida ou alterada em uma implementação deve ser registrada nesta seção do README no mesmo conjunto de mudanças. Para cada variável, informe nome exato, valor default (ou `Nenhum` se não houver), se é obrigatória e para que serve. Quando não existir default, documente também como fornecer o valor sem incluir segredos. Atualize a tabela ao remover variáveis.
 
@@ -62,12 +81,15 @@ Configurações futuras, ainda não implementadas: `COLETA_TENTATIVAS_POR_CAMINH
 - [Especificação geral](docs/especificacao.md)
 - [Stack e versões de referência](docs/stack.md)
 - [Arquitetura e contratos técnicos propostos](docs/arquitetura.md)
+- [Direção visual: UI, tipografia e cores](docs/design-system.md)
 - [Mapa de capacidades](CAPABILITIES.md)
 - [Plano de implementação e gates](tasks/plan.md)
 - [Checklist de implementação](tasks/todo.md)
 - [Contrato OpenAPI do DJEN consultado](docs/contrato-djen.md)
 
 ## Implementação e verificações
+
+A sequência consolidada foi aplicada em PostgreSQL isolado. Seu catálogo coincidiu com o da sequência anterior em 86 colunas, 138 constraints, 36 índices, 27 políticas, 15 funções, dois triggers e RLS/grants de 14 tabelas. A suíte passou com 276 testes e 7.678 assertions; um smoke criou e leu um perfil autenticado. Uma role de despachante insegura foi recusada antes da criação de tabelas. Os demais resultados abaixo são históricos e não comprovam esta consolidação.
 
 ### API de onboarding
 
@@ -98,36 +120,103 @@ No cadastro de parte, `name` é obrigatório e sua chave de equivalência ignora
 
 ### Planejamento de coleta
 
-O planejador é um processo separado da API: usa uma conexão PostgreSQL exclusiva, consulta o catálogo DJEN e registra uma execução por data de Brasília e horário configurado. Para cada advogado, parte e processo elegível, fixa os critérios e gera trabalhos por tribunal e meio `D`/`E`. Editar ou desativar um cadastro posteriormente não altera o plano já registrado. A leitura da API é limitada ao tenant autenticado:
+O despachante é um processo separado da API: usa uma conexão PostgreSQL exclusiva, consulta o catálogo DJEN e registra uma execução por data de Brasília e horário configurado. Para cada advogado, parte e processo elegível, fixa os critérios e gera trabalhos por tribunal e meio `D`/`E`. Editar ou desativar um cadastro posteriormente não altera o plano já registrado. A leitura da API é limitada ao tenant autenticado:
 
 | Método e caminho | Comportamento |
 |---|---|
 | `GET /api/collection-runs` | Lista as execuções cuja audiência inclui o tenant da sessão. |
 | `GET /api/collection-runs/:id/jobs` | Lista os trabalhos do tenant para uma execução autorizada. |
+| `GET /api/collection-runs/:id/events` | Retorna `{ events: [...] }` com os marcos do tenant: `id`, `job_id`, `event_type` (`started` ou `completed`), `recorded_at`, `entity_type`, `entity_id`, `source`, `court` e `medium`, ordenados por `recorded_at` e `id`. |
+| `GET /api/collection-runs/:id/execution` | Retorna `{ jobs: [...] }` com `job_id`, `court`, `medium` e `state` operacional (`pending`, `running`, `succeeded` ou `failed`), ordenados por `job_id`. |
 
-`planned` indica planejamento concluído; `no_work` indica que não houve trabalho elegível; `planning_failed` indica falha do planejamento; `interrupted` identifica planejamento não recuperado após a virada da data local. Nenhum desses estados significa que uma coleta de publicações foi executada ou que ela encontrou zero resultados. Os trabalhos são criados como `pending`; o ETL e a execução da coleta ainda não estão implementados.
+`planned` indica planejamento concluído; `no_work` indica que não houve trabalho elegível; `planning_failed` indica falha do planejamento; `interrupted` identifica planejamento não recuperado após a virada da data local. Nenhum desses estados significa que uma coleta de publicações foi executada ou que ela encontrou zero resultados. Os trabalhos do plano mantêm `collection_jobs.status = pending`; o estado operacional fica separadamente em `collection_job_executions`. O ETL e a execução real da coleta ainda não estão implementados.
 
-### Imagem e banco
+As consultas do Escrevente exigem sessão válida e onboarding do advogado titular, sem acesso de equipe nesta entrega. O tenant vem da sessão, nunca de parâmetro do cliente. UUID inválido, execução inexistente ou fora da audiência do tenant retorna `404` sem revelar dados; uma execução visível sem trabalhos retorna listas vazias, não eventos nem sucesso fabricados. `pending` significa trabalho ainda não iniciado, `running` processamento iniciado, `succeeded` conclusão bem-sucedida confirmada e `failed` falha operacional. Esses estados não informam quantidade de publicações, sucesso vazio ou resultado parcial do futuro ETL; a ausência de término não permite inferir falha.
 
-Construa a imagem com `docker build --target runtime -t advocacia-backend:local backend`. A imagem usa Ruby 4.0.9 sobre Alpine 3.23; as ferramentas de compilação ficam no estágio de build. O processo web inicia como UID/GID `1000:1000` e não executa migrations automaticamente. Neste ambiente, o build precisou de `--network host` para resolver dependências devido ao DNS da rede Docker.
+O Escrevente é implementado no backend Rails, com marcos append-only em `collection_events`. A interface do futuro executor é SQL, no schema `app_private`, acessível somente pela role `advocacia_coletor` entre as roles normais de execução; não é uma API HTTP de escrita:
 
-Use a instância PostgreSQL já existente no servidor de deploy. Um administrador deve executar [`backend/db/provision.sql`](backend/db/provision.sql) e [`backend/db/provision_planner.sql`](backend/db/provision_planner.sql), nessa ordem, no banco da aplicação e configurar credenciais SCRAM fora do repositório. A role `advocacia_migrator` é proprietária das tabelas migradas e executa migrations; `advocacia_runtime` executa a API; `advocacia_planner` pertence somente ao processo confiável de planejamento e pode ler os monitoramentos dos tenants para gerar o trabalho. Runtime e planner não são donos das tabelas; nenhuma das três roles possui `BYPASSRLS`. A API não recebe a credencial do planejador nem a de migration. O provisionamento e a criação do banco no servidor dependem das permissões e do procedimento de deploy.
+| Função SQL | Retorno e efeito |
+|---|---|
+| `collector_claim(uuid)` | Retorna `token`, `expires_at` e `state` do trabalho reivindicado; reserva uma lease de 15 minutos, preservando o estado atual e sem registrar início. |
+| `collector_renew(uuid,text)` | Recebe UUID do trabalho e token vigente; retorna `expires_at`, renovando a lease por 15 minutos a partir do horário do banco sem alterar estado ou marcos, inclusive em `failed` e `succeeded`. |
+| `collector_start(uuid,text)` | Retorna `id` e `recorded_at` do marco `started`; acrescenta o início e muda `pending` ou `failed` para `running` atomicamente, ou confirma o marco já persistido sem duplicá-lo. Em `succeeded`, apenas recupera o início anterior, sem regredir o estado. |
+| `collector_finish(uuid,text)` | Retorna `id` e `recorded_at` do marco `completed`; exige início e acrescenta o término junto da transição para `succeeded`, ou confirma o término já persistido. |
+| `collector_fail(uuid,text)` | Retorna `state = failed`, libera a reivindicação e não acrescenta término nem recebe texto técnico de erro. |
+
+O token é segredo sigiloso vinculado ao trabalho: o banco persiste apenas seu digest SHA-256. Não o registre em logs, URLs ou respostas da API. Operações exigem reivindicação vigente; em trabalho longo, renove antes de expirar. Após falha, um novo claim preserva `failed` até `collector_start`; renovar a lease não apaga a falha. Após expiração ou perda de confirmação, reivindicar um trabalho `succeeded` serve apenas para recuperar a confirmação dos marcos existentes: não reexecute a coleta, não crie outros marcos nem faça o estado regredir. Uma lease ativa impede reivindicação concorrente.
+
+O tenant e as referências dos marcos derivam do trabalho persistido, não de tenant ou contexto enviado pelo coletor. Bloqueio do estado por trabalho, unicidade de `(job_id, event_type)` e transação conjunta de marco e estado sustentam a atomicidade e a idempotência da fronteira; falha ou interrupção não vira término. RLS forçado e privilégios explícitos protegem contra operações normais de leitura cruzada, inserção direta, alteração, exclusão e `TRUNCATE`; não prometem imutabilidade contra o proprietário de migration ou superusuários. A role do coletor usa somente as funções controladas, sem acesso direto às tabelas.
+
+**Verificação histórica do Escrevente, anterior à consolidação:** em PostgreSQL 18.6 isolado, a migration então vigente e seu rollback foram exercitados com roles reais separadas. Os testes específicos passaram com **29 testes e 813 assertions**; a suíte completa passou com **276 testes e 7.678 assertions**, sem falhas, erros ou skips. Um smoke SQL e HTTP na imagem final da API confirmou marcos de início/término no sucesso, início sem término na falha, estado separado e negação de acesso cruzado. A API executou como UID/GID `1000:1000`, o PostgreSQL como `70:70`; a imagem final da API mediu **263.242.962 bytes**. As chamadas de coleta foram controladas para teste: não comprovam execução de ETL ou consulta real ao DJEN. O rollback citado pertence à migration anterior, não à estrutura consolidada.
+
+### Imagens Docker da API e do despachante
+
+As duas imagens já são definidas no mesmo [`backend/Dockerfile`](backend/Dockerfile), por targets independentes. Não existe um Dockerfile separado em `backend/despachante/`; ele não é necessário para gerar uma imagem exclusiva do despachante.
+
+| Componente | Target | Base final | Usuário final | Comando da imagem |
+|---|---|---|---|---|
+| API Rails | `runtime` | `ruby:4.0.9-alpine3.23` | `1000:1000` | `bundle exec puma -C config/puma.rb` |
+| Despachante | `despachante` | `ruby:4.0.9-alpine3.23` | `1000:1000` | `ruby despachante/run.rb` |
+
+Os builds são multi-stage: o despachante usa os estágios `despachante_base` e `despachante_dependencies` antes do target final `despachante`. A instalação de pacotes de compilação ocorre nos estágios de build, sem levar compiladores para as imagens finais. O uso de root durante a construção não é um entrypoint privilegiado: ambas as imagens iniciam diretamente como usuário não root, sem instalar pacotes, corrigir permissões ou executar migrations no startup.
+
+Construa a API, a partir da raiz do monorepo, com `docker build --target runtime -t advocacia-backend:local backend`. Neste ambiente, o build precisou de `--network host` para resolver dependências devido ao DNS da rede Docker. O comando de build do despachante está abaixo; nenhum deles depende de um frontend implementado.
+
+**Migrations iniciais consolidadas — banco inicial vazio:** como não há usuários nem ambiente de produção, a sequência cria diretamente o estado final do schema, sem reproduzir alterações ou backfills anteriores. `backend/db/migrate/20261028000003_create_collection_planning.rb` integra as antigas migrations 04–06; `backend/db/migrate/20261028000004_create_escrevente.rb` substitui a antiga 07. O deploy futuro continua condicionado ao procedimento próprio e às permissões necessárias.
+
+Essas migrations não oferecem rollback destrutivo nem upgrade automático de banco pré-existente. Um banco descartável de desenvolvimento criado pela sequência anterior precisa ser recriado explicitamente antes de receber a sequência consolidada; não aplique as migrations consolidadas sobre o schema antigo nem use os relatos históricos de `db:rollback` abaixo como instrução atual. O uso futuro da instância PostgreSQL do servidor de deploy continua condicionado a um procedimento próprio, ainda não definido.
+
+Para um banco inicial vazio, um administrador deve executar [`backend/db/provision.sql`](backend/db/provision.sql), [`backend/db/provision_despachante.sql`](backend/db/provision_despachante.sql) e [`backend/db/provision_coletor.sql`](backend/db/provision_coletor.sql), nessa ordem, no banco da aplicação, antes das migrations, e configurar credenciais SCRAM fora do repositório. A role `advocacia_migrator` é proprietária das tabelas migradas e executa migrations; `advocacia_runtime` executa a API; `advocacia_despachante` pertence somente ao processo confiável de planejamento e pode ler os monitoramentos dos tenants para gerar o trabalho; `advocacia_coletor` é exclusiva do futuro executor e dos testes de fronteira, sem membros, memberships ou acesso direto às tabelas. Runtime, despachante e coletor não são donos das tabelas; nenhuma das quatro roles possui `BYPASSRLS`. A API não recebe as credenciais do despachante, do coletor ou de migration; o despachante nunca recebe `COLETOR_DATABASE_URL`.
+
+**Registro histórico do corte de nomes (anterior à consolidação; não é procedimento atual de instalação ou upgrade):**
+
+1. O componente antigo (`planner`/planejador) era parado, com reinício pelo supervisor impedido. A versão antiga não podia executar junto com o despachante.
+2. Antes de publicar a release daquela entrega ou executar suas migrations, o procedimento exigia que um administrador executasse [`backend/db/rename_despachante.sql`](backend/db/rename_despachante.sql) no banco da aplicação. A conexão administrativa precisava dos privilégios de gerenciamento da role e das políticas exigidos pelo script, sem usar a credencial da API nem a do despachante. A role é global ao cluster, mas as políticas pertencem a cada banco; o corte abrangia cada banco da aplicação que compartilhasse essa role.
+3. O script renomeava `advocacia_planner` para `advocacia_despachante` e o prefixo de políticas `collection_planner_` para `collection_despachante_`, preservando o OID e as permissões da role. Se as duas roles já existissem, nenhuma existisse ou houvesse colisão de nomes de políticas na mesma tabela, o script abortava sem aplicar mudanças parciais e exigia resolução administrativa do conflito antes de repetir o corte.
+4. O roteiro exigia atualizar o login da URL de conexão para `advocacia_despachante`, substituir `PLANNER_DATABASE_URL` por `DESPACHANTE_DATABASE_URL` e atualizar os arquivos de ambiente protegidos e o gerenciador de segredos. Uma senha SCRAM existente podia ser mantida. Credenciais MD5 antigas dependem do nome da role e são invalidadas pelo PostgreSQL ao renomeá-la; a orientação era convertê-las para SCRAM externamente antes do corte ou redefini-las externamente antes de reiniciar o processo, sem registrar senhas no repositório.
+5. Só então se aplicavam as migrations vigentes naquela entrega e se iniciava o despachante com target, imagem, caminhos e configuração novos, removendo as referências antigas de automações e supervisores. Não havia variável alternativa, alias de classe, target de compatibilidade ou caminho legado. Esse passo histórico não autoriza aplicar a sequência consolidada a um banco pré-existente.
+
+O corte de nomes trocou o módulo `escriba`/Escriba por `escrevente`/Escrevente e moveu `SPEC-escriba.md` para [`SPEC-escrevente.md`](SPEC-escrevente.md), sem arquivo de redirecionamento ou alias. Naquela entrega, o Escrevente era apenas documental. Posteriormente foi implementado no backend Rails, sem ações de usuários nem detalhes de erros, com as verificações históricas descritas acima.
+
 
 Forneça as variáveis por arquivos de ambiente protegidos ou pelo gerenciador de segredos do ambiente. Em uma rede Docker que alcance o PostgreSQL, execute `docker run --rm --env-file <arquivo-de-migration> --entrypoint ruby advocacia-backend:local bin/migrate` separadamente; o arquivo de migration deve conter `MIGRATION_DATABASE_URL` e as demais variáveis necessárias ao boot. Inicie a API com `docker run --rm --env-file <arquivo-da-api> -p 3000:3000 advocacia-backend:local`, fornecendo apenas a URL da role runtime. Coloque a API atrás de terminação HTTPS compatível com `APP_ORIGIN`; nunca exponha `MIGRATION_DATABASE_URL` ao processo web.
 
-Construa o processo separado com `docker build --target planner -t advocacia-planner:local backend` e inicie-o com `docker run --rm --env-file <arquivo-do-planejador> advocacia-planner:local` em uma rede que alcance o PostgreSQL e o DJEN. O arquivo deve fornecer `PLANNER_DATABASE_URL`, `COLETA_HORARIO_1` e `COLETA_HORARIO_2`; não forneça credenciais da API, do Google ou de migration. O processo reconcilia os dois horários do dia local e registra falha do catálogo; após indisponibilidade, espera pelo menos 60 segundos antes de nova requisição. Configure um supervisor de implantação para reiniciar o processo caso ele termine por erro inesperado.
+Construa o processo separado com `docker build --target despachante -t advocacia-despachante:local backend` e inicie-o com `docker run --rm --env-file <arquivo-do-despachante> advocacia-despachante:local` em uma rede que alcance o PostgreSQL e o DJEN. O arquivo deve fornecer `DESPACHANTE_DATABASE_URL`, `COLETA_HORARIO_1` e `COLETA_HORARIO_2`; não forneça credenciais da API, do Google ou de migration. O processo reconcilia os dois horários do dia local e registra falha do catálogo; após indisponibilidade, espera pelo menos 60 segundos antes de nova requisição. Configure um supervisor de implantação para reiniciar o processo caso ele termine por erro inesperado.
 
 O PostgreSQL local de teste é separado e não se destina ao deploy. Para verificá-lo nesta máquina, foi iniciada a imagem `postgres:18.6-alpine3.23` diretamente como UID 70, com diretório de dados previamente preparado; uma linha persistiu após parada e reinício.
 
 Durante o desenvolvimento, as requisições ao DJEN utilizam o nó de saída Tailscale `100.118.186.77`. Em produção, Tailscale não é requisito: o tráfego usa a saída normal da infraestrutura de deploy.
 
-### Verificações desta fatia
+### Verificações da renomeação para despachante e Escrevente
+
+Estas evidências pertencem à entrega de renomeação, anterior à consolidação das migrations; não são resultados desta alteração.
+
+- Os targets `runtime`, `despachante` e `test` foram construídos com os caminhos novos. A suíte completa executou com `DESPACHANTE_DATABASE_URL` e a role real `advocacia_despachante`: **247 testes, 6.865 assertions, sem falhas, erros ou skips**.
+- Em PostgreSQL descartável, o corte de um esquema legado preservou o OID e os atributos da role, os OIDs/alvos/expressões das 12 políticas e uma execução sentinela. Roles ambíguas e colisão de política abortaram com rollback integral; a credencial de migration foi recusada no script administrativo. Reaplicar o corte sobre o estado novo não alterou dados.
+- As migrations vigentes naquela entrega também foram aplicadas a um banco sem tabelas. Os quatro down paths afetados foram exercitados com `db:rollback STEP=4`, seguidos de `db:migrate`, usando a role de migration e sem alterar dados de produção. Esse registro não descreve os down paths da sequência consolidada, que não suporta rollback destrutivo.
+- A imagem final do despachante executou `CollectionDespachante` contra PostgreSQL, com catálogo local explicitamente fornecido, e persistiu dois slots `no_work` em banco sem entidades. O CMD real `ruby despachante/run.rb` iniciou como PID 1 com UID/GID `1000:1000` e reutilizou os slots concluídos sem carregar Rails. Isso verifica planejamento e execução independente, não ETL nem conectividade DJEN.
+- A imagem final da API iniciou Puma em produção como UID/GID `1000:1000`; uma requisição HTTP no loopback do próprio container a `GET /api/session` retornou `200` com `authenticated: false` e `onboarded: false`. Nos dois runtimes não foram encontrados `gcc`, `g++`, `cc`, `make`, arquivos de cache de gems ou `/app/test`.
+- Limites desta verificação: uma tentativa de smoke com catálogo DJEN real excedeu 90 segundos e foi encerrada; o acesso HTTP pela porta publicada no host também excedeu o timeout. Não se declara conectividade externa nem acesso pela porta publicada como aprovados nesta revisão. O smoke HTTP aprovado ocorreu dentro do container; o smoke de planejamento aprovado usou catálogo local explícito.
+- A especificação passou a ser `SPEC-escrevente.md`, com ID `escrevente`; seus links e os links novos do despachante foram verificados naquela entrega. Na entrega de renomeação, o Escrevente permanecia documental, sem implementação de runtime; essa evidência histórica não abrange a implementação atual em andamento.
+
+| Imagem verificada | Tamanho local em bytes |
+|---|---|
+| `advocacia-backend:local` | 263.216.146 |
+| `advocacia-despachante:local` | 176.460.209 |
+| Base `ruby:4.0.9-alpine3.23` | 147.221.451 |
+
+A base Alpine continua escolhida pelo tamanho reduzido com suporte ao Ruby e às dependências nativas utilizadas; os compiladores ficam somente nos estágios de build, e a imagem do despachante mantém bundle próprio sem Rails.
+
+### Verificações históricas anteriores à renomeação
+
+As evidências abaixo foram registradas antes da renomeação dos componentes e da consolidação das migrations. Elas preservam o histórico, mas não comprovam a sequência consolidada, o build, os tamanhos nem a execução dos artefatos renomeados; esses pontos exigem nova verificação em Docker.
 
 - As migrations foram executadas no PostgreSQL de teste com a role de migration. A suíte completa da imagem de testes passou com roles reais separadas: **247 testes, 6.865 assertions, sem falhas, erros ou skips**.
 - A imagem runtime iniciou o Puma como UID 1000. Um smoke HTTP real verificou negação anônima, criação e leitura de dois perfis com tenants distintos, OAB principal sem secundárias e resistência a tenant adulterado. As sessões foram criadas diretamente para o teste; isso não é um teste de login Google real.
-- Tamanhos locais: imagem da API **263.210.704 bytes**, imagem do planejador **176.460.240 bytes**, base `ruby:4.0.9-alpine3.23` **147.221.451 bytes**, PostgreSQL de teste `postgres:18.6-alpine3.23` **429.615.951 bytes**. Alpine reduz a base mantendo compatibilidade Ruby e nativa; compiladores ficam fora das imagens finais. O planejador possui manifesto e bundle próprios, sem as gems Rails da API.
+- Tamanhos históricos, medidos antes da renomeação: imagem da API **263.210.704 bytes**, imagem do processo separado de planejamento **176.460.240 bytes**, base `ruby:4.0.9-alpine3.23` **147.221.451 bytes**, PostgreSQL de teste `postgres:18.6-alpine3.23` **429.615.951 bytes**. Alpine reduz a base mantendo compatibilidade Ruby e nativa; compiladores ficam fora das imagens finais. O despachante possui manifesto e bundle próprios, sem as gems Rails da API.
+- Na revisão anterior à renomeação, a reinspeção das duas imagens locais confirmou os tamanhos históricos acima, usuário configurado `1000:1000` e comandos distintos. Um smoke em containers descartáveis, com filesystem somente leitura, `/tmp` temporário, sem rede, sem capabilities e com `no-new-privileges`, confirmou UID/GID reais `1000:1000`, carregamento de Rails/Puma na API e do runner Ruby com `pg` no processo separado de planejamento então vigente. Não foram encontrados `gcc`, `g++`, `cc`, `make`, arquivos no cache de gems ou `/app/test`; o bundle desse processo não continha Rails. Esse smoke não iniciou o servidor HTTP nem executou planejamento contra banco ou DJEN, e não exercitou `DespachanteRunner` nem a imagem renomeada.
 - O fluxo Google com credenciais reais e a URI HTTPS registrada ainda não foi exercitado: depende de configuração OAuth externa. Os testes automatizados usam tokens assinados de teste e substituem apenas a comunicação externa do provedor.
 - A imagem runtime consultou por HTTPS as chaves públicas reais do Google e recebeu duas chaves RSA; essa verificação de conectividade não substitui a autenticação com credenciais reais.
 - Os testes focados de catálogo e projeção do advogado passaram com 24 testes; partes, com 47; processos, com 63. Um smoke HTTP na imagem runtime consultou o catálogo DJEN real e criou, leu, editou e desativou ambos os tipos em dois tenants, negando acesso cruzado. As sessões desse smoke foram preparadas para teste, sem login Google real.
 - Em 28/10/2026, o catálogo real retornou 93 códigos validados. A [OpenAPI do DJEN](https://comunicaapi.pje.jus.br/swagger/djen.yml) descreve uma lista plana, enquanto a resposta observada agrupa instituições por UF; o cliente aceita ambos os formatos e rejeita resposta parcial inválida.
-- Em banco local separado, o planejador da imagem final consultou o DJEN real e gerou os dois slots do dia. A API confirmou, para dois tenants, trabalhos de advogado, parte e processo com meios `D`/`E`, critérios fixados e isolamento cruzado. Os processos web e planner executaram como UID 1000 e o PostgreSQL como UID 70. Isso verifica planejamento, não execução da coleta.
+- Antes da renomeação, em banco local separado, o processo de planejamento da imagem final então vigente consultou o DJEN real e gerou os dois slots do dia. A API confirmou, para dois tenants, trabalhos de advogado, parte e processo com meios `D`/`E`, critérios fixados e isolamento cruzado. Os processos web e de planejamento executaram como UID 1000 e o PostgreSQL como UID 70. Isso verificou planejamento, não execução da coleta nem a imagem renomeada.

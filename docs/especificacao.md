@@ -30,12 +30,12 @@ Coleta compreende microaplicações de ETL e uma aplicação de planejamento/con
 2. Partes e processos podem ter filtros dos tribunais disponibilizados pela fonte, sujeitos à capacidade real da API. Cada monitoramento pertence ao tenant.
 3. A interface oferece páginas de cadastro e leitura, além de navegação para dashboard e resultados.
 
-### Coleta e Escriba
+### Coleta e Escrevente
 
-1. Duas execuções por dia, em horários configuráveis sem valores padrão; o planejador produz linhas rastreáveis para cada entidade elegível e sua associação ao advogado, fonte e tribunal aplicável. Agenda e data corrente usam `America/Sao_Paulo`.
+1. Duas execuções por dia, em horários configuráveis sem valores padrão; o despachante produz linhas rastreáveis para cada entidade elegível e sua associação ao advogado, fonte e tribunal aplicável. Agenda e data corrente usam `America/Sao_Paulo`.
 2. Para cada execução, a data de consulta é o dia corrente da execução. A coleta principal consulta o caderno por tribunal, data corrente e meio, baixa o ZIP, descompacta seus JSONs e procura correspondências por nome ou OAB do advogado, número de processo e nome de parte. ZIP inválido ou divergente é falha; esgotadas as tentativas do caderno, o fallback consulta comunicações paginadas, com início e fim iguais à data corrente. São inicialmente três tentativas por caminho, com esperas de um e cinco minutos, configuráveis.
 3. Publicações com `id` e `hash` válidos são deduplicadas conjuntamente por fonte e tenant, preservando os vínculos de todos os monitoramentos. Cadernos e consulta de comunicações são dois acessos à mesma fonte lógica DJEN. Publicação sem chave completa válida é guardada separadamente e exibida ao tenant autorizado com aviso de pendência e possível duplicidade; não há resolução nesta entrega. A unicidade global dos identificadores não foi comprovada.
-4. O Escriba registra início, término e referências necessárias do fluxo; seus registros não são alterados nem excluídos por operações normais. O solicitante dispensou retenção automática nesta etapa. Não registra ações de usuários nem detalhes de erros; falhas técnicas são tratadas separadamente.
+4. O Escrevente registra início, término e referências necessárias do fluxo; seus registros não são alterados nem excluídos por operações normais. O solicitante dispensou retenção automática nesta etapa. Não registra ações de usuários nem detalhes de erros; falhas técnicas são tratadas separadamente.
 5. Se as tentativas se esgotarem, a dashboard informa qual tribunal falhou. Uma execução posterior no mesmo dia pode recuperar publicações; não há recuperação automática de datas anteriores. Falha não pode ser apresentada como zero publicações.
 
 ### Consulta e desempenho
@@ -46,7 +46,7 @@ Coleta compreende microaplicações de ETL e uma aplicação de planejamento/con
 
 ## Segurança e riscos
 
-A restrição a tribunais e dashboard aplica-se a respostas e agregações; dashboard não amplia tribunais legíveis, e a negação mascara números sem expor valores subjacentes. O padrão de leitura ampla para usuários sem grupo é decisão expressa do solicitante, com risco de exposição por configuração acidental. O Escriba mantém referências internas mínimas e não registra ações de usuários, identificadores diretos ou erros técnicos. Dados públicos podem conter dados pessoais e continuam sujeitos aos controles de acesso e obrigações legais aplicáveis.
+A restrição a tribunais e dashboard aplica-se a respostas e agregações; dashboard não amplia tribunais legíveis, e a negação mascara números sem expor valores subjacentes. O padrão de leitura ampla para usuários sem grupo é decisão expressa do solicitante, com risco de exposição por configuração acidental. O Escrevente mantém referências internas mínimas e não registra ações de usuários, identificadores diretos ou erros técnicos. Dados públicos podem conter dados pessoais e continuam sujeitos aos controles de acesso e obrigações legais aplicáveis.
 
 ### Documentação da API
 
@@ -67,12 +67,12 @@ A API usará Swagger UI para expor sua documentação interativa, protegida por 
 - Referência observada em 28/10/2026: uma publicação TJRO/D apareceu tanto no caderno quanto na página 1 da consulta por número de processo sem máscara e datas iguais, com `id` **769263947** e `hash` **jlx8NKdwzRKJtohPTKe77wYbD1mrEX** em ambas as fontes. As páginas 2 e 3 estavam vazias. Para uma publicação de cada caderno TJRR/D e TJAP/D, as páginas 1–3 estavam vazias. Essas amostras não demonstram unicidade global.
 - Correspondência por nome, homônimos e vínculos entre monitoramentos; política para alterações posteriores da fonte. A chave conjunta `id` e `hash` já está definida no requisito de deduplicação.
 - Capacidade: 300 usuários simultâneos são referência; não há meta comprovada nem teste de carga exigido para esta entrega.
-- Escriba: sem prazo automático de retenção nesta etapa, por decisão do solicitante. Referências internas permanecem protegidas; avaliar as obrigações legais aplicáveis antes de produção.
+- Escrevente: sem prazo automático de retenção nesta etapa, por decisão do solicitante. Referências internas permanecem protegidas; avaliar as obrigações legais aplicáveis antes de produção.
 - Stack central definida pelo solicitante: Ruby/Rails exclusivamente API-only, Next.js e PostgreSQL com RLS, conforme [registro técnico](stack.md). Versões, infraestrutura, tecnologias de ETL, ferramentas, comandos e estrutura física continuam pendentes; não há aplicação implementada.
 
 ## Verificação e limites
 
-Verificar isolamento entre tenants e escopos na API; expiração em sessão ativa; duas coletas com repetidos e publicações distintas; registros append-only; falha, recuperação e dashboard; inspeção visual e teste de carga com critérios acordados. Não alterar registros do Escriba, registrar segredos, presumir cobertura da fonte ou iniciar implementação com decisões bloqueantes não resolvidas.
+Verificar isolamento entre tenants e escopos na API; expiração em sessão ativa; duas coletas com repetidos e publicações distintas; registros append-only; falha, recuperação e dashboard; inspeção visual e teste de carga com critérios acordados. Não alterar registros do Escrevente, registrar segredos, presumir cobertura da fonte ou iniciar implementação com decisões bloqueantes não resolvidas.
 
 ## Fluxo Git
 

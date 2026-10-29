@@ -11,6 +11,13 @@ class CreateIdentityAndLawyerProfiles < ActiveRecord::Migration[8.1]
           AND NOT rolreplication) OR pg_has_role('advocacia_runtime', 'advocacia_migrator', 'MEMBER') THEN
           RAISE EXCEPTION 'Provision an isolated, non-bypass runtime role first';
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'advocacia_despachante'
+          AND rolcanlogin AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreaterole
+          AND NOT rolcreatedb AND NOT rolreplication)
+          OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member = 'advocacia_despachante'::regrole)
+          OR pg_has_role('advocacia_runtime', 'advocacia_despachante', 'MEMBER') THEN
+          RAISE EXCEPTION 'Provision an isolated, non-bypass despachante login first';
+        END IF;
       END $guard$;
     SQL
 
@@ -192,19 +199,20 @@ class CreateIdentityAndLawyerProfiles < ActiveRecord::Migration[8.1]
         ALTER TABLE public.#{table} ENABLE ROW LEVEL SECURITY;
         ALTER TABLE public.#{table} FORCE ROW LEVEL SECURITY;
         CREATE POLICY tenant_isolation ON public.#{table}
+          TO advocacia_runtime, advocacia_migrator
           USING (#{column} = (SELECT app_private.current_tenant_id()))
           WITH CHECK (#{column} = (SELECT app_private.current_tenant_id()));
-        REVOKE ALL ON public.#{table} FROM PUBLIC, advocacia_runtime;
+        CREATE POLICY collection_despachante_read ON public.#{table}
+          FOR SELECT TO advocacia_despachante USING (true);
+        REVOKE ALL ON public.#{table} FROM PUBLIC, advocacia_runtime, advocacia_despachante;
         GRANT SELECT, INSERT ON public.#{table} TO advocacia_runtime;
+        GRANT SELECT ON public.#{table} TO advocacia_despachante;
       SQL
     end
     execute "GRANT SELECT ON public.schema_migrations TO advocacia_runtime"
   end
 
   def down
-    execute "DROP SCHEMA app_private CASCADE"
-    drop_table :oab_registrations
-    drop_table :lawyers
-    drop_table :tenants
+    raise ActiveRecord::IrreversibleMigration
   end
 end
