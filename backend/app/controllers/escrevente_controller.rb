@@ -38,9 +38,11 @@ class EscreventeController < ApplicationController
 
   def for_visible_run
     run_id = params[:id]
-    return unless run_id.is_a?(String) && run_id.match?(/\A[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\z/i)
 
     DatabaseContext.with_session(session_token) do
+      authorize_session!(owner_only: true)
+      next unless run_id.is_a?(String) && run_id.match?(/\A[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\z/i)
+
       connection = ApplicationRecord.connection
       binds = [ActiveRecord::Relation::QueryAttribute.new("run_id", run_id, ActiveRecord::Type::String.new)]
       visible = connection.exec_query(<<~SQL, "Tenant collection visibility", binds).any?

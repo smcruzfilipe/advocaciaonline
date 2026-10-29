@@ -21,23 +21,26 @@ class PartyMonitoringsController < ApplicationController
 
   def index
     parties = DatabaseContext.with_session(session_token) do
-      party_monitorings.order(:created_at, :id).map { |party| serialize_party(party) }
+      context = authorize_session!("consultar_monitoramentos")
+      party_monitorings(context).order(:created_at, :id).map { |party| serialize_party(party) }
     end
     render json: { parties: parties }
   end
 
   def show
     party = DatabaseContext.with_session(session_token) do
-      serialize_party(party_monitorings.find(params[:id]))
+      context = authorize_session!("consultar_monitoramentos")
+      serialize_party(party_monitorings(context).find(params[:id]))
     end
     render json: party
   end
 
   def create
     party = DatabaseContext.with_session(session_token) do
-      record = PartyMonitoring.create!(input_attributes(creating: true).merge(
-        tenant_id: authenticated_context.fetch("tenant_id")
-      ))
+      attributes = input_attributes(creating: true)
+      context = authorize_session!("cadastrar_monitoramento")
+      record = PartyMonitoring.create!(attributes.merge(tenant_id: context.fetch("tenant_id")))
+      authorize_session!("cadastrar_monitoramento")
       serialize_party(record)
     end
     render json: party, status: :created
@@ -45,9 +48,24 @@ class PartyMonitoringsController < ApplicationController
 
   def update
     party = DatabaseContext.with_session(session_token) do
-      record = party_monitorings.find(params[:id])
-      record.update!(input_attributes(creating: false))
-      serialize_party(record)
+      attributes = input_attributes(creating: false)
+      operations = monitoring_update_operations(attributes)
+      context = authorize_session!(*operations)
+      record = party_monitorings(context).lock.find(params[:id])
+      current = authorize_session!(*operations)
+      raise AuthorizationDenied unless current.fetch("tenant_id") == record.tenant_id
+
+      record.update!(attributes)
+      authorize_session!(*operations) do |current, groups|
+        raise AuthorizationDenied unless current.fetch("tenant_id") == record.tenant_id
+
+        if AuthorizationPolicy.allowed?(owner: current.fetch("role") == "owner", groups: groups,
+          operation: "consultar_monitoramentos")
+          serialize_party(record)
+        else
+          { id: record.id }
+        end
+      end
     end
     render json: party
   end
@@ -66,8 +84,8 @@ class PartyMonitoringsController < ApplicationController
     api_error("invalid_content_type", "Envie os dados em JSON.", :unsupported_media_type)
   end
 
-  def party_monitorings
-    PartyMonitoring.where(tenant_id: authenticated_context.fetch("tenant_id"))
+  def party_monitorings(context)
+    PartyMonitoring.where(tenant_id: context.fetch("tenant_id"))
   end
 
   def input_attributes(creating:)

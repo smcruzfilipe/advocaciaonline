@@ -4,6 +4,7 @@ class CollectionRunsController < ApplicationController
 
   def index
     runs = DatabaseContext.with_session(session_token) do
+      authorize_session!(owner_only: true)
       ApplicationRecord.connection.select_all(<<~SQL).to_a
         SELECT id, collection_date::text AS collection_date, slot, status
         FROM app_private.collection_runs_for_session()
@@ -14,9 +15,11 @@ class CollectionRunsController < ApplicationController
 
   def jobs
     run_id = params[:id]
-    return run_not_found unless run_id.is_a?(String) && run_id.match?(/\A[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\z/i)
 
     jobs = DatabaseContext.with_session(session_token) do
+      authorize_session!(owner_only: true)
+      next unless run_id.is_a?(String) && run_id.match?(/\A[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\z/i)
+
       connection = ApplicationRecord.connection
       binds = [ActiveRecord::Relation::QueryAttribute.new("run_id", run_id, ActiveRecord::Type::String.new)]
       visible = connection.exec_query(<<~SQL, "Tenant collection execution", binds).any?

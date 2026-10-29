@@ -32,6 +32,7 @@ class ProcessMonitoringsController < ApplicationController
 
   def index
     processes = DatabaseContext.with_session(session_token) do
+      authorize_session!("consultar_monitoramentos")
       ProcessMonitoring.order(:id).map { |process| serialize_process(process) }
     end
     render json: { processes: processes }
@@ -39,15 +40,18 @@ class ProcessMonitoringsController < ApplicationController
 
   def show
     process = DatabaseContext.with_session(session_token) do
+      authorize_session!("consultar_monitoramentos")
       serialize_process(ProcessMonitoring.find(params[:id]))
     end
     render json: process
   end
 
   def create
-    attributes = input_attributes(creating: true)
     process = DatabaseContext.with_session(session_token) do
-      record = ProcessMonitoring.create!(attributes.merge(tenant_id: authenticated_context.fetch("tenant_id")))
+      attributes = input_attributes(creating: true)
+      context = authorize_session!("cadastrar_monitoramento")
+      record = ProcessMonitoring.create!(attributes.merge(tenant_id: context.fetch("tenant_id")))
+      authorize_session!("cadastrar_monitoramento")
       serialize_process(record)
     end
     render json: process, status: :created
@@ -55,9 +59,24 @@ class ProcessMonitoringsController < ApplicationController
 
   def update
     process = DatabaseContext.with_session(session_token) do
-      record = ProcessMonitoring.find(params[:id])
-      record.update!(input_attributes(creating: false))
-      serialize_process(record)
+      attributes = input_attributes(creating: false)
+      operations = monitoring_update_operations(attributes)
+      authorize_session!(*operations)
+      record = ProcessMonitoring.lock.find(params[:id])
+      current = authorize_session!(*operations)
+      raise AuthorizationDenied unless current.fetch("tenant_id") == record.tenant_id
+
+      record.update!(attributes)
+      authorize_session!(*operations) do |current, groups|
+        raise AuthorizationDenied unless current.fetch("tenant_id") == record.tenant_id
+
+        if AuthorizationPolicy.allowed?(owner: current.fetch("role") == "owner", groups: groups,
+          operation: "consultar_monitoramentos")
+          serialize_process(record)
+        else
+          { id: record.id }
+        end
+      end
     end
     render json: process
   end
