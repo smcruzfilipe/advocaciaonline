@@ -222,6 +222,44 @@ class CollectionPlanningTest < ActiveSupport::TestCase
     assert_equal recovered_work, jobs(recovered_id)
   end
 
+  test "an incomplete professional profile fails the whole plan and recovers without changing its execution" do
+    token, lawyer = create_lawyer
+    party = create_party(token, name: "Parte preservada", courts: ["TJAC"])
+    failed_id = nil
+
+    PG.connect(ENV.fetch("MIGRATION_DATABASE_URL")) do |admin|
+      primary_id = admin.transaction do
+        admin.exec_params("SELECT set_config('app.session_hash', $1, true)", [IdentityStore.digest(token)])
+        admin.exec_params(<<~SQL, [lawyer.id]).first.fetch("id")
+          UPDATE public.oab_registrations SET "primary" = false
+          WHERE lawyer_id = $1 AND "primary" RETURNING id
+        SQL
+      end
+      begin
+        assert_raises(CollectionDespachante::InvalidProfile) do
+          with_catalog { despachante.plan(slot: 1, now: @now) }
+        end
+        failed_id = @database.exec_params(
+          "SELECT id FROM public.collection_runs WHERE collection_date = $1 AND slot = 1", [@date]).getvalue(0, 0)
+        assert_run(failed_id, slot: 1, status: "planning_failed")
+        assert_empty jobs(failed_id)
+      ensure
+        admin.transaction do
+          admin.exec_params("SELECT set_config('app.session_hash', $1, true)", [IdentityStore.digest(token)])
+          admin.exec_params('UPDATE public.oab_registrations SET "primary" = true WHERE id = $1', [primary_id])
+        end
+      end
+    end
+
+    recovered_id = with_catalog { despachante.plan(slot: 1, now: @now + 1.hour) }
+    assert_equal failed_id, recovered_id
+    assert_run(recovered_id, slot: 1, status: "planned")
+    assert_tenant_work(recovered_id, lawyer.tenant_id, [
+      ["lawyer", lawyer.id, %w[TJAC TRF1], lawyer_criteria],
+      ["party", party.id, ["TJAC"], { "name" => "Parte preservada" }]
+    ])
+  end
+
   test "a successfully resolved empty catalog records no eligible work rather than zero publications" do
     token, = create_lawyer
     create_party(token, name: "Sem tribunal disponível")
