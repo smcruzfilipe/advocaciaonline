@@ -29,7 +29,10 @@ class GoogleSessionsController < ApplicationController
     context = IdentityStore.context(token)
     raise GoogleOidc::AuthenticationFailed unless context
     cookies[SESSION_COOKIE] = cookie_options(expires: 12.hours.from_now).merge(value: token)
-    render json: { authenticated: true, onboarded: context.fetch("tenant_id").present?, csrf_token: csrf }
+    memberships = IdentityStore.memberships(token)
+    render json: { authenticated: true, onboarded: context.fetch("tenant_id").present?, csrf_token: csrf,
+      membership_id: context.fetch("membership_id"), tenant_id: context.fetch("tenant_id"), role: context.fetch("role"),
+      selection_required: memberships.any? && context.fetch("tenant_id").blank?, memberships: memberships }
   rescue GoogleOidc::AuthenticationFailed, IdentityStore::AuthenticationRejected
     api_error("google_login_failed", "Não foi possível entrar com o Google. Tente novamente.", :unauthorized)
   end

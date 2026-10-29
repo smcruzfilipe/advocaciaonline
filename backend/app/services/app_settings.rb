@@ -16,4 +16,19 @@ class AppSettings
   def self.google_client_secret
     ENV.fetch("GOOGLE_CLIENT_SECRET").presence || raise(ArgumentError, "GOOGLE_CLIENT_SECRET is required")
   end
+
+  def self.smtp
+    values = {
+      "host" => ENV.fetch("SMTP_HOST").presence,
+      "port" => ENV.fetch("SMTP_PORT").presence,
+      "username" => ENV.fetch("SMTP_USERNAME").presence,
+      "password" => ENV.fetch("SMTP_PASSWORD").presence,
+      "from" => ENV.fetch("SMTP_FROM").presence
+    }
+    raise ArgumentError, "SMTP configuration is required" unless values.values.all?
+
+    port = Integer(values.fetch("port"), 10)
+    raise ArgumentError, "SMTP port is invalid" unless (1..65_535).cover?(port)
+    values.merge("port" => port)
+  end
 end
