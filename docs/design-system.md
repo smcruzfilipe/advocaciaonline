@@ -9,7 +9,7 @@ O Advocacia Online é um **monorepo**: a interface Next.js e a API Rails pertenc
 - `docs/design-system.md`, na raiz documental compartilhada, é o contrato visual do produto.
 - `frontend/` é o componente Next.js previsto para implementar este contrato: páginas em `frontend/app/`, componentes em `frontend/components/` e tokens/estilos mantidos dentro do frontend. Esse diretório ainda não foi criado; este guia não é um frontend independente.
 - `backend/` contém a API Rails, responsável por identidade, autorização, domínio e persistência. Não recebe estilos nem renderiza a UI Next.js.
-- `backend/despachante/` contém o despachante, executado fora do servidor da API; não possui interface própria. O futuro `etl/` também é um processo sem UI, no mesmo monorepo.
+- `backend/despachante/` contém o despachante, executado fora do servidor da API; não possui interface própria. `etl/` contém o processador, também sem UI, no mesmo monorepo.
 
 Frontend e backend terão imagens distintas, preservando o repositório único. Reutilizar a direção visual do Publique não significa importar sua organização de pastas, criar outro repositório ou deslocar o backend existente. As fronteiras técnicas estão na [arquitetura](arquitetura.md#estrutura-do-monorepo-e-fronteiras).
 
@@ -131,7 +131,7 @@ A organização abaixo orienta composição, não fixa URLs nem adiciona funcion
 
 - **Acesso e onboarding:** coluna única, sem navegação privada antes de autenticação. Usar a identidade Google prevista em [identidade](../SPEC-identidade.md), sem inventar formulário de senha local. Nome, OABs e escritório opcional organizados em grupos legíveis.
 - **Monitoramentos:** separar contexto do advogado, partes e processos conforme [monitoramentos](../SPEC-monitoramentos.md). Exibir nome ou número, tribunais aplicáveis e situação com texto; deixar ações previstas junto ao registro.
-- **Consulta:** cada comunicação permanece independente, agrupada por tribunal; nunca fundir resultados por número de processo. O detalhe prioriza tribunal, número e conteúdo efetivamente fornecido pela fonte. A referência funcional é [consulta](../SPEC-consulta.md).
+- **Consulta:** cada comunicação permanece independente, agrupada por tribunal; nunca fundir resultados por número de processo. O detalhe prioriza tribunal, número e conteúdo efetivamente fornecido pela fonte, escapado na renderização, nunca inserido como HTML bruto. Somente o texto da API é sanitizado na coleta; o caderno não é sanitizado, e a primeira versão deduplicada pode conservar seu HTML. A referência funcional é [consulta](../SPEC-consulta.md).
 - **Dashboard:** apenas as duas métricas aprovadas — comunicações novas persistidas e processos distintos associados — nas janelas definidas em consulta. Compor números, rótulos e períodos sem inventar gráficos, tendências ou métricas. Avisos de coleta aparecem junto ao escopo afetado.
 - **Equipe e grupos:** seguir [autorização](../SPEC-autorizacao.md). Nome comercial do escritório não equivale ao tenant. Ocultar ações não substitui autorização no servidor; apresentação não amplia acesso.
 

@@ -58,7 +58,7 @@ Executar as fatias em ordem de dependência. IDs são os principais do checklist
 - **ID 12:** deduplicação e preservação de vínculos, após ID 11.
 - **ID 13:** agenda, novas tentativas e estado de falha, após ID 12.
 
-**Checkpoint após 10–12:** verificar os contratos propostos de planejamento, persistência e deduplicação. Confirmar coleta primária dos cadernos DJEN ZIP/JSON e fallback pela API paginada da mesma fonte lógica, somente para o dia corrente; deduplicação por `id` e `hash` conjuntamente, com vínculos preservados.
+**Checkpoint após 10–12:** verificar os contratos propostos de planejamento, persistência e deduplicação. Confirmar somente Diário Eletrônico (`D`), sem editais (`E`): cadernos DJEN ZIP/JSON e fallback paginado no primeiro slot, API paginada diretamente no segundo, sem caderno, somente para o dia corrente e na mesma fonte lógica. Sanitizar apenas texto da API, não do caderno; a deduplicação por `id` e `hash` conjuntamente preserva vínculos e a primeira versão, que pode conter HTML e exige escape pelo consumidor.
 
 ### Fase 4 — Consulta e dashboard
 
@@ -135,18 +135,18 @@ Não paralelizar tarefas com dependência direta nem alterações concorrentes a
 
 | Risco dentro do escopo aprovado | Mitigação planejada |
 |---|---|
-| Contrato da fonte, filtros, cobertura e paginação não comprovados para todos os tribunais. | Validar evidências e limites antes do gate 3; usar cadernos ZIP/JSON como caminho principal e consulta paginada como fallback da mesma fonte lógica, sem prometer cobertura não demonstrada. |
+| Contrato da fonte, filtros, cobertura e paginação não comprovados para todos os tribunais. | Validar evidências e limites antes do gate 3; somente para Diário Eletrônico (`D`), usar cadernos ZIP/JSON com fallback paginado no primeiro slot e API paginada diretamente no segundo, sem prometer cobertura não demonstrada nem coletar editais (`E`). |
 | Divergência de nome, homônimos ou filtro por processo pode causar resultados indevidos ou ausentes. | Manter critérios de correspondência e semântica da fonte como decisões explícitas; não inventar normalização nem tratar uma amostra como garantia geral. |
 | `id` e `hash` podem não ter estabilidade/unicidade global comprovada. | Tratar estabilidade como premissa limitada; deduplicar apenas pela combinação conjunta, por tenant e DJEN, preservando vínculos e sem fundir por processo/tribunal. |
 | Horários, fuso, critérios de fallback e política de tentativas ainda não definidos. | Aprovar elegibilidade, condições e limites antes de configurar execução; não inferir quantidade, intervalos ou recuperação de dias anteriores. |
 | Dados pessoais em registros imutáveis, ainda que públicos. | Minimizar dados registrados, manter isolamento e avaliar obrigações legais aplicáveis antes de produção. |
 | Regras de grupo e dashboard podem permitir exposição indevida ou bloquear acesso esperado. | Definir composição e escopos; aplicar decisões no servidor a listas, detalhes, respostas e agregações, preservando as regras funcionais aprovadas. |
 | Capacidade para 300 usuários não foi medida. | Tratar 300 como referência e planejar teste futuro; não afirmar capacidade sem medição. |
-| Versões, ETL, políticas RLS, caminhos e comandos ainda não definidos. | Completar ID 3 a partir da stack central escolhida; depois fixar caminhos reais, limitar cada fatia a 3–5 arquivos e subdividir acima desse limite. |
+| Mudanças nas versões, políticas RLS e dependências podem invalidar os comandos ou as garantias existentes. | Manter versões e comandos explícitos, validar roles reais e revisar cada fatia antes de avançar. |
 
 ## Fronteiras e execução
 
-Manter o escopo das seis especificações: DJEN como fonte lógica, cadernos ZIP/JSON primários, API paginada como fallback, data corrente exclusiva por execução e deduplicação pela combinação conjunta `id` + `hash`. Convites de equipe por e-mail pertencem ao escopo de identidade; não introduzir coleta histórica automática, relatórios ou avisos por e-mail, fontes adicionais ou regras de negócio não aprovadas.
+Manter o escopo das seis especificações: DJEN como fonte lógica, exclusivamente Diário Eletrônico (`D`), sem editais (`E`); cadernos ZIP/JSON com fallback paginado no primeiro slot; API paginada diretamente no segundo, sem caderno; data corrente exclusiva por execução; sanitização somente do texto da API, não do caderno; deduplicação pela combinação conjunta `id` + `hash`, preservando a primeira versão, que pode conter HTML e deve ser escapada pelo consumidor. Evidências anteriores com `E` são históricas, não regras vigentes. Convites de equipe por e-mail pertencem ao escopo de identidade; não introduzir coleta histórica automática, relatórios ou avisos por e-mail, fontes adicionais ou regras de negócio não aprovadas.
 
 `dev` é a base das features; cada feature parte de `dev` em `feature/<nome>` e integra após revisão. Caminhos e comandos existentes são registrados no checklist e no README; caminhos previstos não representam implementação.
 

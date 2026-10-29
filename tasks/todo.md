@@ -1,6 +1,6 @@
 # Tarefas: monitoramento jurídico
 
-Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovados pelo solicitante; decisões 1–3 estão registradas. As tarefas implementadas e suas evidências constam nas respectivas seções.
+Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovados pelo solicitante; decisões 1–3 estão registradas. As tarefas implementadas e suas evidências constam nas respectivas seções. Essas evidências são anteriores à renomeação para processador, à API direta no segundo slot e à restrição ao meio D; não comprovam essas alterações nem foram repetidas nesta revisão. Referências históricas a E não autorizam coleta de editais.
 
 ## Regras de execução e rastreio
 
@@ -9,7 +9,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 - **Fontes na implementação:** aplicar `source-driven-development` em cada fatia que dependa de framework, biblioteca ou serviço externo: identificar as versões efetivamente fixadas, consultar a documentação oficial específica antes de codificar, seguir as APIs documentadas e registrar os links que sustentam decisões não triviais. Conflitos com o código ou ausência de documentação devem ser explicitados; nenhuma consulta substitui teste ou verificação em execução.
 - Áreas são módulos/artefatos lógicos, não caminhos inventados. Depois da decisão técnica 3a, registrar os caminhos exatos antes de executar cada fatia; se exceder cinco arquivos, redividir antes de executar.
 - Não escolher stack, comandos, ferramentas, estruturas, formatos ou transportes antes das decisões 3a–3b. Resultados efetivos e verificações pendentes devem ser distinguidos nas respectivas tarefas.
-- Fonte lógica DJEN: cadernos ZIP/JSON são o caminho principal; comunicações paginadas são fallback; ambos usam exclusivamente a data corrente. Não revalidar retroativamente a premissa aceita de estabilidade de `id`/`hash`, nem iniciar recuperação histórica.
+- Fonte lógica DJEN, somente Diário Eletrônico (`D`), sem coleta de editais (`E`): no primeiro slot, cadernos ZIP/JSON com fallback API paginada; no segundo, API paginada diretamente, sem caderno; ambos usam exclusivamente a data corrente. Sanitizar apenas `texto` da API, não do caderno. Preservar a primeira versão deduplicada, que pode conter HTML e exige escape pelo consumidor. Não revalidar retroativamente a premissa aceita de estabilidade de `id`/`hash`, nem iniciar recuperação histórica.
 - Implementação futura parte de `dev`; o branch atual de documentação não é base de feature. Convite de equipe por e-mail está no escopo aprovado; relatórios e avisos por e-mail e outras fontes ficam fora da primeira entrega.
 - **Schema inicial consolidado:** para banco inicial vazio, as migrations criam diretamente o estado final, sem alterações intermediárias ou backfills históricos. `backend/db/migrate/20261028000003_create_collection_planning.rb` integra as antigas migrations 04–06; `backend/db/migrate/20261028000004_create_escrevente.rb` substitui a antiga 07. Não há rollback destrutivo nem upgrade automático de banco pré-existente.
 - **Verificação da consolidação:** PostgreSQL isolado criou o schema novo; comparação com a sequência anterior confirmou 86 colunas, 138 constraints, 36 índices, 27 políticas, 15 funções e RLS/grants de 14 tabelas. Suíte: 276 testes, 7.678 assertions, sem falhas; smoke de onboarding e leitura autenticada passou. Evidências anteriores continuam históricas.
@@ -27,10 +27,10 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
 
 - [x] **1b — Fixar fallback e tratamento da fonte.**
-  **Aceite:** (1) definir condições de fallback e paginação da consulta de comunicações; (2) garantir datas inicial/final iguais à data corrente e distinguir resposta válida vazia de falha; (3) manter caderno e API como a mesma fonte lógica DJEN.
+  **Aceite:** (1) definir condições de fallback da primeira coleta e paginação da API, usada diretamente na segunda, sem caderno; (2) garantir meio `D` e datas inicial/final iguais à data corrente, distinguindo resposta válida vazia de falha; (3) manter caderno e API como a mesma fonte lógica DJEN, sem coleta de editais (`E`).
   **Verificação comportamental:** avaliar cenários de página única, múltiplas páginas, resposta vazia válida e caderno problemático contra as condições aprovadas.
   **Smoke específico:** revisão de um fluxo de fallback paginado com data atual, confirmando que não solicita dia anterior.
-  **Evidência:** TJAP/D, em 28/10/2026, teve páginas de 100, 100, 100, 100, 67 e 0 itens; as 467 chaves coincidiram com as do caderno. TJRR/E apresentou página inicial vazia e caderno sem comunicações. Todas as consultas usaram a mesma data inicial e final. Erros de resposta são falhas no contrato, não resultados vazios. Detalhes e limites em [contrato DJEN](../docs/contrato-djen.md#verificações-adicionais-de-28102026).
+  **Evidência histórica, anterior à restrição ao meio D:** TJAP/D, em 28/10/2026, teve páginas de 100, 100, 100, 100, 67 e 0 itens; as 467 chaves coincidiram com as do caderno. TJRR/E apresentou página inicial vazia e caderno sem comunicações; essa amostra E não integra a coleta vigente. Todas as consultas usaram a mesma data inicial e final. Erros de resposta são falhas no contrato, não resultados vazios. Detalhes e limites em [contrato DJEN](../docs/contrato-djen.md#verificações-adicionais-de-28102026).
   **Dep.:** 1a. **Escopo:** contrato do caminho alternativo, sem implementar o conector.
   **Áreas previstas (≤5):** especificação de coleta; referência do contrato DJEN.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
@@ -258,12 +258,12 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 - [x] **9b — Separar falhas do registro imutável.**
   **Aceite:** (1) Escrevente não recebe ações de usuário nem detalhes técnicos de erro; (2) estado de sucesso/falha permanece consultável fora do Escrevente e relacionado à execução/tribunal; (3) tenant de registro deriva do contexto server-side.
-  **Verificação comportamental:** exercitar a fronteira com uma chamada controlada que informa o resultado operacional definido no contrato; verificar estado externo, tenant adulterado e ausência de marco final, sem depender de execução do coletor.
+  **Verificação comportamental:** exercitar a fronteira com uma chamada controlada que informa o resultado operacional definido no contrato; verificar estado externo, tenant adulterado e ausência de marco final, sem depender de execução do processador.
   **Smoke específico:** invocar a fronteira com resultado controlado de falha e confirmar estado externo consultável conforme contrato, sem texto técnico ou ação de usuário no Escrevente.
   **Dep.:** 9a, 3b, 4b. **Escopo:** fronteira entre ledger append-only e estado operacional.
   **Áreas previstas (≤5):** Escrevente; estado de execução; contexto de identidade.
   **Rastreio:** [SPEC-escrevente.md — Escopo e contratos lógicos](../SPEC-escrevente.md#escopo-e-contratos-lógicos); [Requisitos](../SPEC-escrevente.md#requisitos-e-critérios-observáveis); [Fronteiras](../SPEC-escrevente.md#fronteiras).
-  **Estado:** `collection_job_executions` mantém o estado por trabalho fora dos marcos. Testes e smoke confirmaram falha consultável por execução/tribunal com início sem término e tenant derivado do trabalho, sem executar o coletor ETL. Os testes específicos passaram com 29 testes e 813 assertions; a suíte completa, 276 testes e 7.678 assertions.
+  **Estado:** `collection_job_executions` mantém o estado por trabalho fora dos marcos. Testes e smoke confirmaram falha consultável por execução/tribunal com início sem término e tenant derivado do trabalho, sem executar o processador ETL. Os testes específicos passaram com 29 testes e 813 assertions; a suíte completa, 276 testes e 7.678 assertions.
 
 ## Checkpoint 3 — após tarefas 7–9
 - [ ] Monitoramentos de advogado/parte/processo entregam tenant e identidade corretos; Escrevente permanece append-only e sem ações/erros técnicos.
@@ -272,16 +272,16 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 ### 10. Planejamento da coleta
 
 - [ ] **10a — Planejar por tenant, entidade, fonte e tribunal.**
-  **Aceite:** (1) trabalho identifica tenant, entidade/monitoramento, execução, fonte lógica e tribunal aplicável; (2) inclui advogado, partes e processos elegíveis conforme filtros decididos; (3) não aceita tenant do cliente como prova de propriedade.
+  **Aceite:** (1) trabalho identifica tenant, entidade/monitoramento, execução, fonte lógica, tribunal aplicável e meio exclusivo `D`; (2) inclui advogado, partes e processos elegíveis conforme filtros decididos, sem planejar `E`; (3) não aceita tenant do cliente como prova de propriedade.
   **Verificação comportamental:** planejar entidades de mais de um tenant e conferir que cada linha mantém seus vínculos sem cruzamento.
   **Smoke específico:** planejar um advogado, uma parte e um processo em dois tenants e inspecionar os vínculos resultantes.
   **Dep.:** 7a–7b, 8a, 4b, 9a. **Escopo:** trabalho planejado, sem ainda executar a fonte.
   **Áreas previstas (≤5):** despachante; contrato de monitoramentos; contexto de tenant; execução.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
-  **Fatia de persistência e planejamento:** `backend/test/integration/collection_planning_test.rb`, `backend/db/provision_despachante.sql`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `README.md`. Um processo de confiança usa credencial PostgreSQL própria sem `BYPASSRLS`; somente ele pode ler os monitoramentos de todos os tenants para formar planos. Web continua restrito pela sessão. Cada execução por data/slot possui trabalhos imutáveis por tenant, entidade, tribunal e meio, com critérios fixados ao planejar; falha não é tratada como trabalho vazio.
+  **Fatia de persistência e planejamento:** `backend/test/integration/collection_planning_test.rb`, `backend/db/provision_despachante.sql`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `README.md`. Um processo de confiança usa credencial PostgreSQL própria sem `BYPASSRLS`; somente ele pode ler os monitoramentos de todos os tenants para formar planos. Web continua restrito pela sessão. Cada execução por data/slot possui trabalhos imutáveis por tenant, entidade, tribunal e meio exclusivo `D`, com critérios fixados ao planejar; falha não é tratada como trabalho vazio.
   **Fatia de integridade:** `backend/test/integration/collection_planning_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`. A integridade antes introduzida pela migration 04 agora faz parte da criação inicial: as referências de advogado, parte e processo dos trabalhos devem pertencer ao mesmo tenant no banco, inclusive para escritas da role despachante.
   **Fatia de leitura:** `backend/test/integration/collection_runs_http_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `backend/app/controllers/collection_runs_controller.rb`, `backend/config/routes.rb`. A audiência antes criada pela migration 05 agora faz parte da criação inicial: é fixada por tenant mesmo sem trabalhos; respostas limitadas ao tenant autenticado. Documentar contrato no README; autorização de equipe permanece pendente de 6b.
-  **Estado:** migrations atuais exercitadas em PostgreSQL 18.6 isolado, com roles reais. Os testes focados de planejamento, agenda e leitura HTTP passaram com 72 testes e 1.248 assertions; incluem dois tenants, os três tipos de entidade, filtros, RLS, vínculos cruzados negados e critérios congelados. O novo teste demonstra falha integral e retomada da mesma execução quando um perfil não possui OAB principal. Um smoke na imagem final com catálogo controlado gerou dois slots `planned`: cada um contém advogado, parte e processo em dois tenants, com seis trabalhos por tenant para TJAC/D e TJAC/E, critérios e identificadores conferidos; a repetição manteve os slots. O smoke anterior com DJEN real é histórico; a autorização de equipe (6b) e as dependências desta tarefa permanecem pendentes.
+  **Evidência histórica, anterior à restrição ao meio D:** migrations então vigentes exercitadas em PostgreSQL 18.6 isolado, com roles reais. Os testes focados de planejamento, agenda e leitura HTTP passaram com 72 testes e 1.248 assertions; incluem dois tenants, os três tipos de entidade, filtros, RLS, vínculos cruzados negados e critérios congelados. O teste de perfil sem OAB principal demonstrou falha integral e retomada da mesma execução após restauração do perfil. Um smoke na imagem final então vigente com catálogo controlado gerou dois slots `planned`: cada um continha advogado, parte e processo em dois tenants, com seis trabalhos por tenant para TJAC/D e TJAC/E, critérios e identificadores conferidos; a repetição manteve os slots. Esse smoke preserva o comportamento antigo, não autoriza E nem verifica a restrição vigente. O smoke anterior com DJEN real também é histórico; a autorização de equipe (6b) e as dependências desta tarefa permanecem pendentes.
 
 - [ ] **10b — Agendar as duas execuções e manter fronteiras lógicas.**
   **Aceite:** (1) configurar dois acionamentos diários conforme horário/fuso/elegibilidade aprovados; (2) manter despachante/control plane e ETL como responsabilidades distintas da aplicação central; (3) cada acionamento planejado tem identidade própria e associação à fonte/tribunal, sem executar ETL nesta fatia.
@@ -293,40 +293,43 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Fatia de agenda:** `backend/test/services/collection_schedule_test.rb`, `backend/despachante/collection_schedule.rb`, `README.md`. Validar horários sem defaults e calcular slots devidos em `America/Sao_Paulo`. Execução independente: `backend/test/integration/despachante_execution_test.rb`, `backend/despachante/run.rb`, `backend/Dockerfile`, `README.md`, `tasks/todo.md`; não executar ETL nesta etapa.
   **Fatia de virada de data:** `backend/test/integration/despachante_execution_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `backend/despachante/run.rb`, `README.md`. O estado `interrupted`, antes acrescentado pela migration 06, agora faz parte da criação inicial. Não publicar nem retomar trabalhos de dia anterior após uma espera externa; identificar a interrupção sem executar coleta retroativa.
   **Fatia da imagem mínima:** `backend/despachante/Gemfile`, `backend/despachante/Gemfile.lock`, `backend/despachante/run.rb`, `backend/Dockerfile`, `README.md`. Instalar apenas as gems usadas pelo processo de planejamento, manter build em estágio separado e verificar a imagem final em execução como usuário não root.
-  **Estado:** testes focados atuais passaram com 72 testes e 1.248 assertions, cobrindo slots, retomada, concorrência, 429 e virada de data. A imagem final atual do despachante foi construída; smoke com catálogo controlado persistiu dois slots `planned` distintos e idempotentes, executando com UID/GID 1000:1000. Isso não comprova conectividade DJEN real nem execução de ETL. Execução dos jobs e interrupção de jobs já planejados ao mudar o dia pertencem à tarefa 13.
+  **Evidência histórica, anterior à restrição ao meio D:** testes focados passaram com 72 testes e 1.248 assertions, cobrindo slots, retomada, concorrência, 429 e virada de data. A imagem final do despachante então vigente foi construída; smoke com catálogo controlado persistiu dois slots `planned` distintos e idempotentes, executando com UID/GID 1000:1000. Isso não comprova a restrição vigente ao meio D, conectividade DJEN real nem execução de ETL. Execução dos jobs e interrupção de jobs já planejados ao mudar o dia pertencem à tarefa 13.
 
 ### 11. Coleta e persistência reais
 
-- [ ] **11a — Coletar pelo caderno ZIP/JSON principal.**
-  **Aceite:** (1) obter caderno por tribunal/data/meio e processar todos os JSONs do ZIP; (2) pesquisar advogado por nome/OAB, processo por número e parte por nome conforme regras aprovadas; (3) consultar somente o dia corrente da execução.
+- [x] **11a — Coletar pelo caderno ZIP/JSON principal no primeiro slot.**
+  **Aceite:** (1) no primeiro slot, obter caderno por tribunal/data corrente/meio `D` e processar todos os JSONs do ZIP, sem sanitizar seu texto; (2) pesquisar advogado por nome/OAB, processo por número e parte por nome conforme regras aprovadas; (3) não consultar caderno no segundo slot nem coletar editais (`E`).
   **Verificação comportamental:** executar cenário controlado de ZIP com vários JSONs e correspondências dos três tipos, incluindo resultado válido vazio.
   **Smoke específico:** processar um caderno controlado e confirmar cada correspondência e ausência de consulta de dia anterior.
   **Dep.:** 10a, 10b, 1a, 3c. **Escopo:** caminho principal de coleta.
   **Áreas previstas (≤5):** conector de cadernos; processamento ZIP/JSON; matching; persistência de publicações; estado de execução.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
+  **Estado:** suíte anterior do processador com 98 testes e 1.004 assertions; smoke controlado processou caderno com dois JSONs e correspondências de advogado, parte e processo. Antes da alteração de fonte no segundo slot, o comando definitivo consultou caderno TJAC/D real e terminou com sucesso e zero correspondências para o trabalho controlado.
 
-- [ ] **11b — Acionar fallback paginado para problema no caderno.**
-  **Aceite:** (1) sob condições de falha aprovadas, consultar API paginada como fallback da mesma fonte DJEN; (2) percorrer páginas necessárias segundo limites decididos e enviar início/fim iguais ao dia corrente; (3) resposta válida vazia não vira falha nem inclui dia anterior.
-  **Verificação comportamental:** cenário de caderno problemático seguido por várias páginas, resposta vazia válida e tentativa de data fora do dia corrente.
-  **Smoke específico:** executar um fallback controlado com mais de uma página e inspecionar os dois filtros de data iguais.
-  **Dep.:** 10a–10b, 1b, 1c, 3a. **Escopo:** caminho alternativo da coleta.
+- [x] **11b — Consultar API paginada como fallback no primeiro slot e diretamente no segundo.**
+  **Aceite:** (1) no primeiro slot, sob condições de falha aprovadas, consultar API como fallback; no segundo, iniciar diretamente na API, sem caderno; (2) consultar somente `D`, percorrer páginas necessárias segundo limites decididos e enviar início/fim iguais ao dia corrente; (3) resposta válida vazia não vira falha nem inclui dia anterior.
+  **Verificação comportamental:** cenário de caderno problemático no primeiro slot seguido por várias páginas, segundo slot sem chamada ao caderno, resposta vazia válida e tentativa de data fora do dia corrente.
+  **Smoke específico:** executar fallback controlado no primeiro slot e API direta no segundo, com mais de uma página, meio `D` e ambos os filtros de data iguais.
+  **Dep.:** 10a–10b, 1b, 1c, 3a. **Escopo:** API paginada como caminho alternativo do primeiro slot e caminho direto do segundo.
   **Áreas previstas (≤5):** conector paginado; política de fallback; processamento de resposta; estado de execução.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
+  **Estado:** testes controlados verificaram múltiplas páginas, datas iguais, sanitização da API, descarte parcial e retomada na primeira página. O runtime definitivo executou o segundo slot TJAC/D contra a API real: sucesso, zero correspondências, uma tentativa da API e nenhuma do caderno.
 
-- [ ] **11c — Persistir comunicações, vínculos e estado por tribunal.**
-  **Aceite:** (1) normalizar e persistir comunicações encontradas no tenant correto e com identidade da fonte lógica DJEN; (2) manter vínculos e estado por execução/tribunal, distinguindo sucesso vazio de falha; (3) deixar falha consultável sem registrar detalhes no Escrevente.
+- [x] **11c — Persistir comunicações, vínculos e estado por tribunal.**
+  **Aceite:** (1) persistir comunicações no tenant correto e na fonte lógica DJEN, convertendo apenas `texto` da API em texto simples, sem sanitizar cadernos; (2) manter vínculos e estado por execução/tribunal, distinguindo sucesso vazio de falha; (3) deixar falha consultável sem registrar detalhes no Escrevente.
   **Verificação comportamental:** conferir publicação e estado de resultados do caderno e fallback, inclusive ausência de itens e falha técnica.
   **Smoke específico:** persistir resultado controlado de cada caminho e ler a comunicação, vínculo e estado do tribunal correspondente.
   **Dep.:** 11a–11b, 9a–9b, 10a. **Escopo:** persistência e status de execução.
   **Áreas previstas (≤5):** persistência de comunicações; vínculos; estado por tribunal; integração Escrevente.
   **Rastreio:** [SPEC-coleta.md — Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos).
+  **Estado:** smoke anterior de seis trabalhos planejados produziu uma comunicação e seis vínculos; PostgreSQL confirmou todos concluídos. Testes de roles e tenants verificaram sucesso vazio, falha e agregado por tribunal sem registrar erro no Escrevente.
 
 ### 12. Deduplicação
 
 - [ ] **12a — Deduplicar pela chave conjunta DJEN/tenant.**
-  **Aceite:** (1) usar conjuntamente `id` e `hash`, escopados por tenant e fonte lógica DJEN; (2) manter uma comunicação quando a chave coincide entre caderno, API e execuções; (3) não fundir registros quando qualquer componente da chave difere ou apenas processo/tribunal coincide.
-  **Verificação comportamental:** cenário com publicação repetida em ambos os caminhos/execuções, chave com cada componente alterado e mesma chave em tenants diferentes.
-  **Smoke específico:** inserir repetição cross-path e conferir uma comunicação para chave igual e registros distintos onde a chave não é igual.
+  **Aceite:** (1) usar conjuntamente `id` e `hash`, escopados por tenant e fonte lógica DJEN; (2) manter uma comunicação e sua primeira versão quando a chave coincide entre caderno, API e execuções, inclusive HTML do caderno; (3) não fundir registros quando qualquer componente da chave difere ou apenas processo/tribunal coincide.
+  **Verificação comportamental:** cenário com publicação repetida em ambos os caminhos/execuções, preservando HTML recebido primeiro do caderno mesmo após texto sanitizado da API, chave com cada componente alterado e mesma chave em tenants diferentes.
+  **Smoke específico:** inserir repetição cross-path e conferir uma comunicação com a primeira versão preservada para chave igual e registros distintos onde a chave não é igual.
   **Dep.:** 11c, 1a–1b, 3c. **Escopo:** chave deduplicadora aprovada; sem revalidar estabilidade assumida.
   **Áreas previstas (≤5):** persistência de comunicações; regra de deduplicação; chave de origem/tenant.
   **Rastreio:** [SPEC-coleta.md — Deduplicação e vínculos](../SPEC-coleta.md#deduplicação-e-vínculos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
@@ -340,7 +343,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Rastreio:** [SPEC-coleta.md — Deduplicação e vínculos](../SPEC-coleta.md#deduplicação-e-vínculos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
 
 ## Checkpoint 4 — após tarefas 10–12
-- [ ] Caderno principal, fallback paginado, estado por tribunal, deduplicação conjunta e vínculos demonstrados em cenários propostos, sem coleta histórica.
+- [ ] Somente D, sem editais E: caderno com fallback no primeiro slot, API direta sem caderno no segundo, sanitização somente API, estado por tribunal, deduplicação conjunta com primeira versão preservada e vínculos demonstrados em cenários propostos, sem coleta histórica.
 - [ ] Aprovação humana registrada antes de avançar.
 
 ### 13. Agenda e falhas
@@ -364,9 +367,9 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 ### 14. Consulta de comunicações
 
 - [ ] **14a — Listar comunicações e apresentar detalhes.**
-  **Aceite:** (1) apresentar cada comunicação independentemente, agrupada por tribunal sem fundir por processo; (2) detalhe inclui tribunal, número do processo e conteúdo fornecido pela fonte; (3) omissões da fonte não são preenchidas como se fossem dados existentes.
-  **Verificação comportamental:** abrir várias comunicações do mesmo processo/tribunal e confirmar independência e conteúdo de origem no detalhe.
-  **Smoke específico:** abrir um resultado agrupado e conferir tribunal, número e conteúdo recebido da fonte.
+  **Aceite:** (1) apresentar cada comunicação independentemente, agrupada por tribunal sem fundir por processo; (2) detalhe inclui tribunal, número do processo e conteúdo da fonte sempre escapado, inclusive HTML preservado da primeira versão de caderno; (3) omissões da fonte não são preenchidas como se fossem dados existentes.
+  **Verificação comportamental:** abrir várias comunicações do mesmo processo/tribunal e confirmar independência e conteúdo de origem no detalhe, sem executar nem inserir HTML bruto da fonte.
+  **Smoke específico:** abrir resultado agrupado com HTML persistido do caderno e conferir tribunal, número e conteúdo escapado, sem presumir que a sanitização da API alterou a primeira versão deduplicada.
   **Dep.:** 12b, 11c, 6b. **Escopo:** leitura, agrupamento visual e detalhe.
   **Áreas previstas (≤5):** consulta; interface de resultados; detalhe; projeção de dados de origem.
   **Rastreio:** [SPEC-consulta.md — Escopo e contratos lógicos](../SPEC-consulta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis).

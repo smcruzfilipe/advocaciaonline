@@ -3,25 +3,25 @@ require "pg"
 require "time"
 require "timeout"
 
-class EscreventeCollectorTest < ActiveSupport::TestCase
+class EscreventeProcessorTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
   FUNCTIONS = {
-    "collector_claim(uuid)" => "SELECT * FROM app_private.collector_claim($1)",
-    "collector_renew(uuid,text)" => "SELECT * FROM app_private.collector_renew($1, $2)",
-    "collector_start(uuid,text)" => "SELECT * FROM app_private.collector_start($1, $2)",
-    "collector_finish(uuid,text)" => "SELECT * FROM app_private.collector_finish($1, $2)",
-    "collector_fail(uuid,text)" => "SELECT * FROM app_private.collector_fail($1, $2)"
+    "processor_claim(uuid)" => "SELECT * FROM app_private.processor_claim($1)",
+    "processor_renew(uuid,text)" => "SELECT * FROM app_private.processor_renew($1, $2)",
+    "processor_start(uuid,text)" => "SELECT * FROM app_private.processor_start($1, $2)",
+    "processor_finish(uuid,text)" => "SELECT * FROM app_private.processor_finish($1, $2)",
+    "processor_fail(uuid,text)" => "SELECT * FROM app_private.processor_fail($1, $2)"
   }.freeze
   PUBLIC_EXECUTION_COLUMNS = %w[job_id tenant_id state updated_at].freeze
 
   setup do
-    @collector_url = ENV.fetch("COLETOR_DATABASE_URL")
-    @collector = PG.connect(@collector_url)
+    @processor_url = ENV.fetch("PROCESSADOR_DATABASE_URL")
+    @processor = PG.connect(@processor_url)
     @runtime = PG.connect(ENV.fetch("DATABASE_URL"))
     @migrator = PG.connect(ENV.fetch("MIGRATION_DATABASE_URL"))
     @despachante = PG.connect(ENV.fetch("DESPACHANTE_DATABASE_URL"))
-    { @collector => "advocacia_coletor", @runtime => "advocacia_runtime",
+    { @processor => "advocacia_processador", @runtime => "advocacia_runtime",
       @migrator => "advocacia_migrator", @despachante => "advocacia_despachante" }.each do |connection, role|
       assert_equal role, connection.exec("SELECT current_user").getvalue(0, 0)
     end
@@ -41,28 +41,28 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
   end
 
   teardown do
-    [@collector, @runtime, @migrator, @despachante].each { |connection| connection&.close }
+    [@processor, @runtime, @migrator, @despachante].each { |connection| connection&.close }
   end
 
-  test "collector is an isolated non bypass login with only the five executor entry points" do
-    role = @collector.exec(<<~SQL).first
+  test "processor is an isolated non bypass login with only the five executor entry points" do
+    role = @processor.exec(<<~SQL).first
       SELECT rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication, rolinherit
       FROM pg_roles WHERE rolname = current_user
     SQL
     role.each { |flag, value| assert_equal "f", value, flag }
-    assert_equal "0", @collector.exec(<<~SQL).getvalue(0, 0)
+    assert_equal "0", @processor.exec(<<~SQL).getvalue(0, 0)
       SELECT count(*) FROM pg_auth_members
-      WHERE member = 'advocacia_coletor'::regrole OR roleid = 'advocacia_coletor'::regrole
+      WHERE member = 'advocacia_processador'::regrole OR roleid = 'advocacia_processador'::regrole
     SQL
     [@runtime, @despachante].each do |connection|
-      assert_raises(PG::InsufficientPrivilege) { connection.exec("SET ROLE advocacia_coletor") }
+      assert_raises(PG::InsufficientPrivilege) { connection.exec("SET ROLE advocacia_processador") }
       FUNCTIONS.each do |signature, sql|
         arguments = signature.include?("text") ? [@job_a, "a" * 64] : [@job_a]
         assert_raises(PG::InsufficientPrivilege) { connection.exec_params(sql, arguments) }
       end
     end
     FUNCTIONS.each_key do |signature|
-      function = @collector.exec_params(<<~SQL, ["app_private.#{signature}"]).first
+      function = @processor.exec_params(<<~SQL, ["app_private.#{signature}"]).first
         SELECT procedure.prosecdef, procedure.proconfig::text,
           pg_get_userbyid(procedure.proowner) AS owner,
           has_function_privilege(current_user, procedure.oid, 'EXECUTE') AS executable,
@@ -76,10 +76,10 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
       assert_equal "f", function.fetch("public_execute"), signature
       assert_includes function.fetch("proconfig"), "search_path=pg_catalog, pg_temp"
     end
-    assert_raises(PG::InsufficientPrivilege) { @collector.exec("SELECT * FROM app_private.sessions") }
-    assert_raises(PG::InsufficientPrivilege) { @collector.exec("SELECT app_private.current_tenant_id()") }
-    assert_raises(PG::InsufficientPrivilege) { @collector.exec("SELECT * FROM public.collection_jobs") }
-    assert_raises(PG::InsufficientPrivilege) { @collector.exec("SET ROLE advocacia_migrator") }
+    assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT * FROM app_private.sessions") }
+    assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT app_private.current_tenant_id()") }
+    assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT * FROM public.collection_jobs") }
+    assert_raises(PG::InsufficientPrivilege) { @processor.exec("SET ROLE advocacia_migrator") }
   end
 
   test "pending execution is created with the job including conflict do nothing and insertion rollback" do
@@ -100,7 +100,7 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
     rolled_back_id = nil
     @despachante.exec("BEGIN")
     begin
-      rolled_back_id = insert_job(@lawyer_a, medium: "E")
+      rolled_back_id = insert_job(@lawyer_a, court: "TRF1")
       @despachante.exec("ROLLBACK")
     ensure
       @despachante.exec("ROLLBACK") if @despachante.transaction_status != PG::PQTRANS_IDLE
@@ -113,8 +113,8 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
   test "events expose only minimal references and the tenant always derives from the persisted job" do
     proof_a = claim(@job_a).fetch("token")
     proof_b = claim(@job_b).fetch("token")
-    @collector.exec_params("SELECT set_config('app.tenant_id', $1, false)", [@lawyer_b.tenant_id])
-    @collector.exec_params("SELECT set_config('app.session_hash', $1, false)", [IdentityStore.digest(@session_b)])
+    @processor.exec_params("SELECT set_config('app.tenant_id', $1, false)", [@lawyer_b.tenant_id])
+    @processor.exec_params("SELECT set_config('app.session_hash', $1, false)", [IdentityStore.digest(@session_b)])
     start(@job_a, proof_a)
     finish(@job_a, proof_a)
     start(@job_b, proof_b)
@@ -148,9 +148,9 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
   end
 
   test "claim renew start and finish preserve one immutable pair and a separate succeeded state" do
-    before = Time.parse(@collector.exec("SELECT clock_timestamp()::text").getvalue(0, 0))
+    before = Time.parse(@processor.exec("SELECT clock_timestamp()::text").getvalue(0, 0))
     claimed = claim(@job_a)
-    after = Time.parse(@collector.exec("SELECT clock_timestamp()::text").getvalue(0, 0))
+    after = Time.parse(@processor.exec("SELECT clock_timestamp()::text").getvalue(0, 0))
     proof = claimed.fetch("token")
     assert_equal %w[token expires_at state], claimed.keys
     assert_equal "pending", claimed.fetch("state")
@@ -225,12 +225,12 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
     renewed = renew(@job_a, next_proof)
     assert_operator Time.parse(renewed.fetch("expires_at")), :>, Time.parse(recovery.fetch("expires_at"))
     assert_equal "failed", execution(@job_a).fetch("state")
-    @collector.exec("BEGIN")
+    @processor.exec("BEGIN")
     begin
       assert_equal first, start(@job_a, next_proof)
       assert_equal "failed", execution(@job_a).fetch("state"), "recovery start must not publish an uncommitted transition"
     ensure
-      @collector.exec("ROLLBACK")
+      @processor.exec("ROLLBACK")
     end
     assert_equal "failed", execution(@job_a).fetch("state")
     assert_equal first, start(@job_a, next_proof)
@@ -308,13 +308,13 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
       "SELECT status FROM public.collection_jobs WHERE id = $1", [@job_a]).getvalue(0, 0)
   end
 
-  %w[collector_start collector_finish collector_renew collector_fail].each do |operation|
+  %w[processor_start processor_finish processor_renew processor_fail].each do |operation|
     test "#{operation} revalidates wall clock expiry after waiting for the execution row lock" do
       proof = claim(@job_a).fetch("token")
-      start(@job_a, proof) if operation == "collector_finish"
+      start(@job_a, proof) if operation == "processor_finish"
       frozen_events = events(@job_a)
       frozen_state = execution(@job_a).fetch("state")
-      result = while_collector_blocked("SELECT * FROM app_private.#{operation}($1, $2)", [@job_a, proof]) do
+      result = while_processor_blocked("SELECT * FROM app_private.#{operation}($1, $2)", [@job_a, proof]) do
         expire_lease(@job_a)
       end
       assert_unavailable_error(result)
@@ -325,7 +325,7 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
 
   test "claim uses the clock after its row lock rather than its statement start time" do
     previous = claim(@job_a).fetch("token")
-    replacement = while_collector_blocked("SELECT * FROM app_private.collector_claim($1)", [@job_a]) do
+    replacement = while_processor_blocked("SELECT * FROM app_private.processor_claim($1)", [@job_a]) do
       expire_lease(@job_a)
     end
     assert_kind_of Hash, replacement
@@ -345,10 +345,10 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
         state == "failed" ? fail_job(@job_a, proof) : expire_lease(@job_a)
       end
       frozen_events = events(@job_a)
-      results = concurrently("SELECT * FROM app_private.collector_claim($1)", [@job_a])
+      results = concurrently("SELECT * FROM app_private.processor_claim($1)", [@job_a])
       winners = results.select { |result| result.is_a?(Hash) }
       losers = results.select { |result| result.is_a?(PG::Error) }
-      assert_equal 1, winners.length, "one real collector connection must acquire the lease"
+      assert_equal 1, winners.length, "one real processor connection must acquire the lease"
       assert_equal 1, losers.length
       assert_unavailable_error(losers.first)
       winner = winners.first
@@ -369,10 +369,10 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
 
   test "concurrent start and finish calls return their original events without duplication" do
     proof = claim(@job_a).fetch("token")
-    starts = concurrently("SELECT * FROM app_private.collector_start($1, $2)", [@job_a, proof])
+    starts = concurrently("SELECT * FROM app_private.processor_start($1, $2)", [@job_a, proof])
     assert starts.all? { |result| result.is_a?(Hash) }
     assert_equal 1, starts.uniq.length
-    completions = concurrently("SELECT * FROM app_private.collector_finish($1, $2)", [@job_a, proof])
+    completions = concurrently("SELECT * FROM app_private.processor_finish($1, $2)", [@job_a, proof])
     assert completions.all? { |result| result.is_a?(Hash) }
     assert_equal 1, completions.uniq.length
     assert_equal %w[started completed], events(@job_a).map { |row| row.fetch("event_type") }
@@ -380,34 +380,34 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
   end
 
   test "rollback restores claim start finish and failure together with their events" do
-    @collector.exec("BEGIN")
+    @processor.exec("BEGIN")
     provisional = claim(@job_a).fetch("token")
-    @collector.exec("ROLLBACK")
+    @processor.exec("ROLLBACK")
     assert_unavailable { start(@job_a, provisional) }
     proof = claim(@job_a).fetch("token")
-    @collector.exec("BEGIN")
+    @processor.exec("BEGIN")
     start(@job_a, proof)
     finish(@job_a, proof)
     assert_equal "pending", execution(@job_a).fetch("state"), "another connection must not see uncommitted transitions"
     assert_empty events(@job_a)
-    @collector.exec("ROLLBACK")
+    @processor.exec("ROLLBACK")
     assert_equal "pending", execution(@job_a).fetch("state")
     assert_empty events(@job_a)
     first = start(@job_a, proof)
-    @collector.exec("BEGIN")
+    @processor.exec("BEGIN")
     fail_job(@job_a, proof)
-    @collector.exec("ROLLBACK")
+    @processor.exec("ROLLBACK")
     assert_equal "running", execution(@job_a).fetch("state")
     assert_equal first, start(@job_a, proof)
-    @collector.exec("BEGIN")
+    @processor.exec("BEGIN")
     finish(@job_a, proof)
-    @collector.exec("ROLLBACK")
+    @processor.exec("ROLLBACK")
     assert_equal "running", execution(@job_a).fetch("state")
     assert_equal ["started"], events(@job_a).map { |row| row.fetch("event_type") }
     finish(@job_a, proof)
     assert_equal "succeeded", execution(@job_a).fetch("state")
   ensure
-    @collector.exec("ROLLBACK") if @collector.transaction_status != PG::PQTRANS_IDLE
+    @processor.exec("ROLLBACK") if @processor.transaction_status != PG::PQTRANS_IDLE
   end
 
   test "forced RLS and ACLs deny direct writes row locks truncation and private claim reads" do
@@ -422,14 +422,14 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
       assert_equal "t", flags.fetch("relrowsecurity")
       assert_equal "t", flags.fetch("relforcerowsecurity")
       assert_equal "advocacia_migrator", flags.fetch("owner")
-      [@runtime, @collector, @despachante].each do |connection|
+      [@runtime, @processor, @despachante].each do |connection|
         ["SELECT job_id FROM public.#{table} FOR UPDATE",
           "DELETE FROM public.#{table}", "TRUNCATE public.#{table}"].each do |sql|
           assert_raises(PG::InsufficientPrivilege) { connection.exec(sql) }
         end
       end
     end
-    [@runtime, @collector, @despachante].each do |connection|
+    [@runtime, @processor, @despachante].each do |connection|
       assert_raises(PG::InsufficientPrivilege) { connection.exec("UPDATE public.collection_events SET event_type = 'completed'") }
       assert_raises(PG::InsufficientPrivilege) { connection.exec("UPDATE public.collection_job_executions SET state = 'failed'") }
       assert_raises(PG::InsufficientPrivilege) { connection.exec("INSERT INTO public.collection_events DEFAULT VALUES") }
@@ -470,31 +470,31 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
     insert_job(lawyer)
   end
 
-  def insert_job(lawyer, medium: "D")
-    @despachante.exec_params(<<~SQL, [@run_id, lawyer.tenant_id, lawyer.id, medium]).getvalue(0, 0)
+  def insert_job(lawyer, court: "TJAC")
+    @despachante.exec_params(<<~SQL, [@run_id, lawyer.tenant_id, lawyer.id, court]).getvalue(0, 0)
       INSERT INTO public.collection_jobs (run_id, tenant_id, entity_type, entity_id, source, court, medium, criteria)
-      VALUES ($1, $2, 'lawyer', $3, 'DJEN', 'TJAC', $4, '{"name":"Fixture sem cópia para os marcos"}') RETURNING id
+      VALUES ($1, $2, 'lawyer', $3, 'DJEN', $4, 'D', '{"name":"Fixture sem cópia para os marcos"}') RETURNING id
     SQL
   end
 
   def claim(job_id)
-    @collector.exec_params("SELECT * FROM app_private.collector_claim($1)", [job_id]).first
+    @processor.exec_params("SELECT * FROM app_private.processor_claim($1)", [job_id]).first
   end
 
   def renew(job_id, proof)
-    @collector.exec_params("SELECT * FROM app_private.collector_renew($1, $2)", [job_id, proof]).first
+    @processor.exec_params("SELECT * FROM app_private.processor_renew($1, $2)", [job_id, proof]).first
   end
 
   def start(job_id, proof)
-    @collector.exec_params("SELECT * FROM app_private.collector_start($1, $2)", [job_id, proof]).first
+    @processor.exec_params("SELECT * FROM app_private.processor_start($1, $2)", [job_id, proof]).first
   end
 
   def finish(job_id, proof)
-    @collector.exec_params("SELECT * FROM app_private.collector_finish($1, $2)", [job_id, proof]).first
+    @processor.exec_params("SELECT * FROM app_private.processor_finish($1, $2)", [job_id, proof]).first
   end
 
   def fail_job(job_id, proof)
-    @collector.exec_params("SELECT * FROM app_private.collector_fail($1, $2)", [job_id, proof]).first
+    @processor.exec_params("SELECT * FROM app_private.processor_fail($1, $2)", [job_id, proof]).first
   end
 
   def execution(job_id)
@@ -528,7 +528,7 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
   def assert_unavailable_error(error)
     assert_instance_of PG::InvalidAuthorizationSpecification, error
     assert_equal "28000", error.result.error_field(PG::Result::PG_DIAG_SQLSTATE)
-    assert_equal "Collector operation unavailable", error.result.error_field(PG::Result::PG_DIAG_MESSAGE_PRIMARY)
+    assert_equal "Processor operation unavailable", error.result.error_field(PG::Result::PG_DIAG_MESSAGE_PRIMARY)
   end
 
   def concurrently(sql, parameters)
@@ -537,7 +537,7 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
     workers = 2.times.map do
       Thread.new do
         Thread.current.report_on_exception = false
-        PG.connect(@collector_url) do |connection|
+        PG.connect(@processor_url) do |connection|
           ready << true
           release.pop
           begin
@@ -559,13 +559,13 @@ class EscreventeCollectorTest < ActiveSupport::TestCase
     workers&.each(&:join)
   end
 
-  def while_collector_blocked(sql, parameters)
+  def while_processor_blocked(sql, parameters)
     pid = Queue.new
     @migrator.exec("BEGIN")
     @migrator.exec_params("SELECT job_id FROM public.collection_job_executions WHERE job_id = $1 FOR UPDATE", [@job_a])
     worker = Thread.new do
       Thread.current.report_on_exception = false
-      PG.connect(@collector_url) do |connection|
+      PG.connect(@processor_url) do |connection|
         pid << connection.backend_pid
         begin
           connection.exec_params(sql, parameters).first

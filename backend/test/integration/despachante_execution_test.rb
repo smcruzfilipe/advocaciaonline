@@ -9,7 +9,10 @@ require_relative "../../despachante/run"
 class DespachanteExecutionTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
-  CATALOG = [{ code: "TJAC", name: "Tribunal de Justiça do Estado do Acre" }].freeze
+  CATALOG = [
+    { code: "TJAC", name: "Tribunal de Justiça do Estado do Acre" },
+    { code: "TRF1", name: "Tribunal Regional Federal da 1ª Região" }
+  ].freeze
 
   setup do
     @despachante_url = ENV.fetch("DESPACHANTE_DATABASE_URL")
@@ -360,14 +363,14 @@ class DespachanteExecutionTest < ActiveSupport::TestCase
     expected_run = { "id" => run_id, "collection_date" => date.iso8601, "slot" => slot.to_s, "status" => "planned" }
     assert_includes runs(date), expected_run
     planned_jobs = jobs(run_id)
-    assert_equal %w[D E], planned_jobs.map { |job| job.fetch("medium") }.sort
+    assert_equal %w[D D], planned_jobs.map { |job| job.fetch("medium") }.sort
+    assert_equal %w[TJAC TRF1], planned_jobs.map { |job| job.fetch("court") }.sort
     planned_jobs.each do |job|
       assert_equal run_id, job.fetch("run_id")
       assert_equal @lawyer.tenant_id, job.fetch("tenant_id")
       assert_equal "lawyer", job.fetch("entity_type")
       assert_equal @lawyer.id, job.fetch("entity_id")
       assert_equal "DJEN", job.fetch("source")
-      assert_equal "TJAC", job.fetch("court")
       assert_equal "pending", job.fetch("status")
       assert_equal "Ana de Ávila", JSON.parse(job.fetch("criteria")).fetch("name")
     end

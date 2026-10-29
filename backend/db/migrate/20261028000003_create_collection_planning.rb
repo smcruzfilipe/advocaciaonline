@@ -61,7 +61,7 @@ class CreateCollectionPlanning < ActiveRecord::Migration[8.1]
     add_check_constraint :collection_jobs, "entity_type IN ('lawyer', 'party', 'process')", name: "collection_job_entity"
     add_check_constraint :collection_jobs, "source = 'DJEN'", name: "collection_job_source"
     add_check_constraint :collection_jobs, "court ~ '[^[:space:]]'", name: "collection_job_court"
-    add_check_constraint :collection_jobs, "medium IN ('D', 'E')", name: "collection_job_medium"
+    add_check_constraint :collection_jobs, "medium = 'D'", name: "collection_job_medium"
     add_check_constraint :collection_jobs, "jsonb_typeof(criteria) = 'object'", name: "collection_job_criteria"
     add_check_constraint :collection_jobs, "status = 'pending'", name: "collection_job_status"
 

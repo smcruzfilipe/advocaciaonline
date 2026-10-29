@@ -181,9 +181,9 @@ class CollectionDespachante
       selection = entity.fetch("courts") && JSON.parse(entity.fetch("courts"))
       applicable = selection ? selection & courts : courts
       criteria = JSON.parse(entity.fetch("criteria"))
-      applicable.product(%w[D E]).map do |court, medium|
+      applicable.map do |court|
         { tenant_id: entity.fetch("tenant_id"), entity_type: entity.fetch("entity_type"),
-          entity_id: entity.fetch("entity_id"), source: "DJEN", court: court, medium: medium, criteria: criteria }
+          entity_id: entity.fetch("entity_id"), source: "DJEN", court: court, medium: "D", criteria: criteria }
       end
     end
   end

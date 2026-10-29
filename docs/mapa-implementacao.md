@@ -1,6 +1,6 @@
 # Mapa físico do monorepo para as fatias
 
-Este mapa reúne caminhos existentes e previstos dentro do mesmo repositório; o estado de cada componente está na [estrutura do monorepo](../README.md#estrutura-do-monorepo). `backend/`, `backend/despachante/` e `backend/test/` já existem; `frontend/` e `etl/` ainda são previstos. Testes do backend e do despachante ficam em `backend/test/`; testes futuros de frontend e ETL estão previstos em `frontend/tests/` e `etl/test/`. Antes de iniciar cada fatia, confirmar os arquivos exatos no checklist e subdividir quando exceder cinco arquivos; geradores, migrations e configuração podem acrescentar arquivos. Nunca marcar uma fatia pronta apenas por criar diretórios.
+Este mapa reúne caminhos existentes e previstos dentro do mesmo repositório; o estado de cada componente está na [estrutura do monorepo](../README.md#estrutura-do-monorepo). `backend/`, `backend/despachante/`, `backend/test/`, `etl/` e `etl/test/` existem; `frontend/` e `frontend/tests/` ainda são previstos. Antes de iniciar cada fatia, confirmar os arquivos exatos no checklist e subdividir quando exceder cinco arquivos; geradores, migrations e configuração podem acrescentar arquivos. Nunca marcar uma fatia pronta apenas por criar diretórios.
 
 | IDs | Áreas físicas existentes ou previstas | Responsabilidade |
 |---|---|---|
