@@ -172,6 +172,10 @@ Cada trabalho usa o dia corrente de `America/Sao_Paulo`, valida integralmente o 
 
 Para os testes de integração isolados, forneça também `PROCESSADOR_TEST_ADMIN_DATABASE_URL` de um PostgreSQL descartável e execute `docker run --rm --network <rede-de-teste> -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL <imagem-de-teste-do-processador>`. A conexão administrativa é exclusiva da preparação de dados sintéticos; não deve ser fornecida ao processador de produção.
 
+Em PostgreSQL 18.6 isolado, `ruby bin/rails test` passou com 402 testes e 9.775 assertions; a imagem de teste do processador passou com 98 testes e 1.004 assertions, sem falhas, erros ou skips. No smoke controlado, seis trabalhos planejados concluíram por caderno e fallback e geraram uma comunicação sanitizada com seis vínculos. O comando definitivo consultou o caderno TJAC/D real e terminou com zero correspondências; isso não comprova cobertura global.
+
+A imagem runtime do processador mediu 201.991.669 bytes e executou com UID/GID 1000:1000; a base `ruby:4.0.9-alpine3.23` mediu 147.221.451 bytes e foi escolhida por compartilhar a versão Ruby do projeto com runtime Alpine enxuto. PostgreSQL local executou com UID/GID 70:70 e preservou dados após reinicialização. A imagem final não inclui ferramentas de compilação ou testes.
+
 
 As consultas do Escrevente exigem sessão válida e onboarding do advogado titular, sem acesso de equipe nesta entrega. O tenant vem da sessão, nunca de parâmetro do cliente. UUID inválido, execução inexistente ou fora da audiência do tenant retorna `404` sem revelar dados; uma execução visível sem trabalhos retorna listas vazias, não eventos nem sucesso fabricados. `pending` significa trabalho ainda não iniciado, `running` processamento iniciado, `succeeded` conclusão bem-sucedida confirmada e `failed` falha operacional. Esses estados, isoladamente, não informam quantidade de publicações, sucesso vazio ou resultado parcial; a ausência de término não permite inferir falha.
 

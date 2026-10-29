@@ -14,7 +14,8 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     "processor_commit(uuid,text,text,jsonb)" => ["SELECT app_private.processor_commit($1, $2, $3, $4::jsonb)", 4],
     "processor_record_failure(uuid,text,text)" => ["SELECT app_private.processor_record_failure($1, $2, $3)", 3],
     "processor_attempt_begin(uuid,text,integer)" => ["SELECT app_private.processor_attempt_begin($1, $2, $3)", 3],
-    "processor_attempt_failed(uuid,text,integer,integer,integer,integer)" => ["SELECT app_private.processor_attempt_failed($1, $2, $3, $4, $5, $6)", 6]
+    "processor_attempt_failed(uuid,text,integer,integer,integer,integer)" => ["SELECT app_private.processor_attempt_failed($1, $2, $3, $4, $5, $6)", 6],
+    "processor_defer(uuid,text,integer)" => ["SELECT app_private.processor_defer($1, $2, $3)", 3]
   }.freeze
 
   setup do
@@ -90,6 +91,8 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
         [@job_a, "a" * 64, 0, 3, 60, 300]
       elsif signature.start_with?("processor_attempt_begin")
         [@job_a, "a" * 64, 3]
+      elsif signature.start_with?("processor_defer")
+        [@job_a, "a" * 64, 1]
       else
         [@job_a, "a" * 64, "caderno", "[]"].first(arity)
       end
@@ -243,6 +246,9 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     proof = claim(@job_a)
     assert_unavailable { commit(@job_a, proof, []) }
     start(@job_a, proof)
+    assert_unavailable { commit(@job_a, proof, []) }
+    attempt_begin(@job_a, proof)
+    assert_unavailable { commit(@job_a, proof, [], source: "fallback") }
     [nil, {}, [publication, nil], [publication, []], [publication, "bad"]].each do |items|
       assert_raises(PG::InvalidParameterValue) { commit(@job_a, proof, items) }
     end
@@ -261,11 +267,23 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     assert_unavailable { commit(@job_a, confirmation, []) }
   end
 
+  test "an active collection attempt cannot finish without persisting its result" do
+    proof = claim(@job_a)
+    start(@job_a, proof)
+    attempt_begin(@job_a, proof)
+    assert_unavailable { @processor.exec_params("SELECT * FROM app_private.processor_finish($1, $2)", [@job_a, proof]) }
+    assert_equal "running", state(@job_a)
+    assert_equal ["started"], event_types(@job_a)
+    assert_equal "succeeded", commit(@job_a, proof, [publication]).fetch("state")
+    assert_equal %w[started completed], event_types(@job_a)
+  end
+
   test "concurrent jobs keep one complete communication with both links" do
     second_job = create_job(@lawyer_a, medium: "E")
     proofs = [@job_a, second_job].map do |job|
       proof = claim(job)
       start(job, proof)
+      attempt_begin(job, proof)
       [job, proof]
     end
     ready = Queue.new
@@ -299,6 +317,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   test "a lease expiring during the tenant lock wait rolls back all commit effects" do
     proof = claim(@job_a)
     start(@job_a, proof)
+    attempt_begin(@job_a, proof)
     @migrator.exec_params("UPDATE public.collection_job_executions SET lease_expires_at = clock_timestamp() + interval '5 seconds' WHERE job_id = $1", [@job_a])
     error = while_commit_blocked(@job_a, proof) do
       @migrator.exec_params(<<~SQL, [@job_a])
@@ -317,6 +336,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   test "repeatable snapshots cannot bypass the serialized exact identity check" do
     proof = claim(@job_a)
     start(@job_a, proof)
+    attempt_begin(@job_a, proof)
     @processor.exec("BEGIN ISOLATION LEVEL REPEATABLE READ")
     assert_unavailable { commit(@job_a, proof, [publication]) }
     @processor.exec("ROLLBACK")
@@ -329,6 +349,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   test "publication links result and Escrevente completion roll back atomically including a finish write failure" do
     proof = claim(@job_a)
     start(@job_a, proof)
+    attempt_begin(@job_a, proof)
     @processor.exec("BEGIN")
     commit(@job_a, proof, [publication])
     assert_empty communications(@lawyer_a)
@@ -376,6 +397,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     end
     recovery = claim(@job_a)
     start(@job_a, recovery)
+    attempt_begin(@job_a, recovery)
     commit(@job_a, recovery, [])
     runtime_as(@session_a) do
       summary = court_state
@@ -414,6 +436,20 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     runtime_as(@session_a) do
       assert_empty @runtime.exec_params("SELECT * FROM app_private.collection_court_states($1)", [empty_run]).to_a
     end
+  end
+
+  test "a retry after received during an attempt survives a lost lease and cannot be shortened" do
+    proof = claim(@job_a)
+    start(@job_a, proof)
+    assert_unavailable { @processor.exec_params("SELECT app_private.processor_defer($1, $2, 200)", [@job_a, proof]) }
+    attempt_begin(@job_a, proof)
+    @processor.exec_params("SELECT app_private.processor_defer($1, $2, 200)", [@job_a, proof])
+    expire(@job_a)
+    replacement = claim(@job_a)
+    attempt_failed(@job_a, replacement, 0)
+    seconds = @migrator.exec_params("SELECT EXTRACT(EPOCH FROM next_attempt_at - clock_timestamp()) FROM public.collection_job_executions WHERE job_id = $1", [@job_a]).getvalue(0, 0).to_f
+    assert_operator seconds, :>, 190
+    assert_unavailable { attempt_begin(@job_a, replacement) }
   end
 
   test "attempt counters leases retry after and resumed in flight work survive without a fourth attempt" do
@@ -532,6 +568,11 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   def commit_started(job, items, source: "caderno")
     proof = claim(job)
     start(job, proof)
+    if source == "fallback"
+      attempt_begin(job, proof, limit: 1)
+      attempt_failed(job, proof, 0, limit: 1)
+    end
+    attempt_begin(job, proof, limit: 1)
     commit(job, proof, items, source: source)
   end
 

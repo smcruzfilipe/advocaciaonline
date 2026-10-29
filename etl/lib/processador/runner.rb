@@ -23,6 +23,7 @@ module Processador
       raise ArgumentError, "invalid backoff" unless backoff_first.positive? && backoff_second.positive?
 
       @database_url = database_url
+      @http = http
       @attempts = attempts
       @backoff_first = backoff_first
       @backoff_second = backoff_second
@@ -43,8 +44,14 @@ module Processador
         return record_failure(db, job_id, token, "interrupted") unless current_date?(job)
 
         db.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [job_id, token])
-        with_lease(job_id, token) do |lease|
-          execute(db, job_id, token, job, lease)
+        previous_callback = @http.on_retry_after
+        @http.on_retry_after = ->(seconds) {
+          db.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, $3::integer)", [job_id, token, seconds])
+        }
+        begin
+          with_lease(job_id, token) { |lease| execute(db, job_id, token, job, lease) }
+        ensure
+          @http.on_retry_after = previous_callback
         end
       end
     end
@@ -77,8 +84,13 @@ module Processador
         matches = []
         begin
           before_request = -> {
-            lease.check!
-            raise DateChanged unless current_date?(job)
+            loop do
+              lease.check!
+              raise DateChanged unless current_date?(job)
+              remaining = @http.retry_wait_remaining
+              break unless remaining.positive?
+              sleep([remaining, 60].min)
+            end
           }
           @sources.fetch(source_path).each(court: job.fetch("court"), date: Date.iso8601(job.fetch("collection_date")),
             medium: job.fetch("medium"), before_request: before_request) do |publication|
@@ -94,6 +106,12 @@ module Processador
           return record_failure(db, job_id, token, "interrupted")
         rescue SourceError => error
           progress = fail_attempt(db, job_id, token, error.retry_after || 0)
+        rescue PG::Error => error
+          begin
+            return record_failure(db, job_id, token, current_date?(job) ? "processing_failed" : "interrupted")
+          rescue PG::Error
+            raise error
+          end
         end
       end
     end

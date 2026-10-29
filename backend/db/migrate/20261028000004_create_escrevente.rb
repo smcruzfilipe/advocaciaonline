@@ -187,6 +187,14 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           WHERE event.job_id = execution.job_id AND event.event_type = 'started') THEN
           RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
         END IF;
+        -- A collection attempt may only finish through the transaction that
+        -- persisted its result. The existing standalone Escrevente contract
+        -- remains available for work that has not started a source attempt.
+        IF execution.state = 'running' AND execution.attempt_in_flight
+          AND NOT EXISTS (SELECT 1 FROM public.collection_job_results AS result
+            WHERE result.job_id = execution.job_id AND result.tenant_id = execution.tenant_id) THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
         INSERT INTO public.collection_events (job_id, tenant_id, event_type)
           VALUES (execution.job_id, execution.tenant_id, 'completed')
           ON CONFLICT (job_id, event_type) DO NOTHING;
@@ -386,6 +394,24 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           - ARRAY['criteria', 'tenant_id', 'entity_type', 'entity_id', 'court', 'medium', 'source', 'run_id', 'collection_date'])
           || jsonb_build_object('exhausted', false);
       END $fn$;
+      CREATE FUNCTION app_private.processor_defer(p_job_id uuid, p_token text, p_seconds integer)
+      RETURNS timestamptz
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      DECLARE job_data jsonb; deadline timestamptz;
+      BEGIN
+        job_data := app_private.processor_job(p_job_id, p_token);
+        IF p_seconds IS NULL OR p_seconds < 0 THEN
+          RAISE EXCEPTION 'Invalid processor configuration' USING ERRCODE = '22023';
+        END IF;
+        IF job_data->>'state' <> 'running' OR (job_data->>'attempt_in_flight')::boolean IS NOT TRUE THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
+        UPDATE public.collection_job_executions SET
+          next_attempt_at = GREATEST(next_attempt_at, clock_timestamp() + make_interval(secs => p_seconds)),
+          updated_at = clock_timestamp() WHERE job_id = p_job_id RETURNING next_attempt_at INTO deadline;
+        RETURN deadline;
+      END $fn$;
+
 
       CREATE FUNCTION app_private.processor_attempt_failed(p_job_id uuid, p_token text, p_retry_after integer,
         p_limit integer, p_backoff_1 integer, p_backoff_2 integer)
@@ -419,7 +445,7 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         UPDATE public.collection_job_executions SET
           phase = CASE WHEN phase = 'caderno' AND attempts >= p_limit THEN 'fallback' ELSE phase END,
           attempt_in_flight = false,
-          next_attempt_at = clock_timestamp() + make_interval(secs => delay_seconds),
+          next_attempt_at = GREATEST(next_attempt_at, clock_timestamp() + make_interval(secs => delay_seconds)),
           updated_at = clock_timestamp() WHERE job_id = p_job_id;
         RETURN (app_private.processor_job(p_job_id, p_token)
           - ARRAY['criteria', 'tenant_id', 'entity_type', 'entity_id', 'court', 'medium', 'source', 'run_id', 'collection_date'])
@@ -449,6 +475,9 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         IF p_source_path IS NULL OR p_source_path NOT IN ('caderno', 'fallback')
           OR p_items IS NULL OR jsonb_typeof(p_items) <> 'array' THEN
           RAISE EXCEPTION 'Invalid processor result' USING ERRCODE = '22023';
+        END IF;
+        IF (job_data->>'attempt_in_flight')::boolean IS NOT TRUE OR job_data->>'phase' <> p_source_path THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
         END IF;
         IF EXISTS (SELECT 1 FROM jsonb_array_elements(p_items) AS supplied(item)
           WHERE jsonb_typeof(supplied.item) <> 'object') THEN
@@ -535,12 +564,14 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
       REVOKE ALL ON FUNCTION app_private.processor_job(uuid,text),
         app_private.processor_commit(uuid,text,text,jsonb), app_private.processor_record_failure(uuid,text,text),
         app_private.processor_attempt_begin(uuid,text,integer),
-        app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer)
+        app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer),
+        app_private.processor_defer(uuid,text,integer)
         FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       GRANT EXECUTE ON FUNCTION app_private.processor_job(uuid,text),
         app_private.processor_commit(uuid,text,text,jsonb), app_private.processor_record_failure(uuid,text,text),
         app_private.processor_attempt_begin(uuid,text,integer),
-        app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer)
+        app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer),
+        app_private.processor_defer(uuid,text,integer)
         TO advocacia_processador;
 
       -- SECURITY INVOKER is intentional: every source row is protected by the

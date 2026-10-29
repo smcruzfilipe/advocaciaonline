@@ -15,4 +15,4 @@ BEGIN
   END IF;
 END $guard$;
 -- The migration grants only EXECUTE on the fixed processor functions, not direct table access.
--- PROCESSADOR_DATABASE_URL belongs only to the future trusted executor and boundary integration tests.
+-- PROCESSADOR_DATABASE_URL belongs only to the trusted processor and boundary integration tests.

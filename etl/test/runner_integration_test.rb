@@ -159,6 +159,32 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
   end
 
+  def test_successful_fallback_page_honors_retry_after_before_requesting_the_next_page
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    responses = [{ body: JSON.generate("status" => "Cancelado") },
+      page([publication(401)]).merge(headers: { "Retry-After" => "1" }), page([])]
+    with_server(responses) do |origin, requests|
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      assert_equal "succeeded", runner(origin, attempts: 1).call(id).fetch("state")
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+      assert_operator elapsed, :>=, 0.9
+      assert_equal 3, requests.length
+    end
+  end
+
+  def test_database_rejection_records_processing_failure_without_completing_the_job
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    item = publication(402).merge("campo_desconhecido" => "\u0000")
+    responses = [{ body: JSON.generate("status" => "Cancelado") }, page([item]), page([])]
+    with_server(responses) do |origin, _requests|
+      result = runner(origin, attempts: 1).call(id)
+      assert_equal "failed", result.fetch("state")
+      assert_equal "processing_failed", result.fetch("code")
+    end
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
+    assert_equal ["started"], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1", [id]).column_values(0)
+  end
+
   private
 
   def scalar(sql, params = [])

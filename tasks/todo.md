@@ -297,29 +297,32 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 ### 11. Coleta e persistência reais
 
-- [ ] **11a — Coletar pelo caderno ZIP/JSON principal.**
+- [x] **11a — Coletar pelo caderno ZIP/JSON principal.**
   **Aceite:** (1) obter caderno por tribunal/data/meio e processar todos os JSONs do ZIP; (2) pesquisar advogado por nome/OAB, processo por número e parte por nome conforme regras aprovadas; (3) consultar somente o dia corrente da execução.
   **Verificação comportamental:** executar cenário controlado de ZIP com vários JSONs e correspondências dos três tipos, incluindo resultado válido vazio.
   **Smoke específico:** processar um caderno controlado e confirmar cada correspondência e ausência de consulta de dia anterior.
   **Dep.:** 10a, 10b, 1a, 3c. **Escopo:** caminho principal de coleta.
   **Áreas previstas (≤5):** conector de cadernos; processamento ZIP/JSON; matching; persistência de publicações; estado de execução.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
+  **Estado:** suíte do processador com 98 testes e 1.004 assertions; smoke controlado processou caderno com dois JSONs e correspondências de advogado, parte e processo. O comando definitivo consultou caderno TJAC/D real e terminou com sucesso e zero correspondências para o trabalho controlado.
 
-- [ ] **11b — Acionar fallback paginado para problema no caderno.**
+- [x] **11b — Acionar fallback paginado para problema no caderno.**
   **Aceite:** (1) sob condições de falha aprovadas, consultar API paginada como fallback da mesma fonte DJEN; (2) percorrer páginas necessárias segundo limites decididos e enviar início/fim iguais ao dia corrente; (3) resposta válida vazia não vira falha nem inclui dia anterior.
   **Verificação comportamental:** cenário de caderno problemático seguido por várias páginas, resposta vazia válida e tentativa de data fora do dia corrente.
   **Smoke específico:** executar um fallback controlado com mais de uma página e inspecionar os dois filtros de data iguais.
   **Dep.:** 10a–10b, 1b, 1c, 3a. **Escopo:** caminho alternativo da coleta.
   **Áreas previstas (≤5):** conector paginado; política de fallback; processamento de resposta; estado de execução.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
+  **Estado:** smoke controlado processou três trabalhos pelo fallback; testes verificaram páginas sucessivas, filtros de data iguais, descarte de resultado parcial e retomada a partir da primeira página.
 
-- [ ] **11c — Persistir comunicações, vínculos e estado por tribunal.**
+- [x] **11c — Persistir comunicações, vínculos e estado por tribunal.**
   **Aceite:** (1) normalizar e persistir comunicações encontradas no tenant correto e com identidade da fonte lógica DJEN; (2) manter vínculos e estado por execução/tribunal, distinguindo sucesso vazio de falha; (3) deixar falha consultável sem registrar detalhes no Escrevente.
   **Verificação comportamental:** conferir publicação e estado de resultados do caderno e fallback, inclusive ausência de itens e falha técnica.
   **Smoke específico:** persistir resultado controlado de cada caminho e ler a comunicação, vínculo e estado do tribunal correspondente.
   **Dep.:** 11a–11b, 9a–9b, 10a. **Escopo:** persistência e status de execução.
   **Áreas previstas (≤5):** persistência de comunicações; vínculos; estado por tribunal; integração Escrevente.
   **Rastreio:** [SPEC-coleta.md — Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos).
+  **Estado:** smoke de seis trabalhos planejados produziu uma comunicação sanitizada e seis vínculos; PostgreSQL confirmou todos concluídos. Testes de roles e tenants verificaram sucesso vazio, falha e agregado por tribunal sem registrar erro no Escrevente.
 
 ### 12. Deduplicação
 

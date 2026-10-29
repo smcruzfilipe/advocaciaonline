@@ -41,5 +41,5 @@ COPY --link --chown=1000:1000 --chmod=0555 bin ./bin
 LABEL org.opencontainers.image.title="Advocacia Online Processador" \
       org.opencontainers.image.description="Processamento DJEN com acesso PostgreSQL restrito por trabalho"
 USER 1000:1000
-CMD ["bundle", "exec", "ruby", "bin/processador"]
+ENTRYPOINT ["bundle", "exec", "ruby", "bin/processador"]
 

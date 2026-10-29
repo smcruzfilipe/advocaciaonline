@@ -1,9 +1,10 @@
 require "digest"
-require "json"
 require "uri"
 require "zip"
 require "zlib"
 require_relative "errors"
+require_relative "page_json"
+require_relative "entry_stream"
 
 module Processador
   class Caderno
@@ -39,13 +40,12 @@ module Processador
         begin
           source_read { validate_archive(archive, download, metadata) }
 
-          # Http owns a private, complete tempfile for this block. Re-read one
-          # JSON at a time only after every member and aggregate is validated.
+          # Every member and aggregate was validated before any publication
+          # is emitted. The second pass holds only one publication at a time.
           archive.each do |entry|
             next unless json_entry?(entry)
 
-            items = source_read { parse_items(entry.get_input_stream(&:read)) }
-            items.each { |item| yield item }
+            source_read { with_entry(download, entry) { |stream| PageJson.read(stream) { |item| yield item } } }
           end
         ensure
           source_read { archive.close }
@@ -103,12 +103,11 @@ module Processador
       File.open(path, "rb") do |input|
         archive.each do |entry|
           validate_local_header(input, entry)
-          json = json_entry?(entry)
-          contents = read_entry(entry, keep: json)
-          next unless json
+          read_entry(path, entry)
+          next unless json_entry?(entry)
 
           pages += 1
-          total += parse_items(contents).length
+          total += with_entry(path, entry) { |stream| PageJson.read(stream) }
         end
       end
       if (!metadata["numero_paginas"].nil? && metadata["numero_paginas"] != pages) ||
@@ -140,7 +139,7 @@ module Processador
       end
     end
 
-    def read_entry(entry, keep:)
+    def read_entry(path, entry)
       if entry.directory?
         unless entry.size == 0 && entry.crc == 0
           source_failure("caderno_invalid_directory")
@@ -151,49 +150,43 @@ module Processador
         source_failure("caderno_unsupported_member")
       end
 
-      contents = +"".b if keep
       size = 0
       crc = 0
       buffer = +"".b
-      entry.get_input_stream do |stream|
+      with_entry(path, entry) do |stream|
         while stream.read(CHUNK_SIZE, buffer)
           size += buffer.bytesize
           source_failure("caderno_member_size_mismatch") if size > entry.size
 
           crc = Zlib.crc32(buffer, crc)
-          contents << buffer if keep
         end
       end
       unless size == entry.size && crc == entry.crc
         source_failure("caderno_member_integrity_mismatch")
       end
-      contents
+    end
+
+    def with_entry(path, entry)
+      stream = EntryStream.new(path, entry)
+      yield stream
+    ensure
+      stream&.close
     end
 
     def json_entry?(entry)
       entry.file? && entry.name.downcase.end_with?(".json")
     end
 
-    def parse_items(contents)
-      contents.force_encoding(Encoding::UTF_8)
-      source_failure("caderno_invalid_json_encoding") unless contents.valid_encoding?
-
-      document = JSON.parse(contents)
-      unless document.is_a?(Hash) && document["items"].is_a?(Array) && document["items"].all? { |item| item.is_a?(Hash) }
-        source_failure("caderno_invalid_json_structure")
-      end
-      # count has no documented completeness semantics; only actual items and
-      # optional package metadata determine the publication total.
-      document["items"]
-    end
 
     def source_read
       yield
+    rescue PageJson::ConsumerError => error
+      raise error.original
     rescue SourceError
       raise
     rescue StandardError
       # Keep ZIP member names, temporary paths and untrusted parser details out
-      # of persisted failure reasons. Consumer code is never inside this block.
+      # of persisted failure reasons.
       source_failure("caderno_invalid_package")
     end
   end

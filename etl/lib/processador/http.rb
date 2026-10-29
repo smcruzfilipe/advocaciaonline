@@ -23,6 +23,7 @@ module Processador
 
     # The last response's delay also accompanies validation errors raised by a source.
     attr_reader :retry_after
+    attr_accessor :on_retry_after
 
     def initialize(open_timeout: 10, read_timeout: 60, write_timeout: 10, test_origin: nil)
       [open_timeout, read_timeout, write_timeout].each do |value|
@@ -34,6 +35,12 @@ module Processador
       @read_timeout = read_timeout
       @write_timeout = write_timeout
       @test_origin = parse_test_origin(test_origin) if test_origin
+    end
+
+    def retry_wait_remaining
+      return 0 unless @retry_not_before
+
+      [@retry_not_before - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max
     end
 
     def get_json(url)
@@ -90,6 +97,8 @@ module Processador
       connection.start do |http|
         http.request(request) do |response|
           @retry_after = parse_retry_after(response["Retry-After"])
+          @retry_not_before = @retry_after && Process.clock_gettime(Process::CLOCK_MONOTONIC) + @retry_after
+          @on_retry_after&.call(@retry_after) unless @retry_after.nil?
           source_error("DJEN returned an unsuccessful HTTP response") unless response.is_a?(Net::HTTPOK)
           encoding = response["Content-Encoding"]
           if encoding && encoding.strip.downcase != "identity"
