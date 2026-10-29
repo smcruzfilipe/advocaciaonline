@@ -9,7 +9,7 @@ O Advocacia Online é um **monorepo**: a interface Next.js e a API Rails pertenc
 - `docs/design-system.md`, na raiz documental compartilhada, é o contrato visual do produto.
 - `frontend/` é o componente Next.js previsto para implementar este contrato: páginas em `frontend/app/`, componentes em `frontend/components/` e tokens/estilos mantidos dentro do frontend. Esse diretório ainda não foi criado; este guia não é um frontend independente.
 - `backend/` contém a API Rails, responsável por identidade, autorização, domínio e persistência. Não recebe estilos nem renderiza a UI Next.js.
-- `backend/despachante/` contém o despachante, executado fora do servidor da API; não possui interface própria. O futuro `etl/` também é um processo sem UI, no mesmo monorepo.
+- `backend/despachante/` contém o despachante, executado fora do servidor da API; não possui interface própria. `etl/` contém o processador, também sem UI, no mesmo monorepo.
 
 Frontend e backend terão imagens distintas, preservando o repositório único. Reutilizar a direção visual do Publique não significa importar sua organização de pastas, criar outro repositório ou deslocar o backend existente. As fronteiras técnicas estão na [arquitetura](arquitetura.md#estrutura-do-monorepo-e-fronteiras).
 

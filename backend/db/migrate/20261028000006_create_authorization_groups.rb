@@ -242,10 +242,10 @@ class CreateAuthorizationGroups < ActiveRecord::Migration[8.1]
       END $fn$;
 
       REVOKE ALL ON app_private.authorization_groups, app_private.authorization_group_rules,
-        app_private.authorization_group_memberships FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_coletor;
+        app_private.authorization_group_memberships FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       REVOKE ALL ON FUNCTION app_private.authorization_group_operations(), app_private.valid_authorization_rule(jsonb),
         app_private.authorization_group_document(uuid,uuid), app_private.manage_authorization_groups(text,uuid,jsonb),
-        app_private.session_group_rules() FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_coletor;
+        app_private.session_group_rules() FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       GRANT EXECUTE ON FUNCTION app_private.manage_authorization_groups(text,uuid,jsonb),
         app_private.session_group_rules() TO advocacia_runtime;
     SQL

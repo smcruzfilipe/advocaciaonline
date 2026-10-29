@@ -1,6 +1,6 @@
 # Tarefas: monitoramento jurídico
 
-Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovados pelo solicitante; decisões 1–3 estão registradas. As tarefas implementadas e suas evidências constam nas respectivas seções.
+Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovados pelo solicitante; decisões 1–3 estão registradas. As tarefas implementadas e suas evidências constam nas respectivas seções. Essas evidências são anteriores à renomeação para processador e não comprovam a configuração renomeada; não foram repetidas nesta alteração.
 
 ## Regras de execução e rastreio
 
@@ -258,12 +258,12 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 - [x] **9b — Separar falhas do registro imutável.**
   **Aceite:** (1) Escrevente não recebe ações de usuário nem detalhes técnicos de erro; (2) estado de sucesso/falha permanece consultável fora do Escrevente e relacionado à execução/tribunal; (3) tenant de registro deriva do contexto server-side.
-  **Verificação comportamental:** exercitar a fronteira com uma chamada controlada que informa o resultado operacional definido no contrato; verificar estado externo, tenant adulterado e ausência de marco final, sem depender de execução do coletor.
+  **Verificação comportamental:** exercitar a fronteira com uma chamada controlada que informa o resultado operacional definido no contrato; verificar estado externo, tenant adulterado e ausência de marco final, sem depender de execução do processador.
   **Smoke específico:** invocar a fronteira com resultado controlado de falha e confirmar estado externo consultável conforme contrato, sem texto técnico ou ação de usuário no Escrevente.
   **Dep.:** 9a, 3b, 4b. **Escopo:** fronteira entre ledger append-only e estado operacional.
   **Áreas previstas (≤5):** Escrevente; estado de execução; contexto de identidade.
   **Rastreio:** [SPEC-escrevente.md — Escopo e contratos lógicos](../SPEC-escrevente.md#escopo-e-contratos-lógicos); [Requisitos](../SPEC-escrevente.md#requisitos-e-critérios-observáveis); [Fronteiras](../SPEC-escrevente.md#fronteiras).
-  **Estado:** `collection_job_executions` mantém o estado por trabalho fora dos marcos. Testes e smoke confirmaram falha consultável por execução/tribunal com início sem término e tenant derivado do trabalho, sem executar o coletor ETL. Os testes específicos passaram com 29 testes e 813 assertions; a suíte completa, 276 testes e 7.678 assertions.
+  **Estado:** `collection_job_executions` mantém o estado por trabalho fora dos marcos. Testes e smoke confirmaram falha consultável por execução/tribunal com início sem término e tenant derivado do trabalho, sem executar o processador ETL. Os testes específicos passaram com 29 testes e 813 assertions; a suíte completa, 276 testes e 7.678 assertions.
 
 ## Checkpoint 3 — após tarefas 7–9
 - [ ] Monitoramentos de advogado/parte/processo entregam tenant e identidade corretos; Escrevente permanece append-only e sem ações/erros técnicos.

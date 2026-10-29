@@ -1,6 +1,6 @@
 # Contrato DJEN — evidências para as tarefas 1a–1c
 
-Fonte oficial: [OpenAPI](https://comunicaapi.pje.jus.br/swagger/djen.yml). Referência funcional: [coleta](../SPEC-coleta.md). Documento de validação, não implementação de coletor. Estabilidade de `id` e `hash` permanece premissa aceita; não foi reaberta.
+Fonte oficial: [OpenAPI](https://comunicaapi.pje.jus.br/swagger/djen.yml). Referência funcional: [coleta](../SPEC-coleta.md). Documento de validação, não implementação de processador. Estabilidade de `id` e `hash` permanece premissa aceita; não foi reaberta.
 
 ## Cadernos: contrato e campos
 

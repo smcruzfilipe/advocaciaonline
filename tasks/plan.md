@@ -142,7 +142,7 @@ Não paralelizar tarefas com dependência direta nem alterações concorrentes a
 | Dados pessoais em registros imutáveis, ainda que públicos. | Minimizar dados registrados, manter isolamento e avaliar obrigações legais aplicáveis antes de produção. |
 | Regras de grupo e dashboard podem permitir exposição indevida ou bloquear acesso esperado. | Definir composição e escopos; aplicar decisões no servidor a listas, detalhes, respostas e agregações, preservando as regras funcionais aprovadas. |
 | Capacidade para 300 usuários não foi medida. | Tratar 300 como referência e planejar teste futuro; não afirmar capacidade sem medição. |
-| Versões, ETL, políticas RLS, caminhos e comandos ainda não definidos. | Completar ID 3 a partir da stack central escolhida; depois fixar caminhos reais, limitar cada fatia a 3–5 arquivos e subdividir acima desse limite. |
+| Mudanças nas versões, políticas RLS e dependências podem invalidar os comandos ou as garantias existentes. | Manter versões e comandos explícitos, validar roles reais e revisar cada fatia antes de avançar. |
 
 ## Fronteiras e execução
 

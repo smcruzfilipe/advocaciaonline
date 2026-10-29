@@ -17,7 +17,8 @@ jobs:
       DATABASE_URL: postgresql://advocacia_runtime@advocacia-ci-db/advocacia_test
       MIGRATION_DATABASE_URL: postgresql://advocacia_migrator@advocacia-ci-db/advocacia_test
       DESPACHANTE_DATABASE_URL: postgresql://advocacia_despachante@advocacia-ci-db/advocacia_test
-      COLETOR_DATABASE_URL: postgresql://advocacia_coletor@advocacia-ci-db/advocacia_test
+      PROCESSADOR_DATABASE_URL: postgresql://advocacia_processador@advocacia-ci-db/advocacia_test
+      PROCESSADOR_TEST_ADMIN_DATABASE_URL: postgresql://postgres@advocacia-ci-db/advocacia_test
       APP_ORIGIN: https://example.test
       GOOGLE_CLIENT_ID: test-client
       GOOGLE_CLIENT_SECRET: test-secret
@@ -27,10 +28,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - name: Build test and despachante images
+      - name: Build backend, despachante and processador images
         run: |
           docker build --target test -t advocacia-ci:test backend
           docker build --target despachante -t advocacia-ci:despachante backend
+          docker build --target test -t advocacia-ci:processador-test etl
+          docker build --target runtime -t advocacia-ci:processador etl
       - name: Start isolated PostgreSQL as non-root
         run: |
           docker network create --internal advocacia-ci
@@ -41,7 +44,7 @@ jobs:
           timeout 60 bash -c 'until docker exec advocacia-ci-db pg_isready -h 127.0.0.1 -U postgres -d advocacia_test; do sleep 1; done'
       - name: Provision isolated roles
         run: |
-          for file in provision.sql provision_despachante.sql provision_coletor.sql; do
+          for file in provision.sql provision_despachante.sql provision_processador.sql; do
             docker exec -i advocacia-ci-db psql -v ON_ERROR_STOP=1 -U postgres -d advocacia_test < "backend/db/$file"
           done
       - name: Apply migrations
@@ -53,8 +56,12 @@ jobs:
         run: |
           docker run --rm --network advocacia-ci \
             -e RAILS_ENV -e DATABASE_URL -e MIGRATION_DATABASE_URL -e DESPACHANTE_DATABASE_URL \
-            -e COLETOR_DATABASE_URL -e APP_ORIGIN -e GOOGLE_CLIENT_ID -e GOOGLE_CLIENT_SECRET \
+            -e PROCESSADOR_DATABASE_URL -e APP_ORIGIN -e GOOGLE_CLIENT_ID -e GOOGLE_CLIENT_SECRET \
             -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL advocacia-ci:test ruby bin/rails test
+      - name: Run processador suite
+        run: |
+          docker run --rm --network advocacia-ci \
+            -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL advocacia-ci:processador-test
       - name: Smoke final despachante image
         run: |
           docker run --rm --network advocacia-ci \

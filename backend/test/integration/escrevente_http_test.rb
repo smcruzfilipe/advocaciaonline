@@ -19,8 +19,8 @@ class EscreventeHttpTest < ActionDispatch::IntegrationTest
     @despachante_url = ENV.fetch("DESPACHANTE_DATABASE_URL")
     @database = PG.connect(@despachante_url)
     assert_equal "advocacia_despachante", @database.exec("SELECT current_user").getvalue(0, 0)
-    @collector = PG.connect(ENV.fetch("COLETOR_DATABASE_URL"))
-    assert_equal "advocacia_coletor", @collector.exec("SELECT current_user").getvalue(0, 0)
+    @processor = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL"))
+    assert_equal "advocacia_processador", @processor.exec("SELECT current_user").getvalue(0, 0)
     @date = Date.iso8601(@database.exec(<<~SQL).getvalue(0, 0))
       SELECT COALESCE(MAX(collection_date) + 1, DATE '2040-01-01')::text FROM public.collection_runs
     SQL
@@ -28,7 +28,7 @@ class EscreventeHttpTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
-    @collector&.close
+    @processor&.close
     @database&.close
   end
 
@@ -208,18 +208,18 @@ class EscreventeHttpTest < ActionDispatch::IntegrationTest
   end
 
   def start_job(job_id)
-    claim = @collector.exec_params(
-      "SELECT token FROM app_private.collector_claim($1::uuid)", [job_id]).getvalue(0, 0)
-    @collector.exec_params("SELECT id FROM app_private.collector_start($1::uuid, $2::text)", [job_id, claim])
+    claim = @processor.exec_params(
+      "SELECT token FROM app_private.processor_claim($1::uuid)", [job_id]).getvalue(0, 0)
+    @processor.exec_params("SELECT id FROM app_private.processor_start($1::uuid, $2::text)", [job_id, claim])
     claim
   end
 
   def finish_job(job_id, claim)
-    @collector.exec_params("SELECT id FROM app_private.collector_finish($1::uuid, $2::text)", [job_id, claim])
+    @processor.exec_params("SELECT id FROM app_private.processor_finish($1::uuid, $2::text)", [job_id, claim])
   end
 
   def fail_job(job_id, claim)
-    @collector.exec_params("SELECT state FROM app_private.collector_fail($1::uuid, $2::text)", [job_id, claim])
+    @processor.exec_params("SELECT state FROM app_private.processor_fail($1::uuid, $2::text)", [job_id, claim])
   end
 
   def persisted_events(token, run_id, jobs)
