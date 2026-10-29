@@ -178,6 +178,8 @@ Para os testes de integração isolados, forneça também `PROCESSADOR_TEST_ADMI
 
 No smoke definitivo, o despachante planejou seis trabalhos `D` em dois slots para advogado, parte e processo no TJAC. A imagem final executou o trabalho do advogado no segundo slot contra a API DJEN real pelo exit node informado: `succeeded`, zero correspondências, uma tentativa da API e nenhuma do caderno. A amostra não comprova cobertura global.
 
+**Verificação das tarefas 10a, 10b, 12a e 12b:** em PostgreSQL 18.6 descartável, o despachante planejou dois slots para dois tenants, cada um com advogado, parte e processo no TJAC/D. O processador percorreu 12 trabalhos com fonte DJEN controlada: seis por caderno e seis pela API. Foram persistidas duas comunicações, uma por tenant, cada qual com seis vínculos e a primeira versão em HTML preservada. A imagem final do despachante confirmou dois slots distintos e idempotentes; a entrada final do processador confirmou o estado concluído após expiração simulada da concessão no banco descartável.
+
 A imagem runtime do processador mediu 201.991.669 bytes e executou com UID/GID 1000:1000; a base `ruby:4.0.9-alpine3.23` mediu 147.221.451 bytes e foi escolhida por compartilhar a versão Ruby do projeto com runtime Alpine enxuto. PostgreSQL local executou com UID/GID 70:70 e preservou dados após reinicialização. A imagem final não inclui ferramentas de compilação ou testes.
 
 

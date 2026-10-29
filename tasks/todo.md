@@ -271,7 +271,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 ### 10. Planejamento da coleta
 
-- [ ] **10a — Planejar por tenant, entidade, fonte e tribunal.**
+- [x] **10a — Planejar por tenant, entidade, fonte e tribunal.**
   **Aceite:** (1) trabalho identifica tenant, entidade/monitoramento, execução, fonte lógica, tribunal aplicável e meio exclusivo `D`; (2) inclui advogado, partes e processos elegíveis conforme filtros decididos, sem planejar `E`; (3) não aceita tenant do cliente como prova de propriedade.
   **Verificação comportamental:** planejar entidades de mais de um tenant e conferir que cada linha mantém seus vínculos sem cruzamento.
   **Smoke específico:** planejar um advogado, uma parte e um processo em dois tenants e inspecionar os vínculos resultantes.
@@ -282,8 +282,9 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Fatia de integridade:** `backend/test/integration/collection_planning_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`. A integridade antes introduzida pela migration 04 agora faz parte da criação inicial: as referências de advogado, parte e processo dos trabalhos devem pertencer ao mesmo tenant no banco, inclusive para escritas da role despachante.
   **Fatia de leitura:** `backend/test/integration/collection_runs_http_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `backend/app/controllers/collection_runs_controller.rb`, `backend/config/routes.rb`. A audiência antes criada pela migration 05 agora faz parte da criação inicial: é fixada por tenant mesmo sem trabalhos; respostas limitadas ao tenant autenticado. Documentar contrato no README; autorização de equipe permanece pendente de 6b.
   **Evidência histórica, anterior à restrição ao meio D:** migrations então vigentes exercitadas em PostgreSQL 18.6 isolado, com roles reais. Os testes focados de planejamento, agenda e leitura HTTP passaram com 72 testes e 1.248 assertions; incluem dois tenants, os três tipos de entidade, filtros, RLS, vínculos cruzados negados e critérios congelados. O teste de perfil sem OAB principal demonstrou falha integral e retomada da mesma execução após restauração do perfil. Um smoke na imagem final então vigente com catálogo controlado gerou dois slots `planned`: cada um continha advogado, parte e processo em dois tenants, com seis trabalhos por tenant para TJAC/D e TJAC/E, critérios e identificadores conferidos; a repetição manteve os slots. Esse smoke preserva o comportamento antigo, não autoriza E nem verifica a restrição vigente. O smoke anterior com DJEN real também é histórico; a autorização de equipe (6b) e as dependências desta tarefa permanecem pendentes.
+  **Verificação atual:** testes focados Rails de planejamento, agenda, leitura e persistência: 94 testes e 1.649 assertions, sem falhas, erros ou skips. Em PostgreSQL descartável, o despachante planejou dois slots para dois tenants, cada qual com advogado, parte e processo no TJAC/D: 12 trabalhos com entidade e tenant associados.
 
-- [ ] **10b — Agendar as duas execuções e manter fronteiras lógicas.**
+- [x] **10b — Agendar as duas execuções e manter fronteiras lógicas.**
   **Aceite:** (1) configurar dois acionamentos diários conforme horário/fuso/elegibilidade aprovados; (2) manter despachante/control plane e ETL como responsabilidades distintas da aplicação central; (3) cada acionamento planejado tem identidade própria e associação à fonte/tribunal, sem executar ETL nesta fatia.
   **Verificação comportamental:** inspecionar os dois acionamentos planejados para o mesmo dia e confirmar distinção de execução e fronteiras sem exigir serviços/diretórios separados ou execução do ETL.
   **Smoke específico:** gerar dois acionamentos planejados para o mesmo dia e conferir identificadores/contexto separados, sem iniciar coleta.
@@ -294,6 +295,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Fatia de virada de data:** `backend/test/integration/despachante_execution_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `backend/despachante/run.rb`, `README.md`. O estado `interrupted`, antes acrescentado pela migration 06, agora faz parte da criação inicial. Não publicar nem retomar trabalhos de dia anterior após uma espera externa; identificar a interrupção sem executar coleta retroativa.
   **Fatia da imagem mínima:** `backend/despachante/Gemfile`, `backend/despachante/Gemfile.lock`, `backend/despachante/run.rb`, `backend/Dockerfile`, `README.md`. Instalar apenas as gems usadas pelo processo de planejamento, manter build em estágio separado e verificar a imagem final em execução como usuário não root.
   **Evidência histórica, anterior à restrição ao meio D:** testes focados passaram com 72 testes e 1.248 assertions, cobrindo slots, retomada, concorrência, 429 e virada de data. A imagem final do despachante então vigente foi construída; smoke com catálogo controlado persistiu dois slots `planned` distintos e idempotentes, executando com UID/GID 1000:1000. Isso não comprova a restrição vigente ao meio D, conectividade DJEN real nem execução de ETL. Execução dos jobs e interrupção de jobs já planejados ao mudar o dia pertencem à tarefa 13.
+  **Verificação atual:** os testes focados acima abrangem horários, retomada e virada de data. O processo da imagem final do despachante retornou dois slots distintos e idempotentes com UID 1000; a seleção e execução automática dos trabalhos continuam na tarefa 13.
 
 ### 11. Coleta e persistência reais
 
@@ -326,25 +328,27 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 ### 12. Deduplicação
 
-- [ ] **12a — Deduplicar pela chave conjunta DJEN/tenant.**
+- [x] **12a — Deduplicar pela chave conjunta DJEN/tenant.**
   **Aceite:** (1) usar conjuntamente `id` e `hash`, escopados por tenant e fonte lógica DJEN; (2) manter uma comunicação e sua primeira versão quando a chave coincide entre caderno, API e execuções, inclusive HTML do caderno; (3) não fundir registros quando qualquer componente da chave difere ou apenas processo/tribunal coincide.
   **Verificação comportamental:** cenário com publicação repetida em ambos os caminhos/execuções, preservando HTML recebido primeiro do caderno mesmo após texto sanitizado da API, chave com cada componente alterado e mesma chave em tenants diferentes.
   **Smoke específico:** inserir repetição cross-path e conferir uma comunicação com a primeira versão preservada para chave igual e registros distintos onde a chave não é igual.
   **Dep.:** 11c, 1a–1b, 3c. **Escopo:** chave deduplicadora aprovada; sem revalidar estabilidade assumida.
   **Áreas previstas (≤5):** persistência de comunicações; regra de deduplicação; chave de origem/tenant.
   **Rastreio:** [SPEC-coleta.md — Deduplicação e vínculos](../SPEC-coleta.md#deduplicação-e-vínculos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
+  **Verificação atual:** o teste de integração do processador exercitou caderno seguido da API com a mesma chave e preservou o HTML inicial; testes Rails focados cobrem chaves alteradas e tenants distintos. No smoke controlado com dois tenants, os 12 trabalhos produziram uma comunicação por tenant.
 
-- [ ] **12b — Preservar todos os vínculos de monitoramento.**
+- [x] **12b — Preservar todos os vínculos de monitoramento.**
   **Aceite:** (1) cada monitoramento que encontra comunicação mantém vínculo consultável mesmo quando a comunicação já existe; (2) repetição não remove vínculos anteriores nem cruza tenants; (3) comunicações distintas continuam independentes.
   **Verificação comportamental:** buscar uma comunicação por várias entidades/execuções e confirmar todos os vínculos; consultar tenant distinto e confirmar isolamento.
   **Smoke específico:** duas entidades do mesmo tenant encontram a mesma chave por caderno e API; consultar uma comunicação e verificar ambos os vínculos.
   **Dep.:** 12a, 10a, 11c. **Escopo:** relação comunicação-monitoramento.
   **Áreas previstas (≤5):** persistência de vínculos; consulta de vínculos; autorização por tenant.
   **Rastreio:** [SPEC-coleta.md — Deduplicação e vínculos](../SPEC-coleta.md#deduplicação-e-vínculos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
+  **Verificação atual:** no smoke controlado, cada comunicação manteve seis vínculos — advogado, parte e processo em duas execuções — com isolamento por tenant; `processador_persistence_test.rb` também verifica leitura RLS e recusa de vínculos cruzados.
 
 ## Checkpoint 4 — após tarefas 10–12
-- [ ] Somente D, sem editais E: caderno com fallback no primeiro slot, API direta sem caderno no segundo, sanitização somente API, estado por tribunal, deduplicação conjunta com primeira versão preservada e vínculos demonstrados em cenários propostos, sem coleta histórica.
-- [ ] Aprovação humana registrada antes de avançar.
+- [x] Somente D, sem editais E: caderno com fallback no primeiro slot, API direta sem caderno no segundo, sanitização somente API, estado por tribunal, deduplicação conjunta com primeira versão preservada e vínculos demonstrados em cenários propostos, sem coleta histórica.
+- [x] Aprovação humana registrada pelo solicitante após revisão do checkpoint 4.
 
 ### 13. Agenda e falhas
 
