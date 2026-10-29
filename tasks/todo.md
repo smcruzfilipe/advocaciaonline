@@ -348,7 +348,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 ## Checkpoint 4 — após tarefas 10–12
 - [x] Somente D, sem editais E: caderno com fallback no primeiro slot, API direta sem caderno no segundo, sanitização somente API, estado por tribunal, deduplicação conjunta com primeira versão preservada e vínculos demonstrados em cenários propostos, sem coleta histórica.
-- [ ] Aprovação humana registrada antes de avançar.
+- [x] Aprovação humana registrada pelo solicitante após revisão do checkpoint 4.
 
 ### 13. Agenda e falhas
 
