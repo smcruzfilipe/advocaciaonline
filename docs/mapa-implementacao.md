@@ -20,9 +20,12 @@ O mapa não implica que todas as rotas, modelos, migrations ou bibliotecas das f
 
 As migrations em `backend/db/migrate/` destinam-se somente à criação de novos bancos de desenvolvimento e definem diretamente o estado final do schema, sem reproduzir alterações intermediárias ou backfills da sequência anterior:
 
+- `20261028000000_create_identity_and_lawyer_profiles.rb`: identidade, vínculos selecionados e contexto de sessão.
 - `20261028000003_create_collection_planning.rb`: planejamento, integridade das entidades dos trabalhos, audiência por tenant e estado `interrupted`; integra as antigas migrations 04–06.
 - `20261028000004_create_escrevente.rb`: marcos append-only e estado operacional dos trabalhos; substitui a antiga `07_create_escrevente`.
+- `20261028000005_create_team_credentials.rb`: credenciais e convites de equipe.
+- `20261028000006_create_authorization_groups.rb`: grupos, regras e associações.
 
-A consolidação deve preservar funções, constraints, nomes, grants, RLS, colunas, índices e comportamento existentes. Não há rollback destrutivo nem upgrade automático de banco pré-existente. Um banco descartável criado pela sequência anterior precisa ser recriado explicitamente antes de receber a sequência consolidada; o provisionamento e a execução estão descritos no [README](../README.md#imagens-docker-da-api-e-do-despachante).
+Não há rollback destrutivo nem upgrade automático de banco pré-existente. Um banco descartável criado pela sequência anterior precisa ser recriado explicitamente antes de receber o schema inicial atual; o provisionamento e a execução estão descritos no [README](../README.md#imagens-docker-da-api-e-do-despachante).
 
-As verificações registradas no README, nas specs e no checklist são evidências históricas anteriores à consolidação, não resultados desta alteração nem comprovação da sequência consolidada.
+Evidências de cada alteração e suas limitações estão no [README](../README.md#implementação-e-verificações) e no checklist; resultados anteriores não comprovam versões posteriores das migrations.

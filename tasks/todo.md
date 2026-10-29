@@ -132,13 +132,28 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 ### 5. Gestão de usuários e expiração
 
-- [ ] **5a — Aplicar validade às credenciais e sessões.**
+**Implementação backend de identidade, equipe e autorização — branch `feature/identidade-equipe-autorizacao`:** manter frontend fora desta entrega. Para banco inicial vazio, o contexto de identidade será consolidado na migration inicial; não há upgrade automático de banco preexistente.
+
+- Identidade/schema: `backend/db/migrate/20261028000000_create_identity_and_lawyer_profiles.rb`, `backend/db/migrate/20261028000005_create_team_credentials.rb`. Vínculos por tenant, sessão selecionada e credenciais com validade/revogação.
+- Sessões: `backend/app/services/identity_store.rb`, `backend/app/controllers/sessions_controller.rb`, `backend/app/controllers/google_sessions_controller.rb`, `backend/config/routes.rb`, `backend/test/integration/tenant_memberships_test.rb`.
+- Credenciais: `backend/app/controllers/team_credentials_controller.rb`, `backend/test/integration/team_credentials_http_test.rb`, `backend/test/integration/team_credential_lifecycle_test.rb`.
+- Convites: `backend/app/controllers/team_invitations_controller.rb`, `backend/test/integration/team_invitations_test.rb`; token em fragmento de URL e aceite por POST autenticado, sem registrar token ou conteúdo do convite.
+- Correio: `backend/app/services/team_invitation_mailer.rb`, `backend/test/services/team_invitation_mailer_test.rb`; configuração SMTP e variáveis serão registradas no README antes de concluir a entrega.
+- Política de autorização: `backend/app/services/authorization_policy.rb`, `backend/test/services/authorization_policy_test.rb`. Grupos, administração, integração com operações existentes e verificações serão detalhados antes de seu fechamento.
+- Configuração SMTP: `backend/app/services/app_settings.rb`, `backend/test/services/app_settings_test.rb`, `README.md`. Credenciais externas, porta explícita e transporte seguro; nenhuma configuração no corpo da requisição.
+- Grupos: `backend/db/migrate/20261028000006_create_authorization_groups.rb`, `backend/app/services/authorization_group_store.rb`, `backend/app/controllers/authorization_groups_controller.rb`, `backend/test/integration/authorization_groups_test.rb`, `backend/test/integration/authorization_groups_http_test.rb`.
+- Fronteira das permissões: `backend/app/controllers/application_controller.rb`, `backend/test/integration/monitoring_authorization_http_test.rb`.
+- Monitoramentos: `backend/app/controllers/party_monitorings_controller.rb`, `backend/app/controllers/process_monitorings_controller.rb`, `backend/app/controllers/lawyer_monitorings_controller.rb`.
+- Consultas auxiliares: `backend/app/controllers/court_catalogs_controller.rb`, `backend/app/controllers/collection_runs_controller.rb`, `backend/app/controllers/escrevente_controller.rb`, `backend/app/controllers/onboardings_controller.rb`. O Escrevente e os dados administrativos de coleta permanecem exclusivos do titular.
+
+- [x] **5a — Aplicar validade às credenciais e sessões.**
   **Aceite:** (1) permitir validade sem expiração ou em dias conforme política aprovada; (2) após vencimento, negar operação protegida no servidor mesmo se a sessão já estava ativa; (3) aplicar renovação/alteração/revogação conforme a decisão 2a.
   **Verificação comportamental:** comparar acesso válido, sem expiração, após vencimento e sessão aberta antes do vencimento.
   **Smoke específico:** renovar ou expirar uma credencial numa sessão ativa e tentar imediatamente uma nova operação protegida.
   **Dep.:** 4b, 2a, 3a. **Escopo:** validade de credencial e checagem server-side.
   **Áreas previstas (≤5):** identidade/autenticação; política de credenciais; interface de validade.
   **Rastreio:** [SPEC-identidade.md — Requisitos](../SPEC-identidade.md#requisitos); [Fronteiras](../SPEC-identidade.md#fronteiras); [Questões abertas](../SPEC-identidade.md#questões-abertas).
+  **Estado:** backend verificado em PostgreSQL com roles reais; testes cobrem vencimento, alteração, renovação e revogação em sessão aberta. Smoke HTTP confirmou revogação seguida de `401` na operação protegida.
 
 - [ ] **5b — Administrar ciclo de usuários aprovado.**
   **Aceite:** (1) executar somente ações de usuário aprovadas em 2a/2b; (2) vincular usuários ao tenant do advogado sem assumir convite, credencial ou login não aprovados.
@@ -147,6 +162,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 5a, 2a, 2b, 3b. **Escopo:** gestão de usuários dentro do ciclo aprovado.
   **Áreas previstas (≤5):** autorização/administração; identidade de equipe; persistência de usuários.
   **Rastreio:** [SPEC-identidade.md — Questões abertas](../SPEC-identidade.md#questões-abertas); [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Questões abertas](../SPEC-autorizacao.md#questões-abertas).
+  **Estado:** backend implementado; testes cobrem convites, seleção de tenant e administração isolada. Smoke HTTP enviou convite a um servidor SMTP local com STARTTLS, aceitou o convite e confirmou que equipe não administra credenciais. A prova de login Google real ainda depende de credenciais externas; o smoke usou sessões preparadas.
 
 ### 6. Grupos e escopo de tribunais
 
@@ -157,6 +173,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 5b, 4b, 2b. **Escopo:** administração lógica de grupos.
   **Áreas previstas (≤5):** autorização/administração; persistência de grupos; interface administrativa.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos).
+  **Estado:** backend implementado e testes de isolamento entre tenants aprovados; smoke HTTP criou e listou grupo com titular e recusou acesso anônimo. A interface frontend e o smoke administrativo com dois tenants permanecem pendentes.
 
 - [ ] **6b — Aplicar permissões por operação e tribunal.**
   **Aceite:** (1) sem grupos, permitir leitura ampla dos tribunais sem conceder escrita; (2) `Consulta TJSP` permite somente leitura TJSP quando avaliado sem conflito; (3) aplicar regras aprovadas pelo servidor ao dado retornado.
@@ -165,6 +182,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 6a, 4b, 2b. **Escopo:** decisão de acesso aplicada em cada operação.
   **Áreas previstas (≤5):** autorização; política de operações; filtros de dados.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos).
+  **Estado:** política por operação/tribunal implementada, testada e aplicada aos consumidores de monitoramento existentes. A consulta de comunicações e suas respostas por tribunal ainda não existem; a verificação de 6b nessas superfícies permanece pendente.
 
 - [ ] **6c — Aplicar a decisão de autorização da dashboard.**
   **Aceite:** (1) decidir o acesso à dashboard conforme política aprovada, tenant e escopo de tribunal; (2) aplicar a decisão no servidor e não retornar valores protegidos quando negada, sem definir sua representação visual.
@@ -173,6 +191,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 6b, 2b–2c. **Escopo:** decisão e aplicação server-side da autorização da dashboard.
   **Áreas previstas (≤5):** autorização; consulta/agregação; filtros server-side.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos); [SPEC-consulta.md — Requisitos](../SPEC-consulta.md#requisitos-e-critérios-observáveis).
+  **Estado:** a decisão `consultar_dashboard` integra o catálogo e a matriz testada; não existe operação real de dashboard/agregação à qual aplicá-la ou submetê-la ao smoke exigido.
 
 ## Checkpoint 2 — após tarefas 4–6
 - [ ] Onboarding, expiração em sessão ativa, isolamento e regras de autorização demonstrados nos cenários propostos.

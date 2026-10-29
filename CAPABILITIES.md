@@ -15,7 +15,7 @@ Ordem: identidade → autorização e Escrevente → monitoramentos → coleta �
 
 Contratos compartilhados de especificação: contexto autenticado identifica usuário e tenant no servidor, respeita expiração e não aceita tenant enviado pelo cliente como prova de acesso. Autorização decide operação e escopo por tribunal/dashboard. Monitoramentos fornecem identidade da entidade e seu tenant; coleta persiste publicações com vínculos e status por execução/tribunal; Escrevente recebe registros de fluxo append-only. Formatos técnicos e transportes ainda não foram escolhidos.
 
-O plano e checklist existentes em `tasks/` foram aprovados pelo solicitante e revisados pelo advisor; as decisões técnicas bloqueantes continuam pendentes antes da implementação. `dev` é a branch padrão; cada feature nasce de `dev`.
+O plano e checklist de monitoramento em `tasks/` registram os gates 1–3 e o estado de cada entrega. `dev` é a branch padrão; cada feature nasce de `dev`.
 
 ## Agenda e atendimento online
 
@@ -40,6 +40,6 @@ Fronteiras aprovadas:
 - Convites obtêm o acesso online de reunioes-online, sem depender da publicação no Google.
 - Não há dependência desta iniciativa em monitoramentos, coleta, consulta ou Escrevente; o despachante da coleta não se torna agendador genérico da agenda.
 
-Decisões confirmadas: duração única de 1 a 120 minutos, intervalo de 0 a 60 minutos e antecedência de 0 a 10.080 minutos, configurados pelo advogado sem defaults ou exceção automática à equipe; consulta de até 15 datas locais por requisição, não horizonte de reserva. AG01–AG03 concluídas documentalmente: convenções de tempo, preservação de compromissos, matriz canônica, schema, funções restritas, ABIs e HTTP aprovados. Disponibilidade mínima por cadastro/remarcação não concede detalhes de ocupantes. Nenhum provedor ou componente da agenda foi implementado. As decisões dos demais módulos permanecem nos respectivos gates.
+Decisões confirmadas: duração única de 1 a 120 minutos, intervalo de 0 a 60 minutos e antecedência de 0 a 10.080 minutos, configurados pelo advogado sem defaults ou exceção automática à equipe; consulta de até 15 datas locais por requisição, não horizonte de reserva. AG01–AG03 concluídas documentalmente: convenções de tempo, preservação de compromissos, matriz canônica, schema, funções restritas, ABIs e HTTP aprovados. Disponibilidade mínima por cadastro/remarcação não concede detalhes de ocupantes. O backend de equipe e grupos foi implementado; as ABIs/contexto limitado da agenda e o frontend compartilhado ainda precisam ser comprovados em AG04. Nenhum componente da agenda foi implementado. As decisões dos demais módulos permanecem nos respectivos gates.
 
 Plano, [checklist](tasks/agenda/todo.md) e [contrato técnico](SPEC-agenda.md#contrato-técnico-aprovado--ag01-e-ag03) aprovados. Gate atual: AG04/C0, comprovação de provedores compartilhados e ambiente reais; AG01–AG03 são conclusões documentais, não provas de runtime. Usar explicitamente `tasks/agenda/plan.md` e `tasks/agenda/todo.md`, preservando os arquivos padrão. As demais capacidades mantêm gates próprios.

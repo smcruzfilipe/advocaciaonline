@@ -2,7 +2,7 @@
 
 Monorepo da plataforma de monitoramento de publicações judiciais voltada a advogados independentes e suas equipes, reunindo backend Rails API-only e frontend Next.js no mesmo repositório. A fonte inicial prevista é o Diário de Justiça Eletrônico Nacional (DJEN), com consulta a cadernos como caminho principal e à API paginada de comunicações como fallback.
 
-> **Estado atual:** o backend contém onboarding, cadastros de monitoramento, geração de planos de coleta e Escrevente com consulta por tenant e interface SQL controlada para o coletor. Frontend, equipe/grupos, executor ETL, execução real da coleta, dashboard e Swagger UI ainda não estão implementados.
+> **Estado atual:** o backend contém onboarding, identidade de equipe, grupos, permissões, cadastros de monitoramento, geração de planos de coleta e Escrevente. Frontend, executor ETL, execução real da coleta, consulta de comunicações, dashboard e Swagger UI ainda não estão implementados.
 
 ## Estrutura do monorepo
 
@@ -60,6 +60,11 @@ As variáveis abaixo são lidas pelo backend, por seus testes ou configuradas na
 | `APP_ORIGIN` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS da API, sem caminho ou credenciais; valida origem de operações mutáveis e compõe o callback Google. |
 | `GOOGLE_CLIENT_ID` | Nenhum | Sim, para autenticação Google | Identificador do cliente OAuth web. |
 | `GOOGLE_CLIENT_SECRET` | Nenhum | Sim, para autenticação Google | Segredo do cliente OAuth web; fornecer por mecanismo de segredos. |
+| `SMTP_HOST` | Nenhum | Sim, para enviar convites | Host do servidor SMTP; fornecer pela configuração protegida do ambiente. |
+| `SMTP_PORT` | Nenhum | Sim, para enviar convites | Porta TCP do servidor SMTP com STARTTLS obrigatório; fornecer pela configuração protegida do ambiente. |
+| `SMTP_USERNAME` | Nenhum | Sim, para enviar convites | Usuário de autenticação SMTP; fornecer pela configuração protegida do ambiente. |
+| `SMTP_PASSWORD` | Nenhum | Sim, para enviar convites | Senha de autenticação SMTP; fornecer por gerenciador de segredos, sem versioná-la. |
+| `SMTP_FROM` | Nenhum | Sim, para enviar convites | Endereço remetente autorizado no servidor SMTP; fornecer pela configuração protegida do ambiente. |
 | `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails usado para proteção de tentativas de autenticação; gerar e fornecer externamente. |
 | `RAILS_ENV` | `production` na imagem runtime; `test` na imagem de testes | Não | Seleciona o ambiente Rails. |
 | `RAILS_LOG_LEVEL` | `info` | Não | Nível de logging. |
@@ -72,7 +77,7 @@ As variáveis abaixo são lidas pelo backend, por seus testes ou configuradas na
 | `BUNDLE_GEMFILE` | `/app/despachante/Gemfile` na imagem do despachante; caminho do `Gemfile` da API no boot Rails | Não | Seleciona o manifesto próprio de dependências de cada processo. |
 | `HOME` | `/home/app` na imagem | Não | Diretório inicial do usuário não root da imagem. |
 
-Configurações futuras, ainda não implementadas: `COLETA_TENTATIVAS_POR_CAMINHO` terá default `3`, `COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS` default `60` e `COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS` default `300`, conforme [`SPEC-coleta.md`](SPEC-coleta.md). Não há prazo automático de retenção do Escrevente nesta etapa. As configurações de SMTP e Swagger permanecem por nomear.
+Configurações futuras, ainda não implementadas: `COLETA_TENTATIVAS_POR_CAMINHO` terá default `3`, `COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS` default `60` e `COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS` default `300`, conforme [`SPEC-coleta.md`](SPEC-coleta.md). Não há prazo automático de retenção do Escrevente nesta etapa. As configurações de Swagger permanecem por nomear.
 
 **Regra de manutenção:** toda variável de ambiente introduzida ou alterada em uma implementação deve ser registrada nesta seção do README no mesmo conjunto de mudanças. Para cada variável, informe nome exato, valor default (ou `Nenhum` se não houver), se é obrigatória e para que serve. Quando não existir default, documente também como fornecer o valor sem incluir segredos. Atualize a tabela ao remover variáveis.
 
@@ -89,7 +94,11 @@ Configurações futuras, ainda não implementadas: `COLETA_TENTATIVAS_POR_CAMINH
 
 ## Implementação e verificações
 
-A sequência consolidada foi aplicada em PostgreSQL isolado. Seu catálogo coincidiu com o da sequência anterior em 86 colunas, 138 constraints, 36 índices, 27 políticas, 15 funções, dois triggers e RLS/grants de 14 tabelas. A suíte passou com 276 testes e 7.678 assertions; um smoke criou e leu um perfil autenticado. Uma role de despachante insegura foi recusada antes da criação de tabelas. Os demais resultados abaixo são históricos e não comprovam esta consolidação.
+O histórico da consolidação anterior registra 276 testes e 7.678 assertions, comparação de catálogo e smoke de onboarding; esses resultados não comprovam as alterações posteriores de identidade e autorização.
+
+**Identidade e autorização:** em PostgreSQL 18.6 isolado, as migrations atuais foram aplicadas com roles segregadas e a suíte passou com **382 testes e 9.242 assertions**, sem falhas, erros ou skips. Smoke HTTP em processo não root criou e listou grupo, enviou convite por SMTP local com STARTTLS, aceitou-o numa sessão preparada, confirmou leitura de equipe sem grupos, negou administração à equipe e bloqueou a sessão após revogação. O smoke não usou Google OAuth nem servidor SMTP externos.
+
+As decisões de transação e privilégios seguem as referências oficiais de [funções PostgreSQL seguras](https://www.postgresql.org/docs/18/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY), [RLS](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) e [travas de advisory](https://www.postgresql.org/docs/18/explicit-locking.html#ADVISORY-LOCKS). O transporte usa o [SMTP da biblioteca Mail](https://github.com/mikel/mail/blob/2.9.1/lib/mail/network/delivery_methods/smtp.rb).
 
 ### API de onboarding
 
@@ -103,9 +112,17 @@ A sequência consolidada foi aplicada em PostgreSQL isolado. Seu catálogo coinc
 
 O corpo do POST contém `full_name`, `primary_oab` com `number` e `uf`, `secondary_oabs` como lista e `office_name` opcional. A OAB principal é obrigatória; as secundárias podem ser uma lista vazia. O número é textual para preservar zeros e sufixos. Não se confunde escritório com tenant.
 
+### Identidade de equipe e grupos
+
+A identidade Google pode ter vínculos em vários tenants. `GET /api/session` informa os vínculos disponíveis; `PATCH /api/session/membership` seleciona um `membership_id` validado pelo servidor e `DELETE /api/session` encerra a sessão. Uma credencial de equipe exige `validity_days` explícito: `null` para sem expiração ou inteiro positivo, contado em períodos de 24 horas desde a criação ou renovação. Alterar a escolha não altera o vencimento até a renovação; revogação é imediata e não é revertida por renovação.
+
+O titular administra credenciais em `GET`/`POST /api/team/credentials`, `PATCH`/`DELETE /api/team/credentials/:id`, `POST /api/team/credentials/:id/renewal` e `POST /api/team/credentials/:id/invitation`. A criação recebe `email`, `validity_days` e `group_ids` opcional. O convite é enviado por SMTP após o commit: se a entrega não for confirmada, a credencial permanece criada e o titular pode reemitir o convite. A reemissão invalida o link anterior sem reiniciar a validade. O link usa fragmento `#token=...`; o cliente deve enviar o token em `POST /api/team/invitations/accept`, com sessão Google, `Origin` e CSRF. O frontend que lê esse fragmento ainda não existe. Não registrar o token nem o conteúdo do convite.
+
+O titular administra grupos, regras e associações em `/api/authorization/groups`, suas rotas `/:id/rules` e `/:id/memberships/:membership_id`; `GET /api/authorization/catalog` lista as operações. Uma regra contém `operation`, `effect` (`allow` ou `deny`) e `court` (`null` para escopo geral). Sem grupos, equipe recebe as leituras padrão; com grupos, concessões se somam e negação explícita prevalece. Escritas exigem concessões distintas. A política de consulta por tribunal e dashboard existe como decisão de autorização; as APIs de comunicações e dashboard ainda não existem e deverão aplicá-la ao serem implementadas.
+
 ### API de monitoramentos
 
-As operações abaixo exigem sessão válida; alterações exigem também `Origin` e `X-CSRF-Token`. O tenant vem da sessão, nunca do corpo ou da query. Por enquanto, só existem sessões do advogado titular: antes de habilitar usuários de equipe, estas rotas precisam integrar as regras de autorização por grupos.
+As operações abaixo exigem sessão válida; alterações exigem também `Origin` e `X-CSRF-Token`. O tenant vem da sessão, nunca do corpo ou da query. A equipe depende da autorização específica por grupo; o titular opera por propriedade. Sem permissão de consulta, uma alteração autorizada retorna somente o identificador, não o detalhe do monitoramento.
 
 | Método e caminho | Comportamento |
 |---|---|
@@ -162,7 +179,7 @@ Os builds são multi-stage: o despachante usa os estágios `despachante_base` e 
 
 Construa a API, a partir da raiz do monorepo, com `docker build --target runtime -t advocacia-backend:local backend`. Neste ambiente, o build precisou de `--network host` para resolver dependências devido ao DNS da rede Docker. O comando de build do despachante está abaixo; nenhum deles depende de um frontend implementado.
 
-**Migrations iniciais consolidadas — banco inicial vazio:** como não há usuários nem ambiente de produção, a sequência cria diretamente o estado final do schema, sem reproduzir alterações ou backfills anteriores. `backend/db/migrate/20261028000003_create_collection_planning.rb` integra as antigas migrations 04–06; `backend/db/migrate/20261028000004_create_escrevente.rb` substitui a antiga 07. O deploy futuro continua condicionado ao procedimento próprio e às permissões necessárias.
+**Migrations iniciais consolidadas — banco inicial vazio:** `20261028000000_create_identity_and_lawyer_profiles.rb` define o schema atual de identidade; `20261028000005_create_team_credentials.rb` e `20261028000006_create_authorization_groups.rb` acrescentam credenciais e grupos. `20261028000003_create_collection_planning.rb` integra as antigas migrations 04–06; `20261028000004_create_escrevente.rb` substitui a antiga 07. O deploy futuro continua condicionado ao procedimento próprio e às permissões necessárias.
 
 Essas migrations não oferecem rollback destrutivo nem upgrade automático de banco pré-existente. Um banco descartável de desenvolvimento criado pela sequência anterior precisa ser recriado explicitamente antes de receber a sequência consolidada; não aplique as migrations consolidadas sobre o schema antigo nem use os relatos históricos de `db:rollback` abaixo como instrução atual. O uso futuro da instância PostgreSQL do servidor de deploy continua condicionado a um procedimento próprio, ainda não definido.
 

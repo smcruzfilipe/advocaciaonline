@@ -130,16 +130,16 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 
 **Dependências:** AG03.
 
-**Bloqueio/gate:** Equipe/grupos e decisão por operação não localizados no código; ABIs `agenda_authorize` e `agenda_context_tenant` ainda sem implementação; frontend compartilhado ausente. Ambiente/banco de teste não comprovados nesta sessão. Referências: tarefas 5–6 do plano anterior e base frontend prevista; não marcar trabalho externo como concluído aqui.
+**Bloqueio/gate:** o backend de equipe, validade e política por operação foi implementado em `feature/identidade-equipe-autorizacao`; as ABIs `agenda_authorize` e `agenda_context_tenant`, o contexto limitado e o frontend compartilhado permanecem ausentes. A entrega da branch e a verificação específica das ABIs de agenda não são presumidas.
 
 **Verificação e smoke (futuros):**
 - Percorrer uma sessão de equipe válida e revogada no provedor e a base frontend real alcançando sessão da API; verificar roles/ambiente sem instalar ou executar containers por inferência.
 
-**Inventário exercitado de AG04:** leitura dos fontes, busca exata e alternativa de provedores/ABIs no backend e inventário da raiz/manifestos. `IdentityStore` fornece login/sessão/tenant do titular, não vínculo ou autorização por grupos; rotas atuais não registram agenda/equipe. README confirma equipe/grupos e frontend não implementados; não foi encontrado projeto Next.js, manifesto, lockfile ou scripts JS da aplicação. Scripts/guards PostgreSQL existem, mas não comprovam banco ativo, roles/grants ou sessão de equipe real.
+**Inventário inicial de AG04:** a análise documental anterior não encontrou provedor de equipe/grupos nem frontend. Posteriormente, o backend de equipe/grupos foi implementado na branch citada e exercitado com roles segregadas; ver evidências no [README](../../README.md#identidade-de-equipe-e-grupos). Essa implementação não fornece, por si só, as ABIs nem o contexto limitado contratados pela agenda.
 
-**Limite do ambiente verificado:** `command -v ruby bundle node npm psql` encontrou somente Node/npm no PATH do host desta sessão; isso não afirma ausência de Ruby nas imagens previstas. Consulta booleana do ambiente desta sessão não encontrou valores não vazios para `DATABASE_URL`, `MIGRATION_DATABASE_URL`, `DESPACHANTE_DATABASE_URL`, `APP_ORIGIN`, `SECRET_KEY_BASE`, `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`. Nenhum valor/URL foi exibido; configuração injetada em outro processo/deploy não foi aferida. Não houve conexão a banco, teste, instalação, build, migration, execução/inspeção de container ou chamada Google real.
+**Ambiente:** a implementação de identidade foi verificada em PostgreSQL e containers isolados não root, com roles segregadas; o ambiente foi descartado após o smoke. O fluxo OAuth Google real não foi exercitado. A disponibilidade futura do ambiente e a base frontend ainda precisam ser comprovadas para AG04.
 
-**Desbloqueio exigido:** entrega autorizada das capacidades compartilhadas de equipe/autorização, das ABIs/contexto contratado e da base frontend; ambiente protegido de teste e comprovação runtime com roles segregadas. Não há tarefa de código elegível de P1–P4 enquanto isso faltar. Este inventário registra o bloqueio, não reduz o aceite nem amplia agenda para implementar os provedores.
+**Desbloqueio exigido:** entrega e comprovação das ABIs/contexto contratado, base frontend e ambiente de teste; validar a integração do provedor de equipe/autorização com as ABIs da agenda. Não há tarefa de código elegível de P1–P4 enquanto isso faltar. Este inventário não reduz o aceite nem amplia agenda para implementar os provedores.
 
 **Arquivos previstos:**
 - `tasks/agenda/todo.md`
