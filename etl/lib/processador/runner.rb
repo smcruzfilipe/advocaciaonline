@@ -46,13 +46,15 @@ module Processador
 
     def call_claimed(job_id, token, state)
       PG.connect(@database_url) do |db|
-        process_claimed(db, job_id, token, state)
+        process_claimed(db, job_id, token, state, defer_retry: true)
       end
+    ensure
+      @http.reset_retry_wait
     end
 
     private
 
-    def process_claimed(db, job_id, token, state)
+    def process_claimed(db, job_id, token, state, defer_retry: false)
       return { "state" => state } if %w[succeeded failed].include?(state)
 
       job = json_call(db, "processor_job", "$1::uuid, $2::text", [job_id, token])
@@ -64,7 +66,7 @@ module Processador
         db.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, $3::integer)", [job_id, token, [seconds, MAX_WAIT_FOR_CURRENT_DAY].min])
       }
       begin
-        with_lease(job_id, token) { |lease| execute(db, job_id, token, job, lease) }
+        with_lease(job_id, token) { |lease| execute(db, job_id, token, job, lease, defer_retry: defer_retry) }
       ensure
         @http.on_retry_after = previous_callback
       end
@@ -74,7 +76,7 @@ module Processador
       raise LeaseLost, "Processor operation unavailable", cause: nil
     end
 
-    def execute(db, job_id, token, job, lease)
+    def execute(db, job_id, token, job, lease, defer_retry:)
       progress = job
       if progress.fetch("attempt_in_flight")
         progress = fail_attempt(db, job_id, token, 0)
@@ -90,6 +92,10 @@ module Processador
         if progress["next_attempt_at"]
           remaining = Time.parse(progress.fetch("next_attempt_at")) - Time.now
           if remaining.positive?
+            if defer_retry
+              db.exec_params("SELECT app_private.processor_release($1::uuid, $2::text)", [job_id, token])
+              return { "state" => "deferred" }
+            end
             sleep([remaining, 60].min)
             next
           end

@@ -352,23 +352,23 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 ### 13. Agenda e falhas
 
-- [ ] **13a — Executar agenda e registrar tentativas e falha por execução/tribunal.**
+- [x] **13a — Executar agenda e registrar tentativas e falha por execução/tribunal.**
   **Aceite:** (1) executar, com o ETL de 11, os acionamentos definidos em 10b; (2) aplicar tentativas, backoff, parada e fallback conforme limites aprovados; (3) estado final identifica falha por tribunal e execução, sem confundi-la com zero publicações nem registrar detalhes técnicos no Escrevente.
   **Verificação comportamental:** fazer a fonte falhar até esgotar tentativas e depois responder; verificar contagem/estado dentro dos limites decididos.
   **Smoke específico:** executar os acionamentos planejados com resultado controlado e conferir a execução/estado de cada um, incluindo falha de tribunal distinta de sucesso sem publicações.
   **Dep.:** 10b, 11a–11c, 1c, 9b. **Escopo:** execução da agenda, tentativas e estado operacional.
   **Áreas previstas (≤5):** execução; política de retries; estado por tribunal; consulta de falhas.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
-  **Plano da branch:** definir a seleção segura dos trabalhos e o acionamento do processador existente; exercitar dois slots, concorrência e reinício com roles reais. A interface de seleção e o transporte serão escolhidos após inspeção das permissões e dos contratos já existentes, sem antecipar configuração não implementada.
+  **Implementação e evidência:** seleção e concessão atômicas no PostgreSQL, worker contínuo e retomada por lease. Testes focados: Rails, 29 testes e 686 assertions; ETL, 61 testes e 444 assertions, sem falhas, erros ou skips. No smoke com fonte controlada, o despachante planejou dois slots TJAC/D e o primeiro terminou com `source_unavailable`, distinto de sucesso vazio.
 
-- [ ] **13b — Recuperar no mesmo dia sem retroatividade.**
+- [x] **13b — Recuperar no mesmo dia sem retroatividade.**
   **Aceite:** (1) execução posterior no mesmo dia pode persistir publicações após falha anterior; (2) deduplicação preserva chave/vínculos entre as execuções; (3) nenhuma execução busca automaticamente data anterior.
   **Verificação comportamental:** primeira execução falha e a seguinte tem sucesso na mesma data; comparar registros, estado e data enviada.
   **Smoke específico:** repetir coleta do dia corrente após falha e confirmar recuperação sem duplicar publicação e sem consulta histórica.
   **Dep.:** 13a, 12a–12b, 1c. **Escopo:** recuperação pela execução posterior, não reprocessamento retroativo.
   **Áreas previstas (≤5):** execução; persistência; deduplicação; política de datas.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Deduplicação e vínculos](../SPEC-coleta.md#deduplicação-e-vínculos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
-  **Plano da branch:** simular falha no primeiro slot, sucesso no segundo e reinício no mesmo dia; verificar trabalho concluído, vínculos e identidade preservados. Simular mudança de data local e confirmar que nenhuma chamada consulta o dia anterior.
+  **Implementação e evidência:** no mesmo smoke, o segundo slot recuperou uma comunicação e um vínculo para o mesmo advogado, usando API paginada na data corrente, sem caderno nem editais. Os testes também cobrem tentativas esgotadas, reingresso concorrente, retomada, data anterior sem requisição e preservação da primeira versão e dos vínculos.
 
 ### 14. Consulta de comunicações
 

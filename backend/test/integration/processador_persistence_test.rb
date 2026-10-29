@@ -16,7 +16,8 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     "processor_record_failure(uuid,text,text)" => ["SELECT app_private.processor_record_failure($1, $2, $3)", 3],
     "processor_attempt_begin(uuid,text,integer)" => ["SELECT app_private.processor_attempt_begin($1, $2, $3)", 3],
     "processor_attempt_failed(uuid,text,integer,integer,integer,integer)" => ["SELECT app_private.processor_attempt_failed($1, $2, $3, $4, $5, $6)", 6],
-    "processor_defer(uuid,text,integer)" => ["SELECT app_private.processor_defer($1, $2, $3)", 3]
+    "processor_defer(uuid,text,integer)" => ["SELECT app_private.processor_defer($1, $2, $3)", 3],
+    "processor_release(uuid,text)" => ["SELECT app_private.processor_release($1, $2)", 2]
   }.freeze
 
   setup do
@@ -145,8 +146,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     second_slot = create_job(@lawyer_a, run_id: create_run(@date, 2))
     tomorrow = create_job(@lawyer_a, run_id: create_run((today + 1).to_s, 1))
     tomorrow_running = create_job(@lawyer_a, run_id: create_run((today + 1).to_s, 2))
-    start(tomorrow_running, claim(tomorrow_running))
-    expire(tomorrow_running)
+    @migrator.exec_params("UPDATE public.collection_job_executions SET state = 'running' WHERE job_id = $1", [tomorrow_running])
     start(yesterday, claim(yesterday))
     expire(yesterday)
     active_proof = claim(@job_b)
@@ -162,6 +162,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
       assert_equal %w[pending pending running pending pending], selected.map { |job| job.fetch("state") }
       assert_empty next_jobs
       assert_equal "pending", processor_job(@job_b, active_proof).fetch("state")
+      assert_unavailable { claim(tomorrow) }
       assert_nil @migrator.exec_params("SELECT claim_digest FROM public.collection_job_executions WHERE job_id = $1",
         [tomorrow]).getvalue(0, 0)
       assert_equal "running", state(tomorrow_running)
@@ -217,12 +218,14 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     before = processor_job(@job_a, original)
     expire(@job_a)
     with_processor_queue(@job_a) do
+      assert_empty next_jobs
+      allow_retry(@job_a)
       selected = next_jobs.fetch(0)
       assert_equal @job_a, selected.fetch("job_id")
       assert_equal "running", selected.fetch("state")
       assert_not_equal original, selected.fetch("token")
       resumed = processor_job(@job_a, selected.fetch("token"))
-      %w[phase caderno_attempts fallback_attempts attempt_in_flight attempt_started_at next_attempt_at].each do |key|
+      %w[phase caderno_attempts fallback_attempts attempt_in_flight attempt_started_at].each do |key|
         assert_equal before.fetch(key), resumed.fetch(key), key
       end
       assert_unavailable { processor_job(@job_a, original) }

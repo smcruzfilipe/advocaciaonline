@@ -43,6 +43,10 @@ module Processador
       [@retry_not_before - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max
     end
 
+    def reset_retry_wait
+      @retry_not_before = nil
+    end
+
     def get_json(url)
       body = +""
       transfer(url, accept: "application/json") { |chunk| body << chunk }

@@ -303,6 +303,7 @@ class RunnerIntegrationTest < Minitest::Test
 
   def test_worker_interrupts_old_work_but_leaves_future_jobs_and_active_leases_untouched
     old = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date - 1))
+    @admin.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp() + interval '1 day' WHERE job_id = $1", [old])
     future = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date + 1))
     active = job("party", @party, { "name" => "Parte Exemplo" })
     PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
@@ -343,6 +344,49 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal "1", scalar("SELECT caderno_attempts::text FROM public.collection_job_executions WHERE job_id = $1", [id])
     assert_equal ["started"], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1", [id]).column_values(0)
   end
+  def test_commit_rolls_back_if_collection_date_changes_during_tenant_lock_wait
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    token = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      claim = processor.exec_params("SELECT token FROM app_private.processor_claim($1::uuid)", [id]).getvalue(0, 0)
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, claim])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 3)", [id, claim])
+      claim
+    end
+    old_date = @date - 10_000
+    old_date -= 1 until scalar("SELECT count(*)::text FROM public.collection_runs WHERE collection_date = $1 AND slot = 1", [old_date]) == "0"
+    pids = Queue.new
+    @admin.exec("BEGIN")
+    @admin.exec_params("SELECT pg_advisory_xact_lock(hashtextextended('processor:' || $1::text, 0))", [@tenant])
+    processing = Thread.new do
+      PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+        pids << processor.backend_pid
+        begin
+          processor.exec_params("SELECT app_private.processor_commit($1::uuid, $2::text, 'caderno', $3::jsonb)",
+            [id, token, JSON.generate([publication(604)])])
+        rescue PG::Error => error
+          error
+        end
+      end
+    end
+    processing.report_on_exception = false
+    pid = Timeout.timeout(5) { pids.pop }
+    Timeout.timeout(5) do
+      sleep(0.01) until @admin.exec_params("SELECT $1::integer = ANY(pg_blocking_pids($2::integer))",
+        [@admin.backend_pid, pid]).getvalue(0, 0) == "t"
+    end
+    @admin.exec_params("UPDATE public.collection_runs SET collection_date = $1 WHERE id = $2", [old_date, @run])
+    @admin.exec("COMMIT")
+    assert_kind_of PG::InvalidAuthorizationSpecification, Timeout.timeout(5) { processing.value }
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
+    assert_equal ["started"], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1", [id]).column_values(0)
+  ensure
+    @admin.exec("ROLLBACK") if @admin && @admin.transaction_status != PG::PQTRANS_IDLE
+    processing&.kill if processing&.alive?
+    processing&.join
+    @admin.exec_params("UPDATE public.collection_runs SET collection_date = $1 WHERE id = $2", [@date, @run]) if @admin && @date && @run
+  end
+
 
   def test_worker_resumes_an_abandoned_current_day_attempt_after_restart
     id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
@@ -353,7 +397,12 @@ class RunnerIntegrationTest < Minitest::Test
     end
     expire_lease(id)
     with_server([{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]) do |origin, requests|
-      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      assert_empty requests
+      allow_retry(id)
+      assert_equal "succeeded", worker.run_once.fetch("state")
       assert_equal 1, requests.length
     end
     assert_equal "2", scalar("SELECT caderno_attempts::text FROM public.collection_job_executions WHERE job_id = $1", [id])
@@ -407,17 +456,42 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal "0", scalar("SELECT matched_count::text FROM public.collection_job_results WHERE job_id = $1", [succeeded])
   end
 
+  def test_worker_runs_other_jobs_while_a_retry_after_waits
+    waiting = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    other = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date, slot: 2))
+    responses = [{ status: 503, headers: { "Retry-After" => "3600" } }, page([])]
+    with_server(responses) do |origin, requests|
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_equal "succeeded", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      assert_equal 2, requests.length
+    end
+    row = @admin.exec_params(<<~SQL, [waiting]).first
+      SELECT state, claim_digest, caderno_attempts, next_attempt_at > clock_timestamp() AS waiting
+      FROM public.collection_job_executions WHERE job_id = $1
+    SQL
+    assert_equal({ "state" => "running", "claim_digest" => nil, "caderno_attempts" => "1", "waiting" => "t" }, row)
+    assert_equal "succeeded", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [other])
+  end
+
   def test_later_slot_recovers_the_same_lawyer_after_exhaustion_without_historical_collection
     criteria = { "name" => LAWYER_NAME, "oabs" => [] }
     failed = job("lawyer", @lawyer, criteria)
-    recovered = job("lawyer", @lawyer, criteria, run: run_for(@date, slot: 2))
+    recovered = nil
     item = publication(603).merge("texto" => "<p>Publicação &amp; recuperação</p><script>remover</script>")
     responses = Array.new(3) { { body: JSON.generate("status" => "Cancelado") } } +
       Array.new(3) { { status: 503 } } + [page([item]), page([])]
 
     with_server(responses) do |origin, requests|
       worker = worker_for(origin)
+      4.times do
+        assert_equal "deferred", worker.run_once.fetch("state")
+        assert_nil worker.run_once
+        allow_retry(failed)
+      end
       assert_equal "source_unavailable", worker.run_once.fetch("code")
+      recovered = job("lawyer", @lawyer, criteria, run: run_for(@date, slot: 2))
       assert_equal "succeeded", worker.run_once.fetch("state")
       assert_nil worker.run_once
       assert_equal 8, requests.length
@@ -494,7 +568,11 @@ class RunnerIntegrationTest < Minitest::Test
       assert_equal "running", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [id])
       assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_failures WHERE job_id = $1", [id])
       assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
-      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      allow_retry(id)
+      assert_equal "succeeded", worker.run_once.fetch("state")
     ensure
       processing&.kill
       processing&.join
@@ -525,7 +603,11 @@ class RunnerIntegrationTest < Minitest::Test
       assert_equal "running", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [id])
       assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
       expire_lease(id)
-      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      allow_retry(id)
+      assert_equal "succeeded", worker.run_once.fetch("state")
       assert_equal 2, requests.length
     ensure
       processing&.kill
@@ -558,6 +640,17 @@ class RunnerIntegrationTest < Minitest::Test
     assert_empty stderr
   end
 
+  def test_cli_does_not_mark_future_work_as_failed
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date + 1))
+    stdout, _stderr, status = Open3.capture3(RbConfig.ruby, File.expand_path("../bin/processador", __dir__), id)
+    assert_equal 1, status.exitstatus
+    assert_empty stdout
+    assert_equal "pending", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [id])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_failures WHERE job_id = $1", [id])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_events WHERE job_id = $1", [id])
+    assert_nil @admin.exec_params("SELECT claim_digest FROM public.collection_job_executions WHERE job_id = $1", [id]).getvalue(0, 0)
+  end
+
   def test_cli_missing_configuration_exits_unsuccessfully_instead_of_waiting
     stdout, stderr, status = Open3.capture3({ "PROCESSADOR_DATABASE_URL" => nil },
       RbConfig.ruby, File.expand_path("../bin/processador", __dir__))
@@ -575,6 +668,10 @@ class RunnerIntegrationTest < Minitest::Test
 
   def expire_lease(id)
     @admin.exec_params("UPDATE public.collection_job_executions SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE job_id = $1", [id])
+  end
+
+  def allow_retry(id)
+    @admin.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp() - interval '1 second' WHERE job_id = $1", [id])
   end
 
   def scalar(sql, params = [])

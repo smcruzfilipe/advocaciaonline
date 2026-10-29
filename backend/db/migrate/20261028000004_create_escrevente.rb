@@ -117,6 +117,14 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           OR (execution.claim_digest IS NOT NULL AND execution.lease_expires_at > clock_timestamp()) THEN
           RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
         END IF;
+        IF EXISTS (
+          SELECT 1 FROM public.collection_jobs AS job
+          JOIN public.collection_runs AS run ON run.id = job.run_id
+          WHERE job.id = execution.job_id
+            AND run.collection_date > (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+        ) THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
         -- Two independently generated UUID v4 values supply 244 random bits.
         -- Only their SHA-256 digest is persisted; no extension or client secret is required.
         token := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
@@ -145,6 +153,8 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
             AND run.collection_date <= (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
             AND execution.state IN ('pending', 'running')
             AND (execution.claim_digest IS NULL OR execution.lease_expires_at <= clock_timestamp())
+            AND (run.collection_date < (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+              OR execution.next_attempt_at IS NULL OR execution.next_attempt_at <= clock_timestamp())
           ORDER BY run.collection_date, run.slot, execution.job_id
           LIMIT 1 FOR UPDATE OF execution SKIP LOCKED;
         IF NOT FOUND THEN
@@ -394,6 +404,21 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         RETURN job_data;
       END $fn$;
 
+      CREATE FUNCTION app_private.processor_release(p_job_id uuid, p_token text)
+      RETURNS void
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      DECLARE job_data jsonb;
+      BEGIN
+        job_data := app_private.processor_job(p_job_id, p_token);
+        IF job_data->>'state' <> 'running'
+          OR (job_data->>'attempt_in_flight')::boolean IS TRUE
+          OR job_data->>'next_attempt_at' IS NULL THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
+        UPDATE public.collection_job_executions SET claim_digest = NULL, lease_expires_at = NULL,
+          updated_at = clock_timestamp() WHERE job_id = p_job_id;
+      END $fn$;
+
       CREATE FUNCTION app_private.processor_attempt_begin(p_job_id uuid, p_token text, p_limit integer)
       RETURNS jsonb
       LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
@@ -560,8 +585,13 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           VALUES (p_job_id, trusted_tenant, p_source_path, matched_count, pending_count);
         UPDATE public.collection_job_executions SET attempt_in_flight = false,
           next_attempt_at = NULL, updated_at = clock_timestamp() WHERE job_id = p_job_id;
-        -- This rechecks the wall clock lease after any advisory-lock wait and all
-        -- inserts. Expiry or event failure rolls back publications, links and result.
+        -- Recheck both the date and lease after advisory-lock waits and inserts.
+        -- A changed date must roll back all partial publications and results.
+        IF (SELECT run.collection_date FROM public.collection_jobs AS job
+          JOIN public.collection_runs AS run ON run.id = job.run_id WHERE job.id = p_job_id)
+          <> (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
         PERFORM app_private.processor_finish(p_job_id, p_token);
         RETURN jsonb_build_object('state', 'succeeded', 'source_path', p_source_path,
           'matched_count', matched_count, 'pending_identity_count', pending_count);
@@ -594,13 +624,13 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         app_private.processor_commit(uuid,text,text,jsonb), app_private.processor_record_failure(uuid,text,text),
         app_private.processor_attempt_begin(uuid,text,integer),
         app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer),
-        app_private.processor_defer(uuid,text,integer)
+        app_private.processor_defer(uuid,text,integer), app_private.processor_release(uuid,text)
         FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       GRANT EXECUTE ON FUNCTION app_private.processor_job(uuid,text),
         app_private.processor_commit(uuid,text,text,jsonb), app_private.processor_record_failure(uuid,text,text),
         app_private.processor_attempt_begin(uuid,text,integer),
         app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer),
-        app_private.processor_defer(uuid,text,integer)
+        app_private.processor_defer(uuid,text,integer), app_private.processor_release(uuid,text)
         TO advocacia_processador;
 
       -- SECURITY INVOKER is intentional: every source row is protected by the
