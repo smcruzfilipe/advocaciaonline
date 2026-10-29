@@ -30,6 +30,8 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
       t.boolean :attempt_in_flight, null: false, default: false
       t.timestamptz :attempt_started_at
       t.timestamptz :next_attempt_at
+      t.timestamptz :caderno_retry_after
+      t.timestamptz :fallback_retry_after
     end
     add_index :collection_job_executions, [:tenant_id, :state, :job_id], name: "tenant_collection_execution_state"
     add_index :collection_job_executions, :lease_expires_at, where: "claim_digest IS NOT NULL",
@@ -131,6 +133,63 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         RETURN NEXT;
       END $fn$;
 
+      CREATE FUNCTION app_private.processor_claim_available(p_job_id uuid)
+      RETURNS TABLE(token text, expires_at timestamptz, state text)
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM public.collection_jobs AS job
+          JOIN public.collection_runs AS run ON run.id = job.run_id
+          WHERE job.id = p_job_id
+            AND run.collection_date > (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+        ) THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
+        RETURN QUERY SELECT claim.token, claim.expires_at, claim.state
+          FROM app_private.processor_claim(p_job_id) AS claim;
+      END $fn$;
+
+      CREATE FUNCTION app_private.processor_next(p_limit integer)
+      RETURNS TABLE(job_id uuid, token text, state text)
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      DECLARE next_job_id uuid;
+      BEGIN
+        IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 3 THEN
+          RAISE EXCEPTION 'Invalid processor configuration' USING ERRCODE = '22023';
+        END IF;
+        SELECT execution.job_id INTO next_job_id
+          FROM public.collection_job_executions AS execution
+          JOIN public.collection_jobs AS job
+            ON job.id = execution.job_id AND job.tenant_id = execution.tenant_id
+          JOIN public.collection_runs AS run ON run.id = job.run_id
+          WHERE run.status = 'planned'
+            AND run.collection_date <= (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+            AND execution.state IN ('pending', 'running')
+            AND (execution.claim_digest IS NULL OR execution.lease_expires_at <= clock_timestamp())
+            AND (run.collection_date < (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+              OR (execution.phase = 'fallback' AND execution.fallback_attempts >= p_limit)
+              OR execution.next_attempt_at IS NULL OR execution.next_attempt_at <= clock_timestamp())
+            AND (run.collection_date < (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+              OR (execution.phase = 'fallback' AND execution.fallback_attempts >= p_limit) OR NOT EXISTS (
+              SELECT 1 FROM public.collection_job_executions AS other
+              JOIN public.collection_jobs AS other_job ON other_job.id = other.job_id
+              JOIN public.collection_runs AS other_run ON other_run.id = other_job.run_id
+              WHERE other_run.collection_date = run.collection_date
+                AND other_job.court = job.court AND other_job.medium = job.medium
+                AND CASE WHEN execution.phase = 'caderno' THEN other.caderno_retry_after
+                  ELSE other.fallback_retry_after END > clock_timestamp()
+            ))
+          ORDER BY run.collection_date, run.slot, execution.job_id
+          LIMIT 1 FOR UPDATE OF execution SKIP LOCKED;
+        IF NOT FOUND THEN
+          RETURN;
+        END IF;
+        -- The row remains locked until this transaction commits. Reuse the
+        -- claim generator without exposing tenant data or releasing that lock.
+        RETURN QUERY SELECT next_job_id, claim.token, claim.state
+          FROM app_private.processor_claim(next_job_id) AS claim;
+      END $fn$;
+
       CREATE FUNCTION app_private.processor_renew(p_job_id uuid, p_token text)
       RETURNS TABLE(expires_at timestamptz)
       LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
@@ -224,12 +283,14 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         RETURN QUERY SELECT 'failed'::text;
       END $fn$;
 
-      REVOKE ALL ON FUNCTION app_private.processor_claim(uuid), app_private.processor_renew(uuid,text),
-        app_private.processor_start(uuid,text), app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
+      REVOKE ALL ON FUNCTION app_private.processor_next(integer), app_private.processor_claim(uuid), app_private.processor_claim_available(uuid),
+        app_private.processor_renew(uuid,text), app_private.processor_start(uuid,text),
+        app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
         FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       GRANT USAGE ON SCHEMA app_private TO advocacia_processador;
-      GRANT EXECUTE ON FUNCTION app_private.processor_claim(uuid), app_private.processor_renew(uuid,text),
-        app_private.processor_start(uuid,text), app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
+      GRANT EXECUTE ON FUNCTION app_private.processor_next(integer), app_private.processor_claim(uuid), app_private.processor_claim_available(uuid),
+        app_private.processor_renew(uuid,text), app_private.processor_start(uuid,text),
+        app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
         TO advocacia_processador;
     SQL
 
@@ -308,8 +369,8 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         ADD CONSTRAINT collection_failure_job_same_tenant FOREIGN KEY (tenant_id, job_id)
           REFERENCES public.collection_jobs (tenant_id, id);
 
-      -- Only migration-owned definers may read a claimed job without a human
-      -- session. Every entry point proves the claim before returning its data.
+      -- Only migration-owned definers may read a job without a human session.
+      -- Selection returns its ID and lease proof; tenant data requires that proof.
       CREATE POLICY processor_owner_read ON public.collection_jobs
         FOR SELECT TO advocacia_migrator USING (true);
       CREATE POLICY processor_owner_read ON public.collection_runs
@@ -367,12 +428,44 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         RETURN job_data;
       END $fn$;
 
+      CREATE FUNCTION app_private.processor_source_deadline(p_job_id uuid, p_token text)
+      RETURNS timestamptz
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      DECLARE job_data jsonb; deadline timestamptz;
+      BEGIN
+        job_data := app_private.processor_job(p_job_id, p_token);
+        SELECT max(CASE WHEN job_data->>'phase' = 'caderno' THEN other.caderno_retry_after
+          ELSE other.fallback_retry_after END) INTO deadline
+          FROM public.collection_job_executions AS other
+          JOIN public.collection_jobs AS other_job ON other_job.id = other.job_id
+          JOIN public.collection_runs AS other_run ON other_run.id = other_job.run_id
+          WHERE other_run.collection_date = (job_data->>'collection_date')::date
+            AND other_job.court = job_data->>'court' AND other_job.medium = job_data->>'medium';
+        RETURN deadline;
+      END $fn$;
+
+      CREATE FUNCTION app_private.processor_release(p_job_id uuid, p_token text)
+      RETURNS void
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      DECLARE job_data jsonb;
+      BEGIN
+        job_data := app_private.processor_job(p_job_id, p_token);
+        IF job_data->>'state' <> 'running'
+          OR (job_data->>'attempt_in_flight')::boolean IS TRUE
+          OR job_data->>'next_attempt_at' IS NULL THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
+        UPDATE public.collection_job_executions SET claim_digest = NULL, lease_expires_at = NULL,
+          updated_at = clock_timestamp() WHERE job_id = p_job_id;
+      END $fn$;
+
       CREATE FUNCTION app_private.processor_attempt_begin(p_job_id uuid, p_token text, p_limit integer)
       RETURNS jsonb
       LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
       DECLARE
         job_data jsonb;
         execution public.collection_job_executions%ROWTYPE;
+        source_deadline timestamptz;
       BEGIN
         job_data := app_private.processor_job(p_job_id, p_token);
         IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 3 THEN
@@ -385,6 +478,14 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           OR (execution.phase = 'caderno' AND execution.caderno_attempts >= p_limit)
           OR (execution.phase = 'fallback' AND execution.fallback_attempts >= p_limit) THEN
           RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
+        source_deadline := app_private.processor_source_deadline(p_job_id, p_token);
+        IF source_deadline > clock_timestamp() THEN
+          UPDATE public.collection_job_executions SET next_attempt_at = source_deadline,
+            updated_at = clock_timestamp() WHERE job_id = p_job_id;
+          RETURN (app_private.processor_job(p_job_id, p_token)
+            - ARRAY['criteria', 'tenant_id', 'entity_type', 'entity_id', 'court', 'medium', 'source', 'run_id', 'collection_date'])
+            || jsonb_build_object('deferred', true);
         END IF;
         UPDATE public.collection_job_executions SET
           caderno_attempts = caderno_attempts + CASE WHEN phase = 'caderno' THEN 1 ELSE 0 END,
@@ -410,6 +511,10 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         END IF;
         UPDATE public.collection_job_executions SET
           next_attempt_at = GREATEST(next_attempt_at, clock_timestamp() + make_interval(secs => p_seconds)),
+          caderno_retry_after = CASE WHEN phase = 'caderno'
+            THEN GREATEST(caderno_retry_after, clock_timestamp() + make_interval(secs => p_seconds)) ELSE caderno_retry_after END,
+          fallback_retry_after = CASE WHEN phase = 'fallback'
+            THEN GREATEST(fallback_retry_after, clock_timestamp() + make_interval(secs => p_seconds)) ELSE fallback_retry_after END,
           updated_at = clock_timestamp() WHERE job_id = p_job_id RETURNING next_attempt_at INTO deadline;
         RETURN deadline;
       END $fn$;
@@ -533,8 +638,13 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           VALUES (p_job_id, trusted_tenant, p_source_path, matched_count, pending_count);
         UPDATE public.collection_job_executions SET attempt_in_flight = false,
           next_attempt_at = NULL, updated_at = clock_timestamp() WHERE job_id = p_job_id;
-        -- This rechecks the wall clock lease after any advisory-lock wait and all
-        -- inserts. Expiry or event failure rolls back publications, links and result.
+        -- Recheck both the date and lease after advisory-lock waits and inserts.
+        -- A changed date must roll back all partial publications and results.
+        IF (SELECT run.collection_date FROM public.collection_jobs AS job
+          JOIN public.collection_runs AS run ON run.id = job.run_id WHERE job.id = p_job_id)
+          <> (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
         PERFORM app_private.processor_finish(p_job_id, p_token);
         RETURN jsonb_build_object('state', 'succeeded', 'source_path', p_source_path,
           'matched_count', matched_count, 'pending_identity_count', pending_count);
@@ -567,13 +677,15 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         app_private.processor_commit(uuid,text,text,jsonb), app_private.processor_record_failure(uuid,text,text),
         app_private.processor_attempt_begin(uuid,text,integer),
         app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer),
-        app_private.processor_defer(uuid,text,integer)
+        app_private.processor_defer(uuid,text,integer), app_private.processor_release(uuid,text),
+        app_private.processor_source_deadline(uuid,text)
         FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       GRANT EXECUTE ON FUNCTION app_private.processor_job(uuid,text),
         app_private.processor_commit(uuid,text,text,jsonb), app_private.processor_record_failure(uuid,text,text),
         app_private.processor_attempt_begin(uuid,text,integer),
         app_private.processor_attempt_failed(uuid,text,integer,integer,integer,integer),
-        app_private.processor_defer(uuid,text,integer)
+        app_private.processor_defer(uuid,text,integer), app_private.processor_release(uuid,text),
+        app_private.processor_source_deadline(uuid,text)
         TO advocacia_processador;
 
       -- SECURITY INVOKER is intentional: every source row is protected by the

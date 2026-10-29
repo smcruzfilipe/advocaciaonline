@@ -3,15 +3,24 @@ require "digest"
 require "json"
 require "pg"
 require "stringio"
+require "open3"
+require "rbconfig"
+require "timeout"
 require "zip"
 require_relative "fallback_test"
 require_relative "../lib/processador/runner"
+require_relative "../lib/processador/worker"
 
 class RunnerIntegrationTest < Minitest::Test
   include ControlledDjen
 
   def setup
     @admin = PG.connect(ENV.fetch("PROCESSADOR_TEST_ADMIN_DATABASE_URL"))
+    # Rails and ETL share the integration database. Keep pre-existing work
+    # intact but locked out of this test's global SKIP LOCKED selection.
+    @queue_guard = PG.connect(ENV.fetch("PROCESSADOR_TEST_ADMIN_DATABASE_URL"))
+    @queue_guard.exec("BEGIN")
+    @queue_guard.exec("SELECT job_id FROM public.collection_job_executions FOR UPDATE")
     @date = Processador::Runner::TIMEZONE.now.to_date
     @tenant = scalar("INSERT INTO public.tenants (created_at, updated_at) VALUES (now(), now()) RETURNING id")
     @admin.transaction do
@@ -34,6 +43,8 @@ class RunnerIntegrationTest < Minitest::Test
     @created_runs&.each { |run| @admin.exec_params("DELETE FROM public.collection_runs WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM public.collection_run_audiences WHERE run_id = $1)", [run]) }
   ensure
     @admin&.close
+    @queue_guard&.exec("ROLLBACK")
+    @queue_guard&.close
   end
 
   def test_caderno_matches_three_entities_and_preserves_the_publication_with_all_links
@@ -230,7 +241,498 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal "Texto da API & parte", JSON.parse(scalar("SELECT payload::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])).fetch("texto")
   end
 
+  def test_claimed_runner_uses_the_selected_lease_without_claiming_again
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    claim = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      processor.exec("SELECT * FROM app_private.processor_next(3)").first
+    end
+    assert_equal id, claim.fetch("job_id")
+    with_server([{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]) do |origin, requests|
+      assert_equal "succeeded", runner(origin).call_claimed(id, claim.fetch("token"), claim.fetch("state")).fetch("state")
+      assert_equal 1, requests.length
+    end
+    assert_equal "1", scalar("SELECT count(*)::text FROM public.collection_events WHERE job_id = $1 AND event_type = 'completed'", [id])
+  end
+
+  def test_worker_automatically_processes_both_slots_and_keeps_the_original_publication_and_links
+    first = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    second = job("party", @party, { "name" => "Parte Exemplo" }, run: run_for(@date, slot: 2))
+    item = publication(601).merge("texto" => "<p>Intimação original</p>", "destinatarios" => [{ "nome" => "Parte Exemplo" }])
+    zip = zip_with([item])
+    output = StringIO.new
+    responses = []
+    with_server(responses) do |origin, requests|
+      responses.concat([
+        { body: JSON.generate("status" => "Processado", "url" => "#{origin}/caderno.zip",
+          "hash" => Digest::SHA256.hexdigest(zip), "numero_paginas" => 2, "total_comunicacoes" => 1) },
+        { body: zip }, page([item.merge("texto" => "Versão posterior")]), page([])
+      ])
+      worker = worker_for(origin, output: output)
+      assert_equal "caderno", worker.run_once.fetch("source_path")
+      assert_equal "fallback", worker.run_once.fetch("source_path")
+      assert_nil worker.run_once
+      assert_equal 4, requests.length
+    end
+    assert_equal %w[succeeded succeeded], output.string.lines.map { |line| JSON.parse(line).fetch("state") }
+    assert_equal item.fetch("texto"), JSON.parse(scalar("SELECT payload::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])).fetch("texto")
+    assert_equal [first, second].sort, @admin.exec_params("SELECT job_id FROM public.collection_communication_links WHERE tenant_id = $1", [@tenant]).column_values(0).sort
+  end
+
+  def test_two_workers_consume_different_jobs_without_duplicate_results_or_events
+    ids = [job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }),
+      job("party", @party, { "name" => "Parte Exemplo" })]
+    responses = Array.new(2) { { body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) } }
+    with_server(responses) do |origin, requests|
+      start = Queue.new
+      workers = 2.times.map do
+        Thread.new { start.pop; worker_for(origin).run_once }
+      end
+      workers.each { |thread| thread.report_on_exception = false }
+      2.times { start << true }
+      assert_equal %w[succeeded succeeded], workers.map { |thread| thread.value.fetch("state") }
+      assert_equal 2, requests.length
+      assert_nil worker_for(origin).run_once
+    ensure
+      workers&.each { |thread| thread.kill; thread.join }
+    end
+    ids.each do |id|
+      assert_equal "1", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
+      assert_equal %w[completed started], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1 ORDER BY event_type", [id]).column_values(0)
+    end
+  end
+
+  def test_worker_interrupts_old_work_but_leaves_future_jobs_and_active_leases_untouched
+    old = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date - 1))
+    @admin.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp() + interval '1 day' WHERE job_id = $1", [old])
+    future = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date + 1))
+    active = job("party", @party, { "name" => "Parte Exemplo" })
+    PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      processor.exec_params("SELECT * FROM app_private.processor_claim($1::uuid)", [active])
+    end
+    with_server([]) do |origin, requests|
+      worker = worker_for(origin)
+      assert_equal "interrupted", worker.run_once.fetch("code")
+      assert_nil worker.run_once
+      assert_empty requests
+    end
+    assert_equal "interrupted", scalar("SELECT code FROM public.collection_job_failures WHERE job_id = $1", [old])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_events WHERE job_id = $1", [old])
+    [future, active].each do |id|
+      assert_equal "pending", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [id])
+      assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_failures WHERE job_id = $1", [id])
+    end
+  end
+
+  def test_worker_interrupts_an_abandoned_previous_day_attempt_without_retrying_the_source
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date - 1))
+    PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      token = processor.exec_params("SELECT token FROM app_private.processor_claim($1::uuid)", [id]).getvalue(0, 0)
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, token])
+      # Simulate a request that started before midnight; the public function
+      # correctly refuses to begin a new attempt for yesterday.
+      @admin.exec_params(<<~SQL, [id])
+        UPDATE public.collection_job_executions SET caderno_attempts = 1,
+          attempt_in_flight = true, attempt_started_at = clock_timestamp() - interval '1 day'
+        WHERE job_id = $1
+      SQL
+    end
+    expire_lease(id)
+    with_server([]) do |origin, requests|
+      assert_equal "interrupted", worker_for(origin).run_once.fetch("code")
+      assert_empty requests
+    end
+    assert_equal "1", scalar("SELECT caderno_attempts::text FROM public.collection_job_executions WHERE job_id = $1", [id])
+    assert_equal ["started"], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1", [id]).column_values(0)
+  end
+  def test_commit_rolls_back_if_collection_date_changes_during_tenant_lock_wait
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    token = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      claim = processor.exec_params("SELECT token FROM app_private.processor_claim($1::uuid)", [id]).getvalue(0, 0)
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, claim])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 3)", [id, claim])
+      claim
+    end
+    old_date = @date - 10_000
+    old_date -= 1 until scalar("SELECT count(*)::text FROM public.collection_runs WHERE collection_date = $1 AND slot = 1", [old_date]) == "0"
+    pids = Queue.new
+    @admin.exec("BEGIN")
+    @admin.exec_params("SELECT pg_advisory_xact_lock(hashtextextended('processor:' || $1::text, 0))", [@tenant])
+    processing = Thread.new do
+      PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+        pids << processor.backend_pid
+        begin
+          processor.exec_params("SELECT app_private.processor_commit($1::uuid, $2::text, 'caderno', $3::jsonb)",
+            [id, token, JSON.generate([publication(604)])])
+        rescue PG::Error => error
+          error
+        end
+      end
+    end
+    processing.report_on_exception = false
+    pid = Timeout.timeout(5) { pids.pop }
+    Timeout.timeout(5) do
+      sleep(0.01) until @admin.exec_params("SELECT $1::integer = ANY(pg_blocking_pids($2::integer))",
+        [@admin.backend_pid, pid]).getvalue(0, 0) == "t"
+    end
+    @admin.exec_params("UPDATE public.collection_runs SET collection_date = $1 WHERE id = $2", [old_date, @run])
+    @admin.exec("COMMIT")
+    assert_kind_of PG::InvalidAuthorizationSpecification, Timeout.timeout(5) { processing.value }
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
+    assert_equal ["started"], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1", [id]).column_values(0)
+  ensure
+    @admin.exec("ROLLBACK") if @admin && @admin.transaction_status != PG::PQTRANS_IDLE
+    processing&.kill if processing&.alive?
+    processing&.join
+    @admin.exec_params("UPDATE public.collection_runs SET collection_date = $1 WHERE id = $2", [@date, @run]) if @admin && @date && @run
+  end
+
+
+  def test_worker_resumes_an_abandoned_current_day_attempt_after_restart
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      claim = processor.exec("SELECT * FROM app_private.processor_next(3)").first
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, claim.fetch("token")])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 3)", [id, claim.fetch("token")])
+    end
+    expire_lease(id)
+    with_server([{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]) do |origin, requests|
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      assert_empty requests
+      allow_retry(id)
+      assert_equal "succeeded", worker.run_once.fetch("state")
+      assert_equal 1, requests.length
+    end
+    assert_equal "2", scalar("SELECT caderno_attempts::text FROM public.collection_job_executions WHERE job_id = $1", [id])
+    assert_equal %w[completed started], @admin.exec_params("SELECT event_type FROM public.collection_events WHERE job_id = $1 ORDER BY event_type", [id]).column_values(0)
+  end
+
+  def test_worker_preserves_exhaustion_when_restarting_an_abandoned_last_fallback_attempt
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      token = processor.exec("SELECT * FROM app_private.processor_next(1)").first.fetch("token")
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, token])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 1)", [id, token])
+      processor.exec_params("SELECT app_private.processor_attempt_failed($1::uuid, $2::text, 0, 1, 1, 1)", [id, token])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 1)", [id, token])
+    end
+    expire_lease(id)
+    with_server([]) do |origin, requests|
+      assert_equal "source_unavailable", worker_for(origin, attempts: 1).run_once.fetch("code")
+      assert_empty requests
+    end
+    assert_equal "1", scalar("SELECT fallback_attempts::text FROM public.collection_job_executions WHERE job_id = $1", [id])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
+  end
+
+  def test_exhausted_fallback_finishes_even_when_source_retry_window_is_open
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date, slot: 2))
+    PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      token = processor.exec_params("SELECT token FROM app_private.processor_claim($1::uuid)", [id]).getvalue(0, 0)
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, token])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 1)", [id, token])
+      processor.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, 3600)", [id, token])
+      processor.exec_params("SELECT app_private.processor_attempt_failed($1::uuid, $2::text, 3600, 1, 1, 1)", [id, token])
+    end
+    expire_lease(id)
+    with_server([]) do |origin, requests|
+      assert_equal "source_unavailable", worker_for(origin, attempts: 1).run_once.fetch("code")
+      assert_empty requests
+    end
+    assert_equal "source_unavailable", scalar("SELECT code FROM public.collection_job_failures WHERE job_id = $1", [id])
+  end
+
+  def test_expired_selected_lease_never_contacts_the_source_and_is_recovered_by_the_next_worker
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    claim = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) { |processor| processor.exec("SELECT * FROM app_private.processor_next(3)").first }
+    expire_lease(id)
+    with_server([{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]) do |origin, requests|
+      assert_raises(Processador::Runner::LeaseLost) { runner(origin).call_claimed(id, claim.fetch("token"), claim.fetch("state")) }
+      assert_empty requests
+      assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_failures WHERE job_id = $1", [id])
+      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+    end
+  end
+
+  def test_worker_keeps_consuming_after_real_source_failure
+    failed = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    succeeded = job("party", @party, { "name" => "Parte Exemplo" }, run: run_for(@date, slot: 2))
+    responses = [{ body: JSON.generate("status" => "Cancelado") }, { status: 503 }, page([])]
+    output = StringIO.new
+    with_server(responses) do |origin, requests|
+      worker = worker_for(origin, attempts: 1, output: output)
+      assert_equal "source_unavailable", worker.run_once.fetch("code")
+      assert_equal "succeeded", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      assert_equal 3, requests.length
+    end
+    assert_equal %w[failed succeeded], output.string.lines.map { |line| JSON.parse(line).fetch("state") }
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [failed])
+    assert_equal "0", scalar("SELECT matched_count::text FROM public.collection_job_results WHERE job_id = $1", [succeeded])
+  end
+
+  def test_worker_runs_other_jobs_while_a_retry_after_waits
+    waiting = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    other = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date, slot: 2))
+    responses = [{ status: 503, headers: { "Retry-After" => "3600" } }, page([])]
+    with_server(responses) do |origin, requests|
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_equal "succeeded", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      assert_equal 2, requests.length
+    end
+    row = @admin.exec_params(<<~SQL, [waiting]).first
+      SELECT state, claim_digest, caderno_attempts, next_attempt_at > clock_timestamp() AS waiting
+      FROM public.collection_job_executions WHERE job_id = $1
+    SQL
+    assert_equal({ "state" => "running", "claim_digest" => nil, "caderno_attempts" => "1", "waiting" => "t" }, row)
+    assert_equal "succeeded", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [other])
+  end
+
+  def test_retry_after_blocks_the_same_source_across_workers_without_blocking_forever
+    ids = [
+      job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }),
+      job("party", @party, { "name" => "Parte Exemplo" })
+    ]
+    empty = { body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }
+    with_server([{ status: 503, headers: { "Retry-After" => "3600" } }, empty, empty]) do |origin, requests|
+      assert_equal "deferred", worker_for(origin).run_once.fetch("state")
+      assert_nil worker_for(origin).run_once
+      assert_equal 1, requests.length
+      waiting = scalar("SELECT job_id FROM public.collection_job_executions WHERE job_id = ANY($1::uuid[]) AND caderno_attempts = 1", ["{#{ids.join(',')}}"])
+      allow_retry(waiting)
+      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      assert_equal 3, requests.length
+    end
+  end
+
+  def test_active_pagination_honors_retry_after_received_by_another_worker
+    run = run_for(@date, slot: 2)
+    other = job("party", @party, { "name" => "Parte Exemplo" }, run: run)
+    job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run)
+    token = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      claim = processor.exec_params("SELECT token FROM app_private.processor_claim($1::uuid)", [other]).getvalue(0, 0)
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [other, claim])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 3)", [other, claim])
+      claim
+    end
+    first_at = second_at = nil
+    first = page([publication(605)]).merge(on_request: -> {
+      PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+        processor.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, 1)", [other, token])
+      end
+      first_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    })
+    last = page([]).merge(on_request: -> { second_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) })
+    with_server([first, last]) do |origin, requests|
+      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      assert_equal 2, requests.length
+      assert_operator second_at - first_at, :>=, 0.9
+    end
+  end
+
+  def test_later_slot_recovers_the_same_lawyer_after_exhaustion_without_historical_collection
+    criteria = { "name" => LAWYER_NAME, "oabs" => [] }
+    failed = job("lawyer", @lawyer, criteria)
+    recovered = nil
+    item = publication(603).merge("texto" => "<p>Publicação &amp; recuperação</p><script>remover</script>")
+    responses = Array.new(3) { { body: JSON.generate("status" => "Cancelado") } } +
+      Array.new(3) { { status: 503 } } + [page([item]), page([])]
+
+    with_server(responses) do |origin, requests|
+      worker = worker_for(origin)
+      4.times do
+        assert_equal "deferred", worker.run_once.fetch("state")
+        assert_nil worker.run_once
+        allow_retry(failed)
+      end
+      assert_equal "source_unavailable", worker.run_once.fetch("code")
+      recovered = job("lawyer", @lawyer, criteria, run: run_for(@date, slot: 2))
+      assert_equal "succeeded", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      assert_equal 8, requests.length
+      assert requests.first(3).all? { |request| request[:target].include?("/caderno/TJAC/#{@date.iso8601}/D") }
+      requests.drop(3).each do |request|
+        params = URI.decode_www_form(URI.parse(request.fetch(:target)).query).to_h
+        assert_equal @date.iso8601, params.fetch("dataDisponibilizacaoInicio")
+        assert_equal @date.iso8601, params.fetch("dataDisponibilizacaoFim")
+        assert_equal "D", params.fetch("meio")
+      end
+    end
+    assert_equal "source_unavailable", scalar("SELECT code FROM public.collection_job_failures WHERE job_id = $1", [failed])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [failed])
+    assert_equal "1", scalar("SELECT matched_count::text FROM public.collection_job_results WHERE job_id = $1", [recovered])
+    assert_equal "1", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
+    assert_equal [recovered], @admin.exec_params("SELECT job_id FROM public.collection_communication_links WHERE tenant_id = $1", [@tenant]).column_values(0)
+    assert_equal "Publicação & recuperação", JSON.parse(scalar("SELECT payload::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])).fetch("texto")
+    attempts = @admin.exec_params("SELECT caderno_attempts, fallback_attempts FROM public.collection_job_executions WHERE job_id = $1", [failed]).first
+    assert_equal({ "caderno_attempts" => "3", "fallback_attempts" => "3" }, attempts)
+  end
+
+  def test_worker_records_real_database_processing_failure_and_continues_without_partial_results
+    failed = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    succeeded = job("party", @party, { "name" => "Parte Exemplo" }, run: run_for(@date, slot: 2))
+    zip = zip_with([publication(602).merge("campo_desconhecido" => "\u0000")])
+    responses = []
+    with_server(responses) do |origin, requests|
+      responses.concat([
+        { body: JSON.generate("status" => "Processado", "url" => "#{origin}/caderno.zip",
+          "hash" => Digest::SHA256.hexdigest(zip), "numero_paginas" => 2, "total_comunicacoes" => 1) },
+        { body: zip }, page([])
+      ])
+      worker = worker_for(origin)
+      assert_equal "processing_failed", worker.run_once.fetch("code")
+      assert_equal "succeeded", worker.run_once.fetch("state")
+      assert_equal 3, requests.length
+    end
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [failed])
+    assert_equal "succeeded", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [succeeded])
+  end
+
+  def test_continuous_worker_waits_between_real_empty_selections
+    waits = []
+    stop = Class.new(StandardError)
+    sleeper = ->(seconds) { waits << seconds; raise stop if waits.length == 2 }
+    worker = Processador::Worker.new(database_url: ENV.fetch("PROCESSADOR_DATABASE_URL"),
+      output: StringIO.new, errors: StringIO.new, sleeper: sleeper)
+    assert_raises(stop) { worker.run }
+    assert_equal [5, 5], waits
+  end
+
+  def test_worker_does_not_swallow_fatal_connection_errors
+    settings = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) { |processor| processor.conninfo_hash.reject { |_key, value| value.nil? || value.empty? } }
+    settings["dbname"] = "nonexistent_processor_database_#{Process.pid}"
+    worker = Processador::Worker.new(database_url: settings, output: StringIO.new, errors: StringIO.new)
+    assert_raises(PG::ConnectionBad) { worker.run }
+  end
+
+  def test_worker_losing_its_lease_during_processing_does_not_commit_or_fail_the_job
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    errors = StringIO.new
+    output = StringIO.new
+    responses = [{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0), delay: 0.3 },
+      { body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]
+    with_server(responses) do |origin, requests|
+      processing = Thread.new { worker_for(origin, output: output, errors: errors).run_once }
+      processing.report_on_exception = false
+      Timeout.timeout(5) { sleep(0.01) until requests.length == 1 }
+      expire_lease(id)
+      assert_nil processing.value
+      assert_empty output.string
+      assert_includes errors.string, "Processador::Runner::LeaseLost"
+      assert_equal "running", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [id])
+      assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_failures WHERE job_id = $1", [id])
+      assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      allow_retry(id)
+      assert_equal "succeeded", worker.run_once.fetch("state")
+    ensure
+      processing&.kill
+      processing&.join
+    end
+  end
+
+  def test_worker_connection_loss_is_fatal_and_a_new_worker_recovers_the_abandoned_job
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    settings = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) { |processor| processor.conninfo_hash.reject { |_key, value| value.nil? || value.empty? } }
+    settings["application_name"] = "processor_disconnect_#{Process.pid}"
+    responses = [{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0), delay: 0.3 },
+      { body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]
+    with_server(responses) do |origin, requests|
+      instance = Processador::Runner.new(database_url: settings, http: http_for(origin), base_url: "#{origin}/api/v1",
+        backoff_first: 1, backoff_second: 1)
+      worker = Processador::Worker.new(database_url: settings, runner: instance, output: StringIO.new, errors: StringIO.new)
+      processing = Thread.new do
+        worker.run_once
+      rescue PG::Error => error
+        error
+      end
+      processing.report_on_exception = false
+      Timeout.timeout(5) { sleep(0.01) until requests.length == 1 || !processing.alive? }
+      assert_equal 1, requests.length, "worker stopped before requesting source: #{processing.value.inspect unless processing.alive?}"
+      disconnected = @admin.exec_params("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = $1", [settings.fetch("application_name")])
+      assert_operator disconnected.ntuples, :>=, 1
+      assert_kind_of PG::Error, processing.value
+      assert_equal "running", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [id])
+      assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
+      expire_lease(id)
+      worker = worker_for(origin)
+      assert_equal "deferred", worker.run_once.fetch("state")
+      assert_nil worker.run_once
+      allow_retry(id)
+      assert_equal "succeeded", worker.run_once.fetch("state")
+      assert_equal 2, requests.length
+    ensure
+      processing&.kill
+      processing&.join
+    end
+    assert_equal "2", scalar("SELECT caderno_attempts::text FROM public.collection_job_executions WHERE job_id = $1", [id])
+  end
+
+  def test_cli_without_uuid_really_consumes_old_work_and_stays_running
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date - 1))
+    Open3.popen3(RbConfig.ruby, File.expand_path("../bin/processador", __dir__)) do |stdin, stdout, stderr, process|
+      stdin.close
+      result = JSON.parse(Timeout.timeout(10) { stdout.gets } || flunk("worker exited before processing: #{stderr.read}"))
+      assert_equal({ "state" => "failed", "code" => "interrupted" }, result)
+      assert process.alive?, "worker must stay available for the next scheduled job"
+      assert_equal "interrupted", scalar("SELECT code FROM public.collection_job_failures WHERE job_id = $1", [id])
+    ensure
+      if process&.alive?
+        Process.kill("TERM", process.pid)
+        process.value
+      end
+    end
+  end
+
+  def test_cli_still_accepts_an_explicit_job_uuid
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date - 1))
+    stdout, stderr, status = Open3.capture3(RbConfig.ruby, File.expand_path("../bin/processador", __dir__), id)
+    assert_equal({ "state" => "failed", "code" => "interrupted" }, JSON.parse(stdout))
+    assert_equal 1, status.exitstatus
+    assert_empty stderr
+  end
+
+  def test_cli_does_not_mark_future_work_as_failed
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date + 1))
+    stdout, _stderr, status = Open3.capture3(RbConfig.ruby, File.expand_path("../bin/processador", __dir__), id)
+    assert_equal 1, status.exitstatus
+    assert_empty stdout
+    assert_equal "pending", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [id])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_failures WHERE job_id = $1", [id])
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_events WHERE job_id = $1", [id])
+    assert_nil @admin.exec_params("SELECT claim_digest FROM public.collection_job_executions WHERE job_id = $1", [id]).getvalue(0, 0)
+  end
+
+  def test_cli_missing_configuration_exits_unsuccessfully_instead_of_waiting
+    stdout, stderr, status = Open3.capture3({ "PROCESSADOR_DATABASE_URL" => nil },
+      RbConfig.ruby, File.expand_path("../bin/processador", __dir__))
+    assert_equal 1, status.exitstatus
+    assert_empty stdout
+    assert_includes stderr, "PROCESSADOR_DATABASE_URL"
+  end
+
   private
+
+  def worker_for(origin, attempts: 3, output: StringIO.new, errors: StringIO.new)
+    Processador::Worker.new(database_url: ENV.fetch("PROCESSADOR_DATABASE_URL"),
+      runner: runner(origin, attempts: attempts), output: output, errors: errors)
+  end
+
+  def expire_lease(id)
+    @admin.exec_params("UPDATE public.collection_job_executions SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE job_id = $1", [id])
+  end
+
+  def allow_retry(id)
+    @admin.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp() - interval '1 second', caderno_retry_after = NULL, fallback_retry_after = NULL WHERE job_id = $1", [id])
+  end
 
   def scalar(sql, params = [])
     @admin.exec_params(sql, params).getvalue(0, 0)

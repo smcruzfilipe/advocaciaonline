@@ -29,6 +29,7 @@ COPY --link --from=dependencies --chown=1000:1000 /bundle /bundle
 COPY --link --chown=1000:1000 Gemfile Gemfile.lock ./
 COPY --link --chown=1000:1000 lib ./lib
 COPY --link --chown=1000:1000 test ./test
+COPY --link --chown=1000:1000 --chmod=0555 bin ./bin
 USER 1000:1000
 CMD ["bundle", "exec", "ruby", "-Itest", "-e", "Dir['test/*_test.rb'].sort.each { |file| require_relative file }"]
 
