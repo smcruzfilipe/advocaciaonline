@@ -475,6 +475,24 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal "succeeded", scalar("SELECT state FROM public.collection_job_executions WHERE job_id = $1", [other])
   end
 
+  def test_retry_after_blocks_the_same_source_across_workers_without_blocking_forever
+    ids = [
+      job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }),
+      job("party", @party, { "name" => "Parte Exemplo" })
+    ]
+    empty = { body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }
+    with_server([{ status: 503, headers: { "Retry-After" => "3600" } }, empty, empty]) do |origin, requests|
+      assert_equal "deferred", worker_for(origin).run_once.fetch("state")
+      assert_nil worker_for(origin).run_once
+      assert_equal 1, requests.length
+      waiting = scalar("SELECT job_id FROM public.collection_job_executions WHERE job_id = ANY($1::uuid[]) AND caderno_attempts = 1", ["{#{ids.join(',')}}"])
+      allow_retry(waiting)
+      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      assert_equal 3, requests.length
+    end
+  end
+
   def test_later_slot_recovers_the_same_lawyer_after_exhaustion_without_historical_collection
     criteria = { "name" => LAWYER_NAME, "oabs" => [] }
     failed = job("lawyer", @lawyer, criteria)
@@ -671,7 +689,7 @@ class RunnerIntegrationTest < Minitest::Test
   end
 
   def allow_retry(id)
-    @admin.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp() - interval '1 second' WHERE job_id = $1", [id])
+    @admin.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp() - interval '1 second', caderno_retry_after = NULL, fallback_retry_after = NULL WHERE job_id = $1", [id])
   end
 
   def scalar(sql, params = [])

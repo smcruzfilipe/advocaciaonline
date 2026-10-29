@@ -11,6 +11,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   TABLES = %w[collection_communications collection_communication_links collection_job_results collection_job_failures].freeze
   FUNCTIONS = {
     "processor_next()" => ["SELECT * FROM app_private.processor_next()", 0],
+    "processor_claim_available(uuid)" => ["SELECT * FROM app_private.processor_claim_available($1)", 1],
     "processor_job(uuid,text)" => ["SELECT app_private.processor_job($1, $2)", 2],
     "processor_commit(uuid,text,text,jsonb)" => ["SELECT app_private.processor_commit($1, $2, $3, $4::jsonb)", 4],
     "processor_record_failure(uuid,text,text)" => ["SELECT app_private.processor_record_failure($1, $2, $3)", 3],
@@ -41,6 +42,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   end
 
   teardown do
+    @migrator&.exec_params("UPDATE public.collection_job_executions SET caderno_retry_after = NULL, fallback_retry_after = NULL WHERE job_id = $1", [@job_a]) if @job_a
     [@processor, @runtime, @migrator, @despachante].each { |connection| connection&.close }
   end
 
@@ -162,7 +164,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
       assert_equal %w[pending pending running pending pending], selected.map { |job| job.fetch("state") }
       assert_empty next_jobs
       assert_equal "pending", processor_job(@job_b, active_proof).fetch("state")
-      assert_unavailable { claim(tomorrow) }
+      assert_unavailable { @processor.exec_params("SELECT * FROM app_private.processor_claim_available($1::uuid)", [tomorrow]) }
       assert_nil @migrator.exec_params("SELECT claim_digest FROM public.collection_job_executions WHERE job_id = $1",
         [tomorrow]).getvalue(0, 0)
       assert_equal "running", state(tomorrow_running)
@@ -882,7 +884,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   end
 
   def allow_retry(job)
-    @migrator.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp() WHERE job_id = $1", [job])
+    @migrator.exec_params("UPDATE public.collection_job_executions SET next_attempt_at = clock_timestamp(), caderno_retry_after = NULL, fallback_retry_after = NULL WHERE job_id = $1", [job])
   end
 
   def runtime_as(token)

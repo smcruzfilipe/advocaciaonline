@@ -30,6 +30,8 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
       t.boolean :attempt_in_flight, null: false, default: false
       t.timestamptz :attempt_started_at
       t.timestamptz :next_attempt_at
+      t.timestamptz :caderno_retry_after
+      t.timestamptz :fallback_retry_after
     end
     add_index :collection_job_executions, [:tenant_id, :state, :job_id], name: "tenant_collection_execution_state"
     add_index :collection_job_executions, :lease_expires_at, where: "claim_digest IS NOT NULL",
@@ -117,14 +119,6 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           OR (execution.claim_digest IS NOT NULL AND execution.lease_expires_at > clock_timestamp()) THEN
           RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
         END IF;
-        IF EXISTS (
-          SELECT 1 FROM public.collection_jobs AS job
-          JOIN public.collection_runs AS run ON run.id = job.run_id
-          WHERE job.id = execution.job_id
-            AND run.collection_date > (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
-        ) THEN
-          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
-        END IF;
         -- Two independently generated UUID v4 values supply 244 random bits.
         -- Only their SHA-256 digest is persisted; no extension or client secret is required.
         token := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
@@ -137,6 +131,22 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           lease_expires_at = expires_at, updated_at = clock_timestamp()
           WHERE job_id = execution.job_id;
         RETURN NEXT;
+      END $fn$;
+
+      CREATE FUNCTION app_private.processor_claim_available(p_job_id uuid)
+      RETURNS TABLE(token text, expires_at timestamptz, state text)
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $fn$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM public.collection_jobs AS job
+          JOIN public.collection_runs AS run ON run.id = job.run_id
+          WHERE job.id = p_job_id
+            AND run.collection_date > (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
+        ) THEN
+          RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
+        RETURN QUERY SELECT claim.token, claim.expires_at, claim.state
+          FROM app_private.processor_claim(p_job_id) AS claim;
       END $fn$;
 
       CREATE FUNCTION app_private.processor_next()
@@ -155,6 +165,15 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
             AND (execution.claim_digest IS NULL OR execution.lease_expires_at <= clock_timestamp())
             AND (run.collection_date < (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date
               OR execution.next_attempt_at IS NULL OR execution.next_attempt_at <= clock_timestamp())
+            AND (run.collection_date < (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date OR NOT EXISTS (
+              SELECT 1 FROM public.collection_job_executions AS other
+              JOIN public.collection_jobs AS other_job ON other_job.id = other.job_id
+              JOIN public.collection_runs AS other_run ON other_run.id = other_job.run_id
+              WHERE other_run.collection_date = run.collection_date
+                AND other_job.court = job.court AND other_job.medium = job.medium
+                AND CASE WHEN execution.phase = 'caderno' THEN other.caderno_retry_after
+                  ELSE other.fallback_retry_after END > clock_timestamp()
+            ))
           ORDER BY run.collection_date, run.slot, execution.job_id
           LIMIT 1 FOR UPDATE OF execution SKIP LOCKED;
         IF NOT FOUND THEN
@@ -259,12 +278,12 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         RETURN QUERY SELECT 'failed'::text;
       END $fn$;
 
-      REVOKE ALL ON FUNCTION app_private.processor_next(), app_private.processor_claim(uuid),
+      REVOKE ALL ON FUNCTION app_private.processor_next(), app_private.processor_claim(uuid), app_private.processor_claim_available(uuid),
         app_private.processor_renew(uuid,text), app_private.processor_start(uuid,text),
         app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
         FROM PUBLIC, advocacia_runtime, advocacia_despachante, advocacia_processador;
       GRANT USAGE ON SCHEMA app_private TO advocacia_processador;
-      GRANT EXECUTE ON FUNCTION app_private.processor_next(), app_private.processor_claim(uuid),
+      GRANT EXECUTE ON FUNCTION app_private.processor_next(), app_private.processor_claim(uuid), app_private.processor_claim_available(uuid),
         app_private.processor_renew(uuid,text), app_private.processor_start(uuid,text),
         app_private.processor_finish(uuid,text), app_private.processor_fail(uuid,text)
         TO advocacia_processador;
@@ -425,6 +444,7 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
       DECLARE
         job_data jsonb;
         execution public.collection_job_executions%ROWTYPE;
+        source_deadline timestamptz;
       BEGIN
         job_data := app_private.processor_job(p_job_id, p_token);
         IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 3 THEN
@@ -437,6 +457,20 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
           OR (execution.phase = 'caderno' AND execution.caderno_attempts >= p_limit)
           OR (execution.phase = 'fallback' AND execution.fallback_attempts >= p_limit) THEN
           RAISE EXCEPTION 'Processor operation unavailable' USING ERRCODE = '28000';
+        END IF;
+        SELECT max(CASE WHEN execution.phase = 'caderno' THEN other.caderno_retry_after
+          ELSE other.fallback_retry_after END) INTO source_deadline
+          FROM public.collection_job_executions AS other
+          JOIN public.collection_jobs AS other_job ON other_job.id = other.job_id
+          JOIN public.collection_runs AS other_run ON other_run.id = other_job.run_id
+          WHERE other_run.collection_date = (job_data->>'collection_date')::date
+            AND other_job.court = job_data->>'court' AND other_job.medium = job_data->>'medium';
+        IF source_deadline > clock_timestamp() THEN
+          UPDATE public.collection_job_executions SET next_attempt_at = source_deadline,
+            updated_at = clock_timestamp() WHERE job_id = p_job_id;
+          RETURN (app_private.processor_job(p_job_id, p_token)
+            - ARRAY['criteria', 'tenant_id', 'entity_type', 'entity_id', 'court', 'medium', 'source', 'run_id', 'collection_date'])
+            || jsonb_build_object('deferred', true);
         END IF;
         UPDATE public.collection_job_executions SET
           caderno_attempts = caderno_attempts + CASE WHEN phase = 'caderno' THEN 1 ELSE 0 END,
@@ -462,6 +496,10 @@ class CreateEscrevente < ActiveRecord::Migration[8.1]
         END IF;
         UPDATE public.collection_job_executions SET
           next_attempt_at = GREATEST(next_attempt_at, clock_timestamp() + make_interval(secs => p_seconds)),
+          caderno_retry_after = CASE WHEN phase = 'caderno'
+            THEN GREATEST(caderno_retry_after, clock_timestamp() + make_interval(secs => p_seconds)) ELSE caderno_retry_after END,
+          fallback_retry_after = CASE WHEN phase = 'fallback'
+            THEN GREATEST(fallback_retry_after, clock_timestamp() + make_interval(secs => p_seconds)) ELSE fallback_retry_after END,
           updated_at = clock_timestamp() WHERE job_id = p_job_id RETURNING next_attempt_at INTO deadline;
         RETURN deadline;
       END $fn$;

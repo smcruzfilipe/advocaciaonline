@@ -39,7 +39,7 @@ module Processador
 
     def call(job_id)
       PG.connect(@database_url) do |db|
-        claim = db.exec_params("SELECT * FROM app_private.processor_claim($1::uuid)", [job_id]).first
+        claim = db.exec_params("SELECT * FROM app_private.processor_claim_available($1::uuid)", [job_id]).first
         process_claimed(db, job_id, claim.fetch("token"), claim.fetch("state"))
       end
     end
@@ -102,6 +102,7 @@ module Processador
         end
 
         progress = json_call(db, "processor_attempt_begin", "$1::uuid, $2::text, $3::integer", [job_id, token, @attempts])
+        next if progress["deferred"]
         source_path = progress.fetch("phase")
         matches = []
         begin
