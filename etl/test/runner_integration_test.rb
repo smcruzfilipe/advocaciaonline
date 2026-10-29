@@ -60,6 +60,32 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal "3", scalar("SELECT count(*)::text FROM public.collection_communication_links WHERE tenant_id = $1", [@tenant])
   end
 
+  def test_caderno_then_api_preserves_first_html_and_links_both_monitorings
+    first_job = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
+    second_run = run_for(@date, slot: 2)
+    second_job = job("party", @party, { "name" => "Parte Exemplo" }, run: second_run)
+    first = publication(120).merge("texto" => "<p>Primeira &amp; versão</p><script>não executar</script>",
+      "destinatarios" => [{ "nome" => "Parte Exemplo" }])
+    later = first.merge("texto" => "<p>Versão posterior da API</p>")
+    zip = zip_with([first])
+    responses = []
+    with_server(responses) do |origin, _requests|
+      responses.concat([
+        { body: JSON.generate("status" => "Processado", "url" => "#{origin}/caderno.zip",
+          "hash" => Digest::SHA256.hexdigest(zip), "numero_paginas" => 2, "total_comunicacoes" => 1) },
+        { body: zip }, page([later]), page([])
+      ])
+      assert_equal "caderno", runner(origin).call(first_job).fetch("source_path")
+      assert_equal "fallback", runner(origin).call(second_job).fetch("source_path")
+    end
+    rows = @admin.exec_params("SELECT id, payload FROM public.collection_communications WHERE tenant_id = $1", [@tenant]).to_a
+    assert_equal 1, rows.length
+    assert_equal first.fetch("texto"), JSON.parse(rows.first.fetch("payload")).fetch("texto")
+    links = @admin.exec_params("SELECT job_id FROM public.collection_communication_links WHERE tenant_id = $1 AND communication_id = $2",
+      [@tenant, rows.first.fetch("id")]).column_values(0)
+    assert_equal [first_job, second_job].sort, links.sort
+  end
+
   def test_failed_caderno_uses_all_fallback_pages_and_same_current_date
     id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
     item = publication(202).merge("texto" => "<p>Texto&nbsp;válido &amp; público</p><script>não executar</script>")
