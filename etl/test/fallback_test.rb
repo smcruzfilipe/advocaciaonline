@@ -51,6 +51,7 @@ module ControlledDjen
           requests << { method: method, target: target, headers: headers }
           response = responses.fetch(index, { status: 500, body: "Unexpected request" })
           index += 1
+          response[:on_request]&.call
           sleep(response.fetch(:delay, 0))
           if response.key?(:raw)
             socket.write(response.fetch(:raw))

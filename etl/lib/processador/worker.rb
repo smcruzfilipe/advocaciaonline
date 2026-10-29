@@ -29,7 +29,7 @@ module Processador
     # Returns nil when idle or when another owner has superseded the lease.
     def run_once
       claim = PG.connect(@database_url) do |db|
-        db.exec("SELECT * FROM app_private.processor_next()").first
+        db.exec_params("SELECT * FROM app_private.processor_next($1::integer)", [@runner.attempts]).first
       end
       return unless claim
 

@@ -244,7 +244,7 @@ class RunnerIntegrationTest < Minitest::Test
   def test_claimed_runner_uses_the_selected_lease_without_claiming_again
     id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
     claim = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
-      processor.exec("SELECT * FROM app_private.processor_next()").first
+      processor.exec("SELECT * FROM app_private.processor_next(3)").first
     end
     assert_equal id, claim.fetch("job_id")
     with_server([{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]) do |origin, requests|
@@ -391,7 +391,7 @@ class RunnerIntegrationTest < Minitest::Test
   def test_worker_resumes_an_abandoned_current_day_attempt_after_restart
     id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
     PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
-      claim = processor.exec("SELECT * FROM app_private.processor_next()").first
+      claim = processor.exec("SELECT * FROM app_private.processor_next(3)").first
       processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, claim.fetch("token")])
       processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 3)", [id, claim.fetch("token")])
     end
@@ -412,7 +412,7 @@ class RunnerIntegrationTest < Minitest::Test
   def test_worker_preserves_exhaustion_when_restarting_an_abandoned_last_fallback_attempt
     id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
     PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
-      token = processor.exec("SELECT * FROM app_private.processor_next()").first.fetch("token")
+      token = processor.exec("SELECT * FROM app_private.processor_next(1)").first.fetch("token")
       processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, token])
       processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 1)", [id, token])
       processor.exec_params("SELECT app_private.processor_attempt_failed($1::uuid, $2::text, 0, 1, 1, 1)", [id, token])
@@ -427,9 +427,26 @@ class RunnerIntegrationTest < Minitest::Test
     assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [id])
   end
 
+  def test_exhausted_fallback_finishes_even_when_source_retry_window_is_open
+    id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run_for(@date, slot: 2))
+    PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      token = processor.exec_params("SELECT token FROM app_private.processor_claim($1::uuid)", [id]).getvalue(0, 0)
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [id, token])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 1)", [id, token])
+      processor.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, 3600)", [id, token])
+      processor.exec_params("SELECT app_private.processor_attempt_failed($1::uuid, $2::text, 3600, 1, 1, 1)", [id, token])
+    end
+    expire_lease(id)
+    with_server([]) do |origin, requests|
+      assert_equal "source_unavailable", worker_for(origin, attempts: 1).run_once.fetch("code")
+      assert_empty requests
+    end
+    assert_equal "source_unavailable", scalar("SELECT code FROM public.collection_job_failures WHERE job_id = $1", [id])
+  end
+
   def test_expired_selected_lease_never_contacts_the_source_and_is_recovered_by_the_next_worker
     id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] })
-    claim = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) { |processor| processor.exec("SELECT * FROM app_private.processor_next()").first }
+    claim = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) { |processor| processor.exec("SELECT * FROM app_private.processor_next(3)").first }
     expire_lease(id)
     with_server([{ body: JSON.generate("status" => "Sem comunicações", "total_comunicacoes" => 0) }]) do |origin, requests|
       assert_raises(Processador::Runner::LeaseLost) { runner(origin).call_claimed(id, claim.fetch("token"), claim.fetch("state")) }
@@ -490,6 +507,31 @@ class RunnerIntegrationTest < Minitest::Test
       assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
       assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
       assert_equal 3, requests.length
+    end
+  end
+
+  def test_active_pagination_honors_retry_after_received_by_another_worker
+    run = run_for(@date, slot: 2)
+    other = job("party", @party, { "name" => "Parte Exemplo" }, run: run)
+    job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run)
+    token = PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+      claim = processor.exec_params("SELECT token FROM app_private.processor_claim($1::uuid)", [other]).getvalue(0, 0)
+      processor.exec_params("SELECT * FROM app_private.processor_start($1::uuid, $2::text)", [other, claim])
+      processor.exec_params("SELECT app_private.processor_attempt_begin($1::uuid, $2::text, 3)", [other, claim])
+      claim
+    end
+    first_at = second_at = nil
+    first = page([publication(605)]).merge(on_request: -> {
+      PG.connect(ENV.fetch("PROCESSADOR_DATABASE_URL")) do |processor|
+        processor.exec_params("SELECT app_private.processor_defer($1::uuid, $2::text, 1)", [other, token])
+      end
+      first_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    })
+    last = page([]).merge(on_request: -> { second_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) })
+    with_server([first, last]) do |origin, requests|
+      assert_equal "succeeded", worker_for(origin).run_once.fetch("state")
+      assert_equal 2, requests.length
+      assert_operator second_at - first_at, :>=, 0.9
     end
   end
 

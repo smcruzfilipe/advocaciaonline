@@ -10,7 +10,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   LAWYER_NAME = "Guilherme Curcelli Guimarães".freeze
   TABLES = %w[collection_communications collection_communication_links collection_job_results collection_job_failures].freeze
   FUNCTIONS = {
-    "processor_next()" => ["SELECT * FROM app_private.processor_next()", 0],
+    "processor_next(integer)" => ["SELECT * FROM app_private.processor_next($1)", 1],
     "processor_claim_available(uuid)" => ["SELECT * FROM app_private.processor_claim_available($1)", 1],
     "processor_job(uuid,text)" => ["SELECT app_private.processor_job($1, $2)", 2],
     "processor_commit(uuid,text,text,jsonb)" => ["SELECT app_private.processor_commit($1, $2, $3, $4::jsonb)", 4],
@@ -18,7 +18,8 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     "processor_attempt_begin(uuid,text,integer)" => ["SELECT app_private.processor_attempt_begin($1, $2, $3)", 3],
     "processor_attempt_failed(uuid,text,integer,integer,integer,integer)" => ["SELECT app_private.processor_attempt_failed($1, $2, $3, $4, $5, $6)", 6],
     "processor_defer(uuid,text,integer)" => ["SELECT app_private.processor_defer($1, $2, $3)", 3],
-    "processor_release(uuid,text)" => ["SELECT app_private.processor_release($1, $2)", 2]
+    "processor_release(uuid,text)" => ["SELECT app_private.processor_release($1, $2)", 2],
+    "processor_source_deadline(uuid,text)" => ["SELECT app_private.processor_source_deadline($1, $2)", 2]
   }.freeze
 
   setup do
@@ -84,7 +85,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     with_processor_queue(@job_a, @job_b) do
       @processor.exec_params("SELECT set_config('app.tenant_id', $1, false)", [@lawyer_b.tenant_id])
       @processor.exec_params("SELECT set_config('app.session_hash', $1, false)", [IdentityStore.digest(@session_b)])
-      result = @processor.exec("SELECT * FROM app_private.processor_next()")
+      result = @processor.exec("SELECT * FROM app_private.processor_next(3)")
       assert_equal %w[job_id token state], result.fields
       assert_equal [2950, 25, 25], result.nfields.times.map { |index| result.ftype(index) }
       assert_equal 1, result.ntuples
@@ -308,7 +309,9 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
       assert_equal "advocacia_migrator", metadata.fetch("owner")
       assert_equal "f", metadata.fetch("public_execute")
       assert_includes metadata.fetch("proconfig"), "search_path=pg_catalog, pg_temp"
-      parameters = if signature.start_with?("processor_attempt_failed")
+      parameters = if signature.start_with?("processor_next")
+        [3]
+      elsif signature.start_with?("processor_attempt_failed")
         [@job_a, "a" * 64, 0, 3, 60, 300]
       elsif signature.start_with?("processor_attempt_begin")
         [@job_a, "a" * 64, 3]
@@ -355,7 +358,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
           AND cmd = 'SELECT' AND roles = ARRAY['advocacia_migrator']::name[] AND qual = 'true'
       SQL
     end
-    assert_equal "t", @processor.exec("SELECT has_function_privilege(current_user, 'app_private.processor_next()', 'EXECUTE')").getvalue(0, 0)
+    assert_equal "t", @processor.exec("SELECT has_function_privilege(current_user, 'app_private.processor_next(integer)', 'EXECUTE')").getvalue(0, 0)
     [@processor, @runtime, @despachante].each do |connection|
       flags = connection.exec("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user").first
       assert_equal({ "rolsuper" => "f", "rolbypassrls" => "f" }, flags)
@@ -813,7 +816,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   end
 
   def next_jobs(connection = @processor)
-    connection.exec("SELECT * FROM app_private.processor_next()").to_a
+    connection.exec("SELECT * FROM app_private.processor_next(3)").to_a
   end
 
   def with_processor_queue(*jobs)

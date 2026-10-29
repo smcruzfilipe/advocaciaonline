@@ -21,6 +21,8 @@ module Processador
     DateChanged = Class.new(StandardError)
     LeaseLost = Class.new(StandardError)
 
+    attr_reader :attempts
+
     def initialize(database_url:, http: Http.new, base_url: API_BASE, attempts: 3, backoff_first: 60, backoff_second: 300, date_source: -> { TIMEZONE.now.to_date })
       raise ArgumentError, "invalid attempts" unless (1..3).cover?(attempts)
       raise ArgumentError, "invalid backoff" unless backoff_first.positive? && backoff_second.positive?
@@ -90,7 +92,7 @@ module Processador
         return record_failure(db, job_id, token, "source_unavailable") if exhausted
 
         if progress["next_attempt_at"]
-          remaining = Time.parse(progress.fetch("next_attempt_at")) - Time.now
+          remaining = db.exec_params("SELECT EXTRACT(EPOCH FROM $1::timestamptz - clock_timestamp())", [progress.fetch("next_attempt_at")]).getvalue(0, 0).to_f
           if remaining.positive?
             if defer_retry
               db.exec_params("SELECT app_private.processor_release($1::uuid, $2::text)", [job_id, token])
@@ -110,7 +112,9 @@ module Processador
             loop do
               lease.check!
               raise DateChanged unless current_date?(job)
-              remaining = @http.retry_wait_remaining
+              delay = db.exec_params("SELECT EXTRACT(EPOCH FROM app_private.processor_source_deadline($1::uuid, $2::text) - clock_timestamp())", [job_id, token]).getvalue(0, 0)
+              source_wait = delay ? delay.to_f : 0
+              remaining = [@http.retry_wait_remaining, source_wait].max
               break unless remaining.positive?
               sleep([remaining, 60].min)
             end

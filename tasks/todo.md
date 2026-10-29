@@ -359,7 +359,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 10b, 11a–11c, 1c, 9b. **Escopo:** execução da agenda, tentativas e estado operacional.
   **Áreas previstas (≤5):** execução; política de retries; estado por tribunal; consulta de falhas.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
-  **Implementação e evidência:** seleção e concessão atômicas no PostgreSQL, worker contínuo e retomada por lease. Testes focados: Rails, 58 testes e 1.486 assertions; ETL, 62 testes e 450 assertions, sem falhas, erros ou skips. No smoke com fonte controlada, o despachante planejou dois slots TJAC/D e o primeiro terminou com `source_unavailable`, distinto de sucesso vazio.
+  **Implementação e evidência:** seleção e concessão atômicas no PostgreSQL, worker contínuo e retomada por lease. Testes focados: Rails, 58 testes e 1.493 assertions; ETL, 64 testes e 457 assertions, sem falhas, erros ou skips. No smoke com fonte controlada, o despachante planejou dois slots TJAC/D e o primeiro terminou com `source_unavailable`, distinto de sucesso vazio.
 
 - [x] **13b — Recuperar no mesmo dia sem retroatividade.**
   **Aceite:** (1) execução posterior no mesmo dia pode persistir publicações após falha anterior; (2) deduplicação preserva chave/vínculos entre as execuções; (3) nenhuma execução busca automaticamente data anterior.
