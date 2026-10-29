@@ -146,10 +146,10 @@ Não paralelizar tarefas com dependência direta nem alterações concorrentes a
 
 ## Fronteiras e execução
 
-Manter o escopo das seis especificações: DJEN como fonte lógica, cadernos ZIP/JSON primários, API paginada como fallback, data corrente exclusiva por execução e deduplicação pela combinação conjunta `id` + `hash`. Não introduzir coleta histórica automática, e-mail, fontes adicionais ou regras de negócio não aprovadas.
+Manter o escopo das seis especificações: DJEN como fonte lógica, cadernos ZIP/JSON primários, API paginada como fallback, data corrente exclusiva por execução e deduplicação pela combinação conjunta `id` + `hash`. Convites de equipe por e-mail pertencem ao escopo de identidade; não introduzir coleta histórica automática, relatórios ou avisos por e-mail, fontes adicionais ou regras de negócio não aprovadas.
 
-`dev` é a base das features; quando os gates liberarem a implementação, cada feature parte de `dev` em `feature/<nome>` e integra após revisão. Os caminhos físicos de código e comandos ficam pendentes do ID 3; não os inventar neste plano.
+`dev` é a base das features; cada feature parte de `dev` em `feature/<nome>` e integra após revisão. Caminhos e comandos existentes são registrados no checklist e no README; caminhos previstos não representam implementação.
 
 A implementação incremental segue a regra de `source-driven-development` do [checklist](todo.md#regras-de-execução-e-rastreio): verificar versões e documentação oficial antes das decisões dependentes de tecnologia, registrar fontes e validar o comportamento em execução.
 
-As verificações do [checklist](todo.md) são propostas e ainda não foram executadas. Nenhum comando de build, teste, lint ou formatação foi presumido.
+Resultados e limitações das verificações efetivamente executadas são registrados no [checklist](todo.md) e no [README](../README.md#implementação-e-verificações); tarefas ainda não executadas mantêm suas verificações propostas como pendentes.

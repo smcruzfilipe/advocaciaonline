@@ -53,13 +53,40 @@ class CreateIdentityAndLawyerProfiles < ActiveRecord::Migration[8.1]
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         google_subject text NOT NULL UNIQUE CHECK (length(google_subject) BETWEEN 1 AND 255),
         verified_email text NOT NULL,
-        tenant_id uuid UNIQUE REFERENCES public.tenants(id) DEFERRABLE INITIALLY DEFERRED,
         disabled_at timestamptz,
         created_at timestamptz NOT NULL DEFAULT clock_timestamp()
       );
+      CREATE TABLE app_private.tenant_memberships (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES public.tenants(id) DEFERRABLE INITIALLY DEFERRED,
+        identity_id uuid REFERENCES app_private.identities(id),
+        role text NOT NULL CHECK (role IN ('owner', 'member')),
+        invited_email text,
+        accepted_at timestamptz,
+        validity_days integer CHECK (validity_days IS NULL OR validity_days > 0),
+        credential_started_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+        expires_at timestamptz,
+        revoked_at timestamptz,
+        UNIQUE (tenant_id, id),
+        CHECK ((identity_id IS NULL) = (accepted_at IS NULL)),
+        CHECK (role <> 'owner' OR (identity_id IS NOT NULL AND validity_days IS NULL
+          AND expires_at IS NULL AND revoked_at IS NULL)),
+        CHECK (role <> 'member' OR (invited_email IS NOT NULL
+          AND invited_email = lower(btrim(invited_email))))
+      );
+      CREATE UNIQUE INDEX one_owner_per_identity ON app_private.tenant_memberships(identity_id)
+        WHERE role = 'owner';
+      CREATE UNIQUE INDEX one_owner_per_tenant ON app_private.tenant_memberships(tenant_id)
+        WHERE role = 'owner';
+      CREATE UNIQUE INDEX one_live_membership_per_email
+        ON app_private.tenant_memberships(tenant_id, invited_email) WHERE revoked_at IS NULL;
+      CREATE UNIQUE INDEX one_live_membership_per_identity
+        ON app_private.tenant_memberships(tenant_id, identity_id) WHERE revoked_at IS NULL;
+      CREATE INDEX ON app_private.tenant_memberships(identity_id);
       CREATE TABLE app_private.sessions (
         session_hash text PRIMARY KEY CHECK (session_hash ~ '^[0-9a-f]{64}$'),
         identity_id uuid NOT NULL REFERENCES app_private.identities(id),
+        selected_membership_id uuid REFERENCES app_private.tenant_memberships(id),
         csrf_token text NOT NULL,
         expires_at timestamptz NOT NULL,
         revoked_at timestamptz,
@@ -127,30 +154,95 @@ class CreateIdentityAndLawyerProfiles < ActiveRecord::Migration[8.1]
         IF identity_row.disabled_at IS NOT NULL THEN
           RAISE EXCEPTION 'Identity unavailable' USING ERRCODE = '28000';
         END IF;
-        INSERT INTO app_private.sessions(session_hash, identity_id, csrf_token, expires_at)
-          VALUES (p_hash, identity_row.id, p_csrf, statement_timestamp() + interval '12 hours');
+        INSERT INTO app_private.sessions(session_hash, identity_id, selected_membership_id, csrf_token, expires_at)
+          SELECT p_hash, identity_row.id, CASE WHEN count(*) = 1 THEN (array_agg(m.id))[1] END,
+            p_csrf, statement_timestamp() + interval '12 hours'
+          FROM app_private.tenant_memberships m WHERE m.identity_id = identity_row.id
+            AND m.accepted_at IS NOT NULL AND m.revoked_at IS NULL
+            AND (m.expires_at IS NULL OR m.expires_at > statement_timestamp());
         RETURN QUERY SELECT identity_row.id;
       END $fn$;
 
-      CREATE FUNCTION app_private.session_context(p_hash text)
-      RETURNS TABLE(identity_id uuid, tenant_id uuid, csrf_token text)
-      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
-        SELECT identity.id, identity.tenant_id, session.csrf_token
+      CREATE FUNCTION app_private.session_identity(p_hash text)
+      RETURNS TABLE(identity_id uuid, verified_email text, csrf_token text)
+      LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
+        SELECT identity.id, identity.verified_email, session.csrf_token
           FROM app_private.sessions AS session
           JOIN app_private.identities AS identity ON identity.id = session.identity_id
           WHERE session.session_hash = p_hash AND session.revoked_at IS NULL
-            AND session.expires_at > statement_timestamp() AND identity.disabled_at IS NULL
+            AND session.expires_at > clock_timestamp() AND identity.disabled_at IS NULL
+      $fn$;
+
+      CREATE FUNCTION app_private.session_context(p_hash text)
+      RETURNS TABLE(identity_id uuid, tenant_id uuid, csrf_token text, membership_id uuid, role text)
+      LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
+        SELECT identity.id, membership.tenant_id, session.csrf_token, membership.id, membership.role
+          FROM app_private.sessions AS session
+          JOIN app_private.identities AS identity ON identity.id = session.identity_id
+          LEFT JOIN app_private.tenant_memberships AS membership
+            ON membership.id = session.selected_membership_id
+              AND membership.identity_id = identity.id AND membership.accepted_at IS NOT NULL
+              AND membership.revoked_at IS NULL
+              AND (membership.expires_at IS NULL OR membership.expires_at > clock_timestamp())
+          WHERE session.session_hash = p_hash AND session.revoked_at IS NULL
+            AND session.expires_at > clock_timestamp() AND identity.disabled_at IS NULL
+            AND (session.selected_membership_id IS NULL OR membership.id IS NOT NULL)
       $fn$;
 
       CREATE FUNCTION app_private.current_tenant_id() RETURNS uuid
-      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
+      LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
         SELECT context.tenant_id FROM app_private.session_context(current_setting('app.session_hash', true)) AS context
       $fn$;
+
+      CREATE FUNCTION app_private.current_membership_id() RETURNS uuid
+      LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
+        SELECT context.membership_id FROM app_private.session_context(current_setting('app.session_hash', true)) AS context
+      $fn$;
+
+      CREATE FUNCTION app_private.lock_authorization(p_exclusive boolean) RETURNS uuid
+      LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
+      DECLARE before_context record; after_context record; lock_key bigint;
+      BEGIN
+        SELECT * INTO before_context FROM app_private.session_context(current_setting('app.session_hash', true));
+        IF NOT FOUND OR before_context.tenant_id IS NULL THEN
+          RAISE EXCEPTION 'Authorization context unavailable' USING ERRCODE = '42501';
+        END IF;
+        lock_key := hashtextextended('authorization:' || before_context.tenant_id::text, 0);
+        IF p_exclusive THEN
+          PERFORM pg_advisory_xact_lock(lock_key);
+        ELSE
+          PERFORM pg_advisory_xact_lock_shared(lock_key);
+        END IF;
+        -- Global order: tenant authorization, then session, then domain rows.
+        -- Session updates (logout/selection) must wait for protected operations.
+        PERFORM 1 FROM app_private.sessions s
+          WHERE s.session_hash = current_setting('app.session_hash', true) FOR SHARE;
+        SELECT * INTO after_context FROM app_private.session_context(current_setting('app.session_hash', true));
+        IF NOT FOUND OR (after_context.identity_id, after_context.tenant_id,
+          after_context.membership_id, after_context.role) IS DISTINCT FROM
+          (before_context.identity_id, before_context.tenant_id, before_context.membership_id, before_context.role) THEN
+          RAISE EXCEPTION 'Authorization context changed' USING ERRCODE = '42501';
+        END IF;
+        RETURN after_context.tenant_id;
+      END $fn$;
+
+      CREATE FUNCTION app_private.require_owner() RETURNS uuid
+      LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
+      DECLARE owner_tenant uuid;
+      BEGIN
+        SELECT context.tenant_id INTO owner_tenant
+          FROM app_private.session_context(current_setting('app.session_hash', true)) AS context
+          WHERE context.role = 'owner';
+        IF owner_tenant IS NULL THEN
+          RAISE EXCEPTION 'Owner access required' USING ERRCODE = '42501';
+        END IF;
+        RETURN owner_tenant;
+      END $fn$;
 
       CREATE FUNCTION app_private.claim_tenant(p_hash text)
       RETURNS TABLE(tenant_id uuid, claimed boolean)
       LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
-      DECLARE identity_row app_private.identities%ROWTYPE; new_tenant uuid;
+      DECLARE identity_row app_private.identities%ROWTYPE; new_tenant uuid; owner_membership uuid;
       BEGIN
         SELECT identity.* INTO identity_row FROM app_private.identities AS identity
           JOIN app_private.sessions AS session ON session.identity_id = identity.id
@@ -158,18 +250,31 @@ class CreateIdentityAndLawyerProfiles < ActiveRecord::Migration[8.1]
             AND session.expires_at > statement_timestamp() AND identity.disabled_at IS NULL
           FOR UPDATE OF identity;
         IF NOT FOUND THEN RETURN; END IF;
-        IF identity_row.tenant_id IS NOT NULL THEN
-          RETURN QUERY SELECT identity_row.tenant_id, false; RETURN;
-        END IF;
+        SELECT m.tenant_id INTO new_tenant FROM app_private.tenant_memberships m
+          WHERE m.identity_id = identity_row.id AND m.role = 'owner';
+        IF FOUND THEN RETURN QUERY SELECT new_tenant, false; RETURN; END IF;
         new_tenant := gen_random_uuid();
-        UPDATE app_private.identities SET tenant_id = new_tenant WHERE id = identity_row.id;
+        INSERT INTO app_private.tenant_memberships(tenant_id, identity_id, role, accepted_at)
+          VALUES (new_tenant, identity_row.id, 'owner', statement_timestamp())
+          RETURNING id INTO owner_membership;
+        UPDATE app_private.sessions SET selected_membership_id = owner_membership WHERE session_hash = p_hash;
         RETURN QUERY SELECT new_tenant, true;
       END $fn$;
 
       CREATE FUNCTION app_private.revoke_session(p_hash text) RETURNS void
-      LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
-        UPDATE app_private.sessions SET revoked_at = statement_timestamp() WHERE session_hash = p_hash
-      $fn$;
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, app_private, pg_temp AS $fn$
+      DECLARE selected_tenant uuid;
+      BEGIN
+        -- Resolve only from the bearer hash, including an expired membership.
+        -- The session UPDATE also serializes selection changes and active operations.
+        SELECT m.tenant_id INTO selected_tenant FROM app_private.sessions s
+          JOIN app_private.tenant_memberships m ON m.id = s.selected_membership_id
+          WHERE s.session_hash = p_hash;
+        IF selected_tenant IS NOT NULL THEN
+          PERFORM pg_advisory_xact_lock(hashtextextended('authorization:' || selected_tenant::text, 0));
+        END IF;
+        UPDATE app_private.sessions SET revoked_at = clock_timestamp() WHERE session_hash = p_hash;
+      END $fn$;
 
       REVOKE ALL ON ALL TABLES IN SCHEMA app_private FROM PUBLIC, advocacia_runtime;
       REVOKE ALL ON ALL FUNCTIONS IN SCHEMA app_private FROM PUBLIC;
@@ -177,7 +282,8 @@ class CreateIdentityAndLawyerProfiles < ActiveRecord::Migration[8.1]
       GRANT USAGE ON SCHEMA app_private TO advocacia_runtime;
       GRANT EXECUTE ON FUNCTION app_private.start_login(text,text,text,text),
         app_private.consume_login(text,text), app_private.authenticate_google(text,text,text,text),
-        app_private.session_context(text), app_private.current_tenant_id(),
+        app_private.session_identity(text), app_private.session_context(text), app_private.current_tenant_id(),
+        app_private.current_membership_id(), app_private.require_owner(), app_private.lock_authorization(boolean),
         app_private.claim_tenant(text), app_private.revoke_session(text) TO advocacia_runtime;
 
       CREATE FUNCTION app_private.require_primary_oab() RETURNS trigger

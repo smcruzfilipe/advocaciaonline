@@ -1,9 +1,11 @@
 class OnboardingsController < ApplicationController
   before_action :require_authentication
+  before_action :require_onboarding, only: :show
   before_action :verify_csrf, only: :create
 
   def show
     payload = DatabaseContext.with_session(session_token) do
+      authorize_session!(owner_only: true)
       lawyer = Lawyer.first
       { tenant_id: lawyer.tenant_id, profile: serialize_profile(lawyer) } if lawyer
     end
@@ -26,6 +28,12 @@ class OnboardingsController < ApplicationController
   end
 
   private
+
+  def require_onboarding
+    return if authenticated_context.fetch("tenant_id")
+
+    api_error("onboarding_required", "Cadastre seu perfil profissional para continuar.", :not_found)
+  end
 
   def serialize_profile(lawyer)
     registrations = lawyer.oab_registrations.order(primary: :desc).to_a

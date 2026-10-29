@@ -2,8 +2,12 @@ class LawyerMonitoringsController < ApplicationController
   before_action :require_authentication
 
   def show
-    context = authenticated_context
+    unless authenticated_context["tenant_id"]
+      return api_error("onboarding_required", "Cadastre seu perfil profissional para continuar.", :not_found)
+    end
+
     payload = DatabaseContext.with_session(session_token) do
+      context = authorize_session!("consultar_monitoramentos")
       lawyer = Lawyer.find_by(tenant_id: context.fetch("tenant_id"))
       if lawyer
         oabs = lawyer.oab_registrations.order(primary: :desc, uf: :asc, number: :asc).pluck(:number, :uf)
