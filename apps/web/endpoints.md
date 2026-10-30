@@ -1,46 +1,46 @@
 # Checklist de integração dos endpoints — web
 
-Fonte: `backend/config/routes.rb`. Itens indicam integração e verificação no frontend, não implementação do backend. Rotas administrativas de coleta e callback OAuth devem ser avaliadas conforme sua finalidade; não presumir que todas exigem tela.
+Fonte: `backend/config/routes.rb`. `[x]` indica integração e comportamento exercitados pela interface ou pelo relay contra Rails e PostgreSQL descartável; não implica autorização de deploy. Os convites foram enviados a um SMTP local descartável com STARTTLS, não a um serviço externo. O callback inválido foi verificado (303 para login), mas o retorno válido do Google permanece pendente; o catálogo real retornou 503 após a fonte responder 403 neste ambiente.
 
-- [ ] `GET /auth/google` — `google_sessions#new`
-- [ ] `GET /auth/google/callback` — `google_sessions#create`
-- [ ] `GET /api/session` — `sessions#show`
-- [ ] `PATCH /api/session/membership` — `sessions#update`
-- [ ] `DELETE /api/session` — `sessions#destroy`
-- [ ] `GET /api/team/credentials` — `team_credentials#index`
-- [ ] `POST /api/team/credentials` — `team_credentials#create`
-- [ ] `PATCH /api/team/credentials/:id` — `team_credentials#update`
-- [ ] `POST /api/team/credentials/:id/renewal` — `team_credentials#renew`
-- [ ] `DELETE /api/team/credentials/:id` — `team_credentials#destroy`
-- [ ] `POST /api/team/credentials/:id/invitation` — `team_credentials#reissue`
-- [ ] `POST /api/team/invitations/accept` — `team_invitations#create`
-- [ ] `GET /api/authorization/catalog` — `authorization_groups#catalog`
-- [ ] `GET /api/authorization/groups` — `authorization_groups#index`
-- [ ] `POST /api/authorization/groups` — `authorization_groups#create`
-- [ ] `GET /api/authorization/groups/:id` — `authorization_groups#show`
-- [ ] `PATCH /api/authorization/groups/:id` — `authorization_groups#update`
-- [ ] `DELETE /api/authorization/groups/:id` — `authorization_groups#destroy`
-- [ ] `POST /api/authorization/groups/:id/rules` — `authorization_groups#create_rule`
-- [ ] `PATCH /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#update_rule`
-- [ ] `DELETE /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#destroy_rule`
-- [ ] `PUT /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#assign_membership`
-- [ ] `DELETE /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#remove_membership`
-- [ ] `GET /api/onboarding` — `onboardings#show`
-- [ ] `POST /api/onboarding` — `onboardings#create`
-- [ ] `GET /api/monitorings/lawyer` — `lawyer_monitorings#show`
-- [ ] `GET /api/courts` — `court_catalogs#index`
-- [ ] `GET /api/monitorings/parties` — `party_monitorings#index`
-- [ ] `POST /api/monitorings/parties` — `party_monitorings#create`
-- [ ] `GET /api/monitorings/parties/:id` — `party_monitorings#show`
-- [ ] `PATCH /api/monitorings/parties/:id` — `party_monitorings#update`
-- [ ] `GET /api/monitorings/processes` — `process_monitorings#index`
-- [ ] `POST /api/monitorings/processes` — `process_monitorings#create`
-- [ ] `GET /api/monitorings/processes/:id` — `process_monitorings#show`
-- [ ] `PATCH /api/monitorings/processes/:id` — `process_monitorings#update`
-- [ ] `GET /api/collection-runs` — `collection_runs#index`
-- [ ] `GET /api/collection-runs/:id/jobs` — `collection_runs#jobs`
-- [ ] `GET /api/collection-runs/:id/events` — `escrevente#events`
-- [ ] `GET /api/collection-runs/:id/execution` — `escrevente#execution`
-- [ ] `GET /api/communications` — `communications#index`
-- [ ] `GET /api/communications/:id` — `communications#show`
-- [ ] `GET /api/dashboard` — `dashboard#show`
+- [x] `GET /auth/google` — `google_sessions#new`; início com ingresso autenticado
+- [ ] `GET /auth/google/callback` — `google_sessions#create`; retorno válido do Google ainda não exercitado
+- [x] `GET /api/session` — `sessions#show`
+- [x] `PATCH /api/session/membership` — `sessions#update`
+- [x] `DELETE /api/session` — `sessions#destroy`
+- [x] `GET /api/team/credentials` — `team_credentials#index`
+- [x] `POST /api/team/credentials` — `team_credentials#create`; SMTP local com STARTTLS
+- [x] `PATCH /api/team/credentials/:id` — `team_credentials#update`
+- [x] `POST /api/team/credentials/:id/renewal` — `team_credentials#renew`
+- [x] `DELETE /api/team/credentials/:id` — `team_credentials#destroy`
+- [x] `POST /api/team/credentials/:id/invitation` — `team_credentials#reissue`; SMTP local com STARTTLS
+- [x] `POST /api/team/invitations/accept` — `team_invitations#create`; sessão e convite sintéticos no backend real
+- [x] `GET /api/authorization/catalog` — `authorization_groups#catalog`
+- [x] `GET /api/authorization/groups` — `authorization_groups#index`
+- [x] `POST /api/authorization/groups` — `authorization_groups#create`
+- [x] `GET /api/authorization/groups/:id` — `authorization_groups#show`
+- [x] `PATCH /api/authorization/groups/:id` — `authorization_groups#update`
+- [x] `DELETE /api/authorization/groups/:id` — `authorization_groups#destroy`
+- [x] `POST /api/authorization/groups/:id/rules` — `authorization_groups#create_rule`
+- [x] `PATCH /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#update_rule`
+- [x] `DELETE /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#destroy_rule`
+- [x] `PUT /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#assign_membership`
+- [x] `DELETE /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#remove_membership`
+- [x] `GET /api/onboarding` — `onboardings#show`
+- [x] `POST /api/onboarding` — `onboardings#create`
+- [x] `GET /api/monitorings/lawyer` — `lawyer_monitorings#show`
+- [ ] `GET /api/courts` — `court_catalogs#index`; catálogo real indisponível
+- [x] `GET /api/monitorings/parties` — `party_monitorings#index`
+- [x] `POST /api/monitorings/parties` — `party_monitorings#create`
+- [x] `GET /api/monitorings/parties/:id` — `party_monitorings#show`
+- [x] `PATCH /api/monitorings/parties/:id` — `party_monitorings#update`
+- [x] `GET /api/monitorings/processes` — `process_monitorings#index`
+- [x] `POST /api/monitorings/processes` — `process_monitorings#create`
+- [x] `GET /api/monitorings/processes/:id` — `process_monitorings#show`
+- [x] `PATCH /api/monitorings/processes/:id` — `process_monitorings#update`
+- [x] `GET /api/collection-runs` — `collection_runs#index`
+- [x] `GET /api/collection-runs/:id/jobs` — `collection_runs#jobs`
+- [x] `GET /api/collection-runs/:id/events` — `escrevente#events`
+- [x] `GET /api/collection-runs/:id/execution` — `escrevente#execution`
+- [x] `GET /api/communications` — `communications#index`
+- [x] `GET /api/communications/:id` — `communications#show`
+- [x] `GET /api/dashboard` — `dashboard#show`

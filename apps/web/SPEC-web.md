@@ -1,6 +1,6 @@
 # Especificação: interface web de monitoramento jurídico
 
-**Estado:** proposta para revisão. Escopo: frontend em `apps/web/`; não altera backend nem aprova os checkpoints pendentes. Os módulos e contratos funcionais continuam sendo os de `CAPABILITIES.md` e das respectivas `SPEC-*.md`. As telas exportadas em `banani-selecao.json` são referência visual, não prova de integração nem autoridade sobre regras de negócio.
+**Estado:** implementação autorizada para o frontend em `apps/web/`; não altera o backend nem aprova os checkpoints pendentes. Os módulos e contratos funcionais continuam sendo os de `CAPABILITIES.md` e das respectivas `SPEC-*.md`. As telas exportadas em `banani-selecao.json` são referência visual, não prova de integração nem autoridade sobre regras de negócio.
 
 ## Objetivo e usuários
 
@@ -27,6 +27,9 @@ Ordem proposta: identidade → autorização e monitoramentos → consulta/dashb
 - Dashboard apresenta comunicações novas e processos distintos para hoje, semana civil e últimos sete dias em `America/Sao_Paulo`; `*` quando negada, sem recuperar número por outra via. Falha, parcial, andamento, indisponibilidade, ausência de trabalho e sucesso vazio são distintos.
 - O Escrevente é somente leitura. Coleta é limitada a Diário Eletrônico `D`; não implementar editais, busca histórica automática, fontes adicionais, relatórios ou avisos de publicação por e-mail. Convites de equipe por e-mail permanecem previstos.
 - Cada fluxo deve tratar carregamento, vazio, erro, sucesso e ausência de permissão quando aplicáveis. Dados de demonstração jamais substituem respostas reais nem simulam gravação ou autenticação.
+- Leituras, alterações e troca de vínculo em abas da aplicação são coordenadas com Web Locks; leituras conferem a sessão antes e depois da solicitação, e mutações comparam sessão e vínculo antes de enviar. Navegador sem Web Locks recebe erro e não envia operações protegidas. O backend continua responsável pela autorização efetiva.
+- A limitação de início do Google permanece por IP do cliente: o ingresso HTTPS confiável substitui os cabeçalhos internos de IP e segredo, e o Next.js rejeita o início de login sem essa configuração. Os detalhes e variáveis estão no README.
+- O link `/invite/accept#token=...` emitido pelo backend é recebido pela interface; o fragmento é removido da barra de endereço e o token fica em cookie HttpOnly de curta duração. A confirmação compara a impressão digital do convite aberto naquela aba, evitando aceitar um convite de outra aba. Não armazenar o token no cliente.
 
 ## Visual e acessibilidade
 
@@ -34,13 +37,27 @@ Usar `docs/design-system.md` como contrato visual e `banani-selecao.json` como r
 
 ## Stack, comandos e estrutura
 
-Next.js com TypeScript, no monorepo, em `apps/web/`; backend Rails API e PostgreSQL permanecem separados. Não há frontend instalado, lockfile, versão de Next.js, gerenciador de pacotes, comandos de desenvolvimento/build/lint/teste ou convenção de testes frontend existentes para esta aplicação. Essas escolhas e comandos exatos devem ser definidos e verificados antes da implementação; não são resultados já observados. O frontend terá imagem própria quando os gates de containerização aplicáveis estiverem cumpridos.
+Next.js 16.4.3, React 19.3.1 e TypeScript no monorepo; backend Rails API e PostgreSQL permanecem separados. O `package-lock.json` fixa as dependências. O runtime de desenvolvimento e teste é Node.js 24 em container não root; a imagem de frontend para deploy depende dos gates de containerização aplicáveis.
 
-Estrutura certa: `apps/web/` é a raiz da aplicação; endpoints existentes constam de `apps/web/endpoints.md`; documentação e specs permanecem na raiz e em `docs/`. Subdiretórios de código e testes, estilo e exemplo real ainda dependem da implementação e não devem ser apresentados como existentes.
+- Desenvolvimento: `npm run dev -- --hostname 0.0.0.0`
+- Dependências: `npm ci --ignore-scripts`
+- Formatação: `npm run format:check`
+- Lint: `npm run lint`
+- Tipos: `npm run typecheck`
+- Testes: `npm test`
+- Build: `npm run build`
+
+Os comandos são executados a partir de `apps/web/`, dentro do container. `src/app/` contém rotas, telas e handlers; `src/components/` reúne o shell e a sessão; `src/lib/` contém o cliente HTTP. Testes comportamentais ficam junto à lógica testada. A lista dos endpoints existentes está em `apps/web/endpoints.md`.
+
+O estilo usa TypeScript estrito, componentes por tarefa, nomes explícitos e formatação Prettier. Exemplo da regra de apresentação, em `src/app/dashboard/presentation.mjs`:
+
+```js
+if (masked || value === "*") return { value: "*", note: "Sem permissão" };
+```
 
 ## Testes e verificação
 
-Exercitar no navegador real desktop e móvel: login/onboarding, troca de vínculo, cadastro e ciclo de monitoramentos, administração restrita, comunicações com HTML da fonte escapado, identidade pendente e dashboard com zero, falha, parcial e máscara. Confirmar erros e ausência de acesso com chamadas reais; RLS e autorização do servidor não são substituídas por controles escondidos. Testar login Google real quando houver credenciais, sem incluí-las no repositório. Definir comando de testes e lint conforme ferramentas escolhidas; testar isoladamente casos de estado e segurança relevantes e rodar verificação integrada antes do aceite.
+Exercitar no navegador headless desktop e móvel: login/onboarding, troca de vínculo, cadastro e ciclo de monitoramentos, administração restrita, comunicações com HTML da fonte escapado, identidade pendente e dashboard com zero, falha, parcial e máscara. Confirmar erros e ausência de acesso com chamadas reais; RLS e autorização do servidor não são substituídas por controles escondidos. Testar login Google real quando houver credenciais, sem incluí-las no repositório. `node:test` cobre bordas de estado e transporte; executar também lint, tipos, formatação, build e verificação integrada.
 
 ## Fronteiras
 
@@ -48,6 +65,6 @@ Exercitar no navegador real desktop e móvel: login/onboarding, troca de víncul
 - **Pedir aprovação:** mudanças em regras funcionais, permissões, schema, fontes ou escopo; gates humanos de checkpoints continuam vigentes.
 - **Nunca:** registrar segredos, confiar tenant enviado pelo cliente, exibir números negados, tratar falha como zero, inserir HTML bruto da fonte ou alegar integração e verificação não realizadas.
 
-## Questões técnicas a resolver antes do código
+## Dependências externas para comprovação
 
-Versões e gerenciador de pacotes; comandos reproduzíveis de execução, build e verificação; organização concreta e padrões de estilo; estratégia de comunicação segura entre origens, cookies e CSRF; configuração de OAuth real e infraestrutura. Soluções devem respeitar o backend existente e as regras de documentação de variáveis. A disponibilidade de credenciais externas é condição para comprovar Google real, não evidência de que já esteja configurado.
+O teste de OAuth Google real exige cliente web e segredo externos configurados para `APP_ORIGIN/auth/google/callback`; a entrega SMTP real exige servidor e credenciais externos. Sessões e convites controlados comprovam os caminhos internos, não essas integrações externas.

@@ -2,17 +2,17 @@
 
 Monorepo da plataforma de monitoramento de publicações judiciais voltada a advogados independentes e suas equipes, reunindo backend Rails API-only e frontend Next.js no mesmo repositório. A fonte inicial é o Diário de Justiça Eletrônico Nacional (DJEN), exclusivamente Diário Eletrônico (`D`), sem coleta de editais (`E`): na primeira coleta, cadernos com fallback paginado; na segunda, API paginada diretamente.
 
-> **Estado atual:** o backend contém onboarding, identidade de equipe, grupos, permissões, cadastros, planejamento, coleta, consulta de comunicações e dados da dashboard. O frontend e o Swagger UI ainda não estão implementados.
+> **Estado atual:** o backend contém identidade, autorização, monitoramentos, coleta, consulta e dashboard. A interface Next.js fica em `apps/web/`; o Swagger UI ainda não está implementado.
 
 ## Estrutura do monorepo
 
-A raiz é compartilhada pelo produto inteiro; não é a raiz de uma aplicação Rails nem de uma aplicação Next.js isolada. Cada componente mantém suas dependências, comandos e artefatos de execução. Diretórios previstos abaixo ainda não existem e não representam implementação concluída.
+A raiz é compartilhada pelo produto inteiro; não é a raiz de uma aplicação Rails nem de uma aplicação Next.js isolada. Cada componente mantém suas dependências, comandos e artefatos de execução.
 
 | Caminho relativo à raiz | Responsabilidade | Situação |
 |---|---|---|
 | `backend/` | API Rails, domínio, persistência e testes; dependências em `backend/Gemfile` e `backend/Gemfile.lock`. | Existente. |
 | `backend/despachante/` | Despachante de coletas, processo Ruby separado da API, com `Gemfile` e lockfile próprios. | Existente; pertence ao backend e ao mesmo monorepo, mas não executa dentro do servidor Rails. |
-| `frontend/` | Interface Next.js com TypeScript e App Router; páginas, componentes e estilos do produto. | Previsto, ainda não criado. |
+| `apps/web/` | Interface Next.js com TypeScript e App Router; páginas, componentes e estilos do produto. | Existente. |
 | `etl/` | Execução da coleta, em processo separado da API e do despachante. | Existente; processador automático com retomada. |
 | `docs/` | Especificação geral, arquitetura, contratos técnicos e direção visual compartilhados. | Existente. |
 | `tasks/` | Plano, gates e checklist de implementação do monorepo. | Existente. |
@@ -20,7 +20,7 @@ A raiz é compartilhada pelo produto inteiro; não é a raiz de uma aplicação 
 
 Frontend e API terão imagens Docker separadas. O despachante já tem target próprio `despachante` em `backend/Dockerfile`; o target da API é `runtime`. Processos e imagens separados não significam repositórios separados. PostgreSQL é infraestrutura compartilhada: imagem separada somente para testes locais e instância já existente no deploy.
 
-A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha as fronteiras. O [guia visual](docs/design-system.md#escopo-no-monorepo) orienta a interface de `frontend/`, não uma aplicação independente deste repositório.
+A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha as fronteiras. O [guia visual](docs/design-system.md#escopo-no-monorepo) orienta a interface de `apps/web/`, não uma aplicação independente deste repositório.
 
 ## Escopo funcional
 
@@ -41,13 +41,36 @@ O projeto é um monorepo. As imagens de frontend e backend serão separadas; a i
 
 Versões de referência e limites da decisão: [`docs/stack.md`](docs/stack.md). Estrutura e ferramentas propostas para os demais componentes estão em [`docs/arquitetura.md`](docs/arquitetura.md).
 
+## Interface web em desenvolvimento
+
+`apps/web/` usa Node.js 24, npm e Next.js App Router. A API precisa estar disponível em uma rede Docker compartilhada; os comandos abaixo usam `advocacia-local`, com um proxy HTTPS à frente do frontend. Configure `APP_ORIGIN`, `RAILS_API_ORIGIN` e `AUTH_INGRESS_SECRET` no ambiente protegido antes de executar. O exemplo usa a imagem Node para desenvolvimento, não uma imagem de deploy do produto.
+
+```bash
+mkdir -p apps/web/node_modules apps/web/.next
+docker run --rm -it --name advocacia-web --network advocacia-local \
+  --user "$(id -u):$(id -g)" \
+  --mount "type=bind,source=$PWD/apps/web,target=/workspace" \
+  --tmpfs "/workspace/node_modules:exec,uid=$(id -u),gid=$(id -g),mode=0775" \
+  --tmpfs "/workspace/.next:uid=$(id -u),gid=$(id -g),mode=0775" \
+  --tmpfs /tmp:mode=1777 -w /workspace -e HOME=/tmp \
+  -e APP_ORIGIN -e RAILS_API_ORIGIN -e AUTH_INGRESS_SECRET \
+  node:24.22.1-alpine \
+  sh -c 'npm ci --ignore-scripts && npm run dev -- --hostname 0.0.0.0'
+```
+
+Enquanto o container estiver ativo, `docker exec advocacia-web npm run format:check`, `docker exec advocacia-web npm run lint`, `docker exec advocacia-web npm run typecheck`, `docker exec advocacia-web npm test` e `docker exec advocacia-web npm run build` executam as verificações. O diretório de dependências e o build usam tmpfs; não são instalados no host.
+
+O ingresso público deve terminar TLS, encaminhar a mesma origem ao Next.js e **substituir**, não concatenar nem confiar nos valores do navegador, os cabeçalhos `X-Advocacia-Client-IP` pelo endereço IP real do cliente e `X-Advocacia-Ingress-Secret` pelo valor protegido de `AUTH_INGRESS_SECRET` nas requisições a `/auth/google`. O segredo deve ser acessível somente ao ingresso e ao processo Next.js; impedir acesso público direto ao Next.js e à API. O Next.js envia o IP autenticado ao Rails para preservar a limitação por cliente; a conexão interna deve vir de uma rede de proxy confiável para a configuração Rails. Se houver balanceador anterior, o ingresso só pode usar o IP repassado por ele depois de validar sua cadeia de confiança.
+
+Não registrar query strings do callback OAuth nem os cabeçalhos internos em logs de ingresso ou observabilidade. O login requer cliente Google registrado e o convite requer SMTP configurado. A API e o frontend compartilham `APP_ORIGIN`; cookies `Secure` e CSRF exigem HTTPS também no desenvolvimento. Leituras e mutações exigem um navegador com Web Locks em contexto seguro para coordenar sessões e vínculos entre abas. O relay aceita até 1 MiB de corpo por requisição e impõe prazo de 20 segundos; configure também limites de corpo e tempo no ingresso HTTPS. Se uma mutação perder a confirmação, consulte o estado antes de repeti-la.
+
 ## Swagger UI e acesso à documentação
 
 Requisito registrado: a documentação interativa da API será publicada com Swagger UI e protegida por login e senha. O contrato proposto usa autenticação HTTP Basic separada do login Google, exclusivamente por HTTPS, conforme [`docs/arquitetura.md`](docs/arquitetura.md#identidade-convites-e-documentação). O Swagger UI ainda não existe; não há usuário ou senha padrão, nem credenciais versionadas.
 
 ## Variáveis de ambiente
 
-As variáveis abaixo são lidas pelo backend, por seus testes ou configuradas nas imagens e nos processos indicados; a conexão do processador é exclusiva dessa fronteira. Forneça valores sem default pelo gerenciador de segredos ou ambiente protegido do deploy; não versione credenciais nem URLs contendo senhas. As credenciais Google exigem um cliente OAuth web registrado externamente, com URI de redirecionamento exatamente `APP_ORIGIN/auth/google/callback`.
+As variáveis abaixo são lidas pelos componentes, seus testes ou processos indicados; a conexão do processador é exclusiva dessa fronteira. Forneça valores sem default pelo gerenciador de segredos ou ambiente protegido do deploy; não versione credenciais nem URLs contendo senhas. As credenciais Google exigem um cliente OAuth web registrado externamente, com URI de redirecionamento exatamente `APP_ORIGIN/auth/google/callback`.
 
 | Variável | Default | Obrigatória? | Finalidade |
 |---|---|---|---|
@@ -63,7 +86,9 @@ As variáveis abaixo são lidas pelo backend, por seus testes ou configuradas na
 | `COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS` | `60` | Não | Espera em segundos após a primeira falha, inteiro positivo; alterações requerem aprovação. |
 | `COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS` | `300` | Não | Espera em segundos após a segunda falha, inteiro positivo; alterações requerem aprovação. |
 | `PROCESSADOR_TEST_ADMIN_DATABASE_URL` | Nenhum | Sim, apenas na integração do processador em banco descartável | Conexão administrativa usada exclusivamente para preparar e remover dados sintéticos do teste; fornecer no ambiente protegido de teste, nunca no processo de produção ou com acesso a banco real. |
-| `APP_ORIGIN` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS da API, sem caminho ou credenciais; valida origem de operações mutáveis e compõe o callback Google. |
+| `APP_ORIGIN` | Nenhum | Sim, para frontend, API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS compartilhada, sem caminho ou credenciais; forneça pelo ambiente protegido. A API valida origens de operações mutáveis e compõe o callback Google; o proxy web usa seu host canônico para contatar a API. |
+| `RAILS_API_ORIGIN` | Nenhum | Sim, no frontend | Origem interna da API Rails, acessível somente ao servidor Next.js; forneça pela configuração protegida do ambiente, sem expô-la ao navegador. |
+| `AUTH_INGRESS_SECRET` | Nenhum | Sim, no frontend para iniciar login Google | Segredo compartilhado com o proxy HTTPS confiável para autenticar o IP do cliente encaminhado à limitação de login. Gere pelo menos 32 bytes aleatórios e forneça ao Next.js e ao proxy por um gerenciador de segredos; nunca o exponha ao navegador nem registre seu valor. Sem ele ou sem os cabeçalhos confiáveis, o login falha fechado. |
 | `GOOGLE_CLIENT_ID` | Nenhum | Sim, para autenticação Google | Identificador do cliente OAuth web. |
 | `GOOGLE_CLIENT_SECRET` | Nenhum | Sim, para autenticação Google | Segredo do cliente OAuth web; fornecer por mecanismo de segredos. |
 | `SMTP_HOST` | Nenhum | Sim, para enviar convites | Host do servidor SMTP; fornecer pela configuração protegida do ambiente. |
@@ -100,7 +125,11 @@ Não há prazo automático de retenção do Escrevente nesta etapa. As configura
 
 ## Implementação e verificações
 
-As evidências registradas nesta seção são anteriores à renomeação para processador e não comprovam a configuração renomeada; não foram repetidas nesta alteração.
+**Interface web:** em containers não root, `npm run format:check`, `npm run lint`, `npm run typecheck` e `npm test` passaram; o runner executou **33 testes**, sem falhas ou skips. `npm run build` gerou o build Next.js de produção. No Chromium headless, o build foi exercitado com Rails e PostgreSQL descartável: onboarding, troca de vínculo entre abas, operações de monitoramento e equipe, grupos, dashboard parcial e mascarada, comunicações independentes e HTML da fonte como texto. A 320 px não houve transbordamento horizontal.
+
+Um SMTP descartável com STARTTLS e certificado de teste recebeu criação e reemissão de convite; o link efetivamente entregue foi aberto e aceito pela interface com sessão sintética. Também foi exercitada a falha de SMTP sem perder a credencial. Não houve login Google nem entrega em servidor SMTP externos. A consulta ao catálogo real do DJEN retornou 503 na API, após a fonte responder 403 neste ambiente; o fluxo de seleção bem-sucedida de tribunal real continua sem comprovação. O checklist detalhado está em [`apps/web/endpoints.md`](apps/web/endpoints.md).
+
+Os registros históricos a seguir são anteriores à renomeação para processador e não comprovam, por si só, a configuração renomeada.
 
 O histórico da consolidação anterior registra 276 testes e 7.678 assertions, comparação de catálogo e smoke de onboarding; esses resultados não comprovam as alterações posteriores de identidade e autorização.
 
@@ -124,7 +153,7 @@ O corpo do POST contém `full_name`, `primary_oab` com `number` e `uf`, `seconda
 
 A identidade Google pode ter vínculos em vários tenants. `GET /api/session` informa os vínculos disponíveis; `PATCH /api/session/membership` seleciona um `membership_id` validado pelo servidor e `DELETE /api/session` encerra a sessão. Uma credencial de equipe exige `validity_days` explícito: `null` para sem expiração ou inteiro positivo, contado em períodos de 24 horas desde a criação ou renovação. Alterar a escolha não altera o vencimento até a renovação; revogação é imediata e não é revertida por renovação.
 
-O titular administra credenciais em `GET`/`POST /api/team/credentials`, `PATCH`/`DELETE /api/team/credentials/:id`, `POST /api/team/credentials/:id/renewal` e `POST /api/team/credentials/:id/invitation`. A criação recebe `email`, `validity_days` e `group_ids` opcional. O convite é enviado por SMTP após o commit: se a entrega não for confirmada, a credencial permanece criada e o titular pode reemitir o convite. A reemissão invalida o link anterior sem reiniciar a validade. O link usa fragmento `#token=...`; o cliente deve enviar o token em `POST /api/team/invitations/accept`, com sessão Google, `Origin` e CSRF. O frontend que lê esse fragmento ainda não existe. Não registrar o token nem o conteúdo do convite.
+O titular administra credenciais em `GET`/`POST /api/team/credentials`, `PATCH`/`DELETE /api/team/credentials/:id`, `POST /api/team/credentials/:id/renewal` e `POST /api/team/credentials/:id/invitation`. A criação recebe `email`, `validity_days` e `group_ids` opcional. O convite é enviado por SMTP após o commit: se a entrega não for confirmada, a credencial permanece criada e o titular pode reemitir o convite. A reemissão invalida o link anterior sem reiniciar a validade. O link usa fragmento `#token=...`; a interface preserva o token durante o login e o envia a `POST /api/team/invitations/accept`, com sessão Google, `Origin` e CSRF. Não registrar o token nem o conteúdo do convite.
 
 O titular administra grupos, regras e associações em `/api/authorization/groups`, suas rotas `/:id/rules` e `/:id/memberships/:membership_id`; `GET /api/authorization/catalog` lista as operações. Uma regra contém `operation`, `effect` (`allow` ou `deny`) e `court` (`null` para escopo geral). Sem grupos, equipe recebe as leituras padrão; com grupos, concessões se somam e negação explícita prevalece. Escritas exigem concessões distintas. A consulta e a dashboard aplicam a política por tribunal e operação no servidor.
 
@@ -157,7 +186,7 @@ A identidade incompleta aparece com `identity_status: "pending"` e `warning: "po
 
 A dashboard usa `America/Sao_Paulo`, `as_of` e `periods` com `today`, `week` e `last_seven_days`; cada período contém `start`, `end`, `communications` e `processes`. O início é inclusivo e o fim exclusivo. Uma comunicação completa é contada na primeira persistência; processos usam CNJ canônico válido e são distintos por janela. A agregação considera somente tribunais autorizados cujo trabalho esteja integralmente concluído. `state` distingue `succeeded`, `partial`, `running`, `failed`, `no_work`, `unavailable` e `masked`; sem tribunal concluído, números são `null`, não zero. Sem permissão de dashboard, cada número é `*`, sem valor subjacente na resposta.
 
-Para o estado corrente de cada tribunal usa-se o último slot relevante do dia; um planejamento posterior falho, interrompido ou sem trabalho não herda o sucesso anterior. Avisos de falhas persistentes incluem apenas tribunais legíveis e permanecem até sucesso integral em slot posterior do mesmo dia. Falhas não recuperadas em dias anteriores continuam sinalizadas sem iniciar coleta retroativa. As telas e a apresentação visual ainda não existem.
+Para o estado corrente de cada tribunal usa-se o último slot relevante do dia; um planejamento posterior falho, interrompido ou sem trabalho não herda o sucesso anterior. Avisos de falhas persistentes incluem apenas tribunais legíveis e permanecem até sucesso integral em slot posterior do mesmo dia. Falhas não recuperadas em dias anteriores continuam sinalizadas sem iniciar coleta retroativa. As telas correspondentes estão em `apps/web/`.
 
 **Verificação:** em PostgreSQL 18.6 descartável, com roles segregadas, `ruby bin/rails test test/integration/communications_http_test.rb test/integration/dashboard_http_test.rb` executou 47 testes e 691 assertions; `ruby bin/rails test` executou 460 testes e 10.503 assertions, sem falhas, erros ou skips. No smoke HTTP em servidor Rails não root, o processador persistiu comunicação e pendência, registrou falha de tribunal e recuperou no segundo slot; a API retornou estado parcial, máscara para equipe restrita e contagens de 2 comunicações e 2 processos após a recuperação. O smoke usou fonte controlada e sessões preparadas, não Google OAuth real.
 
@@ -194,7 +223,7 @@ Após uma tentativa frustrada, o processador libera a concessão enquanto aguard
 
 Cada trabalho consulta somente Diário Eletrônico (`D`) no dia corrente de `America/Sao_Paulo`. Na primeira coleta, valida integralmente o ZIP do caderno e, após esgotar as tentativas, percorre a API paginada até a primeira página vazia válida; na segunda, inicia diretamente pela API, sem caderno. Contadores, etapa e espera são persistidos; falha posterior não publica páginas parciais. Somente para resultados da API, Loofah converte o campo `texto` em texto simples, removendo HTML, scripts e estilos e decodificando entidades; cadernos são persistidos sem essa sanitização. Como a primeira versão é preservada na deduplicação, uma comunicação inicialmente obtida de caderno pode continuar contendo HTML mesmo se também aparecer na API. Todo texto da fonte deve ser escapado pelo consumidor na renderização.
 
-`collection_communications`, `collection_communication_links`, `collection_job_results` e `collection_job_failures` armazenam resultados, vínculos e falhas fora dos marcos do Escrevente. A função `app_private.collection_court_states(uuid)` agrega o estado do tribunal sob a sessão autenticada; contagens ficam `NULL` quando o tribunal não terminou integralmente. As telas de consulta ainda não existem.
+`collection_communications`, `collection_communication_links`, `collection_job_results` e `collection_job_failures` armazenam resultados, vínculos e falhas fora dos marcos do Escrevente. A função `app_private.collection_court_states(uuid)` agrega o estado do tribunal sob a sessão autenticada; contagens ficam `NULL` quando o tribunal não terminou integralmente. A consulta está integrada à interface em `apps/web/`.
 
 Para os testes de integração isolados, forneça também `PROCESSADOR_TEST_ADMIN_DATABASE_URL` de um PostgreSQL descartável e execute `docker run --rm --network <rede-de-teste> -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL <imagem-de-teste-do-processador>`. A conexão administrativa é exclusiva da preparação de dados sintéticos; não deve ser fornecida ao processador de produção.
 

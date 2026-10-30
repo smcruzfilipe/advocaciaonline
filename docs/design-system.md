@@ -1,13 +1,13 @@
 # Direção visual: UI, tipografia e cores
 
-**Estado:** contrato visual para a futura interface do Advocacia Online, baseado na direção solicitada: cantos retos, preto e branco e composição funcional. As medidas e os tokens abaixo são propostas de aplicação, não estilos já implementados. Esta entrega é documental; não cria frontend, componentes, dependências ou imagens Docker e não altera os gates do [plano](../tasks/plan.md).
+**Estado:** contrato visual do Advocacia Online: cantos retos, preto e branco e composição funcional. A interface em `apps/web/` aplica esta direção; o guia por si só não comprova conformidade visual ou de acessibilidade e não altera os gates do [plano](../tasks/plan.md).
 
 ## Escopo no monorepo
 
 O Advocacia Online é um **monorepo**: a interface Next.js e a API Rails pertencem ao mesmo repositório, não a projetos versionados separadamente. A [estrutura do monorepo](../README.md#estrutura-do-monorepo) distingue caminhos existentes de componentes previstos.
 
 - `docs/design-system.md`, na raiz documental compartilhada, é o contrato visual do produto.
-- `frontend/` é o componente Next.js previsto para implementar este contrato: páginas em `frontend/app/`, componentes em `frontend/components/` e tokens/estilos mantidos dentro do frontend. Esse diretório ainda não foi criado; este guia não é um frontend independente.
+- `apps/web/` é o componente Next.js que implementa este contrato: páginas em `apps/web/src/app/`, componentes em `apps/web/src/components/` e estilos mantidos dentro do aplicativo.
 - `backend/` contém a API Rails, responsável por identidade, autorização, domínio e persistência. Não recebe estilos nem renderiza a UI Next.js.
 - `backend/despachante/` contém o despachante, executado fora do servidor da API; não possui interface própria. `etl/` contém o processador, também sem UI, no mesmo monorepo.
 
@@ -162,4 +162,4 @@ Antes de declarar uma tela aderente:
 - Medir contraste nos pares realmente renderizados, incluindo hover, seleção, erro, indisponibilidade e cores forçadas.
 - Exercitar os estados da tabela com respostas reais autorizadas e restritas; conferir que nenhuma falha vira zero e nenhum valor negado chega ao navegador.
 
-**Limite desta entrega:** houve inspeção documental e do CSS da referência, não execução ou inspeção em navegador do Publique. Não há frontend implementado neste repositório para validar visualmente. Os critérios acima são aceite futuro, não verificações concluídas nem declaração de conformidade WCAG.
+**Limite da referência:** a direção original foi baseada em inspeção documental e do CSS, não em execução ou inspeção em navegador do Publique. Os critérios acima não são, por si, declaração de conformidade WCAG; verificações da implementação são registradas no README.
