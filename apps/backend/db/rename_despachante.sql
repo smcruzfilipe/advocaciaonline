@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 -- Administrative upgrade, not a Rails migration. Stop the old collection process
 -- and concurrent provisioning/migrations before running this in the application DB:
--- psql -X --username=<administrator> --dbname=<application_database> --file=backend/db/rename_despachante.sql
+-- psql -X --username=<administrator> --dbname=<application_database> --file=apps/backend/db/rename_despachante.sql
 -- Use a PostgreSQL superuser, or an administrator with CREATEROLE, ADMIN OPTION
 -- on the old role and ownership of every affected table. Migrator is not sufficient.
 --

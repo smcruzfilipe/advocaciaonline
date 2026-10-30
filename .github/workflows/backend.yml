@@ -30,10 +30,10 @@ jobs:
           persist-credentials: false
       - name: Build backend, despachante and processador images
         run: |
-          docker build --target test -t advocacia-ci:test backend
-          docker build --target despachante -t advocacia-ci:despachante backend
-          docker build --target test -t advocacia-ci:processador-test etl
-          docker build --target runtime -t advocacia-ci:processador etl
+          docker build --target test -t advocacia-ci:test apps/backend
+          docker build --target despachante -t advocacia-ci:despachante apps/backend
+          docker build --target test -t advocacia-ci:processador-test apps/etl
+          docker build --target runtime -t advocacia-ci:processador apps/etl
       - name: Start isolated PostgreSQL as non-root
         run: |
           docker network create --internal advocacia-ci
@@ -45,7 +45,7 @@ jobs:
       - name: Provision isolated roles
         run: |
           for file in provision.sql provision_despachante.sql provision_processador.sql; do
-            docker exec -i advocacia-ci-db psql -v ON_ERROR_STOP=1 -U postgres -d advocacia_test < "backend/db/$file"
+            docker exec -i advocacia-ci-db psql -v ON_ERROR_STOP=1 -U postgres -d advocacia_test < "apps/backend/db/$file"
           done
       - name: Apply migrations
         run: |

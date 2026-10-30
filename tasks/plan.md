@@ -62,7 +62,7 @@ Executar as fatias em ordem de dependência. IDs são os principais do checklist
 
 #### Plano da branch 13a–13b — execução e recuperação
 
-**Objetivo:** ligar os trabalhos duráveis já planejados ao processo `etl/`, sem mover o processamento para a API Rails nem alterar as regras de fonte, identidade ou tenant. `backend/despachante/run.rb` planeja slots; `etl/bin/processador` consome a fila e também aceita um UUID específico.
+**Objetivo:** ligar os trabalhos duráveis já planejados ao processo `apps/etl/`, sem mover o processamento para a API Rails nem alterar as regras de fonte, identidade ou tenant. `apps/backend/despachante/run.rb` planeja slots; `apps/etl/bin/processador` consome a fila e também aceita um UUID específico.
 
 1. **Contrato de seleção:** `app_private.processor_next(limite)` seleciona e concede trabalho por transação, usando `FOR UPDATE SKIP LOCKED`; expõe apenas UUID, estado e token à role do processador. Instâncias concorrentes não obtêm a mesma concessão, retomam trabalho após expiração e ignoram datas futuras e estados terminais. Trabalho antigo só é concedido para registrar interrupção, sem acesso à fonte.
 2. **13a — Execução:** integrar os slots planejados à execução dos trabalhos, reutilizando as tentativas, esperas, limites, fallback e estados persistentes do processador. Preservar separação de processos e diferenciar falha, pendência e sucesso vazio por execução/tribunal.
@@ -80,9 +80,9 @@ Executar as fatias em ordem de dependência. IDs são os principais do checklist
 
 O escopo desta branch é o backend: as interfaces e a aprovação dos checkpoints permanecem pendentes. Os endpoints de consulta e dashboard reutilizam a sessão autenticada, o bloqueio de autorização e as políticas RLS existentes; o tenant nunca é aceito do cliente.
 
-1. **Consulta:** `backend/app/controllers/communications_controller.rb` e eventuais serviços específicos consultam comunicações e vínculos preservados pela coleta, aplicando a autorização por tribunal à lista e ao detalhe. As comunicações permanecem independentes; pendências de identidade mantêm o aviso. O conteúdo da fonte é não confiável e a futura interface deve escapá-lo.
-2. **Dashboard:** `backend/app/controllers/dashboard_controller.rb` e eventuais serviços específicos calculam as duas métricas e as três janelas aprovadas, com recorte por tribunais autorizados e estados operacionais. Negação da dashboard devolve `*` sem disponibilizar o valor protegido; falha, ausência de conclusão e zero permanecem distintos.
-3. **Integração:** `backend/config/routes.rb` expõe os endpoints; testes HTTP próprios em `backend/test/integration/` verificam tenants, grupos, tribunais, pendências, janelas, falhas e recuperação. O README registra os contratos HTTP e suas limitações. Não há frontend nem alteração das fontes de coleta.
+1. **Consulta:** `apps/backend/app/controllers/communications_controller.rb` e eventuais serviços específicos consultam comunicações e vínculos preservados pela coleta, aplicando a autorização por tribunal à lista e ao detalhe. As comunicações permanecem independentes; pendências de identidade mantêm o aviso. O conteúdo da fonte é não confiável e a futura interface deve escapá-lo.
+2. **Dashboard:** `apps/backend/app/controllers/dashboard_controller.rb` e eventuais serviços específicos calculam as duas métricas e as três janelas aprovadas, com recorte por tribunais autorizados e estados operacionais. Negação da dashboard devolve `*` sem disponibilizar o valor protegido; falha, ausência de conclusão e zero permanecem distintos.
+3. **Integração:** `apps/backend/config/routes.rb` expõe os endpoints; testes HTTP próprios em `apps/backend/test/integration/` verificam tenants, grupos, tribunais, pendências, janelas, falhas e recuperação. O README registra os contratos HTTP e suas limitações. Não há frontend nem alteração das fontes de coleta.
 4. **Verificação:** executar testes focados e suíte existente usando PostgreSQL descartável com roles reais; exercitar o caminho HTTP definitivo com dados controlados, inclusive negação e estado terminal. As tarefas 14a e 15b só serão encerradas integralmente quando a interface também for entregue.
 
 #### Branch frontend-web — implementação da interface

@@ -8,27 +8,10 @@ O Advocacia Online é um **monorepo**: a interface Next.js e a API Rails pertenc
 
 - `docs/design-system.md`, na raiz documental compartilhada, é o contrato visual do produto.
 - `apps/web/` é o componente Next.js que implementa este contrato: páginas em `apps/web/src/app/`, componentes em `apps/web/src/components/` e estilos mantidos dentro do aplicativo.
-- `backend/` contém a API Rails, responsável por identidade, autorização, domínio e persistência. Não recebe estilos nem renderiza a UI Next.js.
-- `backend/despachante/` contém o despachante, executado fora do servidor da API; não possui interface própria. `etl/` contém o processador, também sem UI, no mesmo monorepo.
+- `apps/backend/` contém a API Rails, responsável por identidade, autorização, domínio e persistência. Não recebe estilos nem renderiza a UI Next.js.
+- `apps/backend/despachante/` contém o despachante, executado fora do servidor da API; não possui interface própria. `apps/etl/` contém o processador, também sem UI, no mesmo monorepo.
 
-Frontend e backend terão imagens distintas, preservando o repositório único. Reutilizar a direção visual do Publique não significa importar sua organização de pastas, criar outro repositório ou deslocar o backend existente. As fronteiras técnicas estão na [arquitetura](arquitetura.md#estrutura-do-monorepo-e-fronteiras).
-
-## Referência e adaptação
-
-A referência citada como `public` foi localizada nesta máquina em `/home/filipe/publique`. Foram consultados `DESIGN.md` e `apps/web/src/app/globals.css`, especialmente o tema operacional `.banani-console.console-layout` e suas regras de acesso e responsividade. Esses caminhos identificam a origem; não são dependências necessárias para usar este guia.
-
-O CSS global do Publique também contém um tema de marketing com JetBrains Mono, gradientes e formas arredondadas. Ele não é a base desta direção. O console operacional usa uma stack de sistema, branco, preto-piano, azul funcional, raio de 4px e ausência de sombras. O CSS específico do console prevalece como evidência sobre descrições antigas do próprio `DESIGN.md`.
-
-| Aspecto | Observado no console do Publique | Direção para o Advocacia Online |
-|---|---|---|
-| Composição | Superfícies planas, separadores e navegação lateral | Preservar organização por tarefa e hierarquia sem elevação. |
-| Cantos | Raio de 4px em controles e painéis | Raio **zero** nos elementos desenhados pela aplicação. |
-| Cores | Branco, preto-piano `#0B0D12`, neutros e azul `#155EEF` | Preto, branco e cinzas neutros; sem azul de ação. |
-| Tipografia | Fonte de sistema, corpo 16px/1,5, pesos regulares e negritos | Preservar a família e a legibilidade; escala própria abaixo. |
-| Estados | Textos, avisos e cores funcionais | Texto explícito, borda e ícone opcional; sem depender de cores cromáticas. |
-| Adaptação | Sidebar de 248px; navegação superior até 1024px | Mesma ideia de reorganização, com dimensões propostas neste guia. |
-
-Adotar ideias visuais, não marca, textos, imagens, fluxos comerciais ou regras de permissão do Publique. Este guia define apresentação; as [especificações funcionais](especificacao.md) continuam prevalecendo em dados, ações e autorização.
+Frontend e backend terão imagens distintas, preservando o repositório único. As fronteiras técnicas estão na [arquitetura](arquitetura.md#estrutura-do-monorepo-e-fronteiras). Este guia define apresentação; as [especificações funcionais](especificacao.md) prevalecem em dados, ações e autorização.
 
 ## Princípios de UI
 
@@ -162,4 +145,4 @@ Antes de declarar uma tela aderente:
 - Medir contraste nos pares realmente renderizados, incluindo hover, seleção, erro, indisponibilidade e cores forçadas.
 - Exercitar os estados da tabela com respostas reais autorizadas e restritas; conferir que nenhuma falha vira zero e nenhum valor negado chega ao navegador.
 
-**Limite da referência:** a direção original foi baseada em inspeção documental e do CSS, não em execução ou inspeção em navegador do Publique. Os critérios acima não são, por si, declaração de conformidade WCAG; verificações da implementação são registradas no README.
+Os critérios acima não são, por si, declaração de conformidade WCAG; verificações da implementação são registradas no README.
