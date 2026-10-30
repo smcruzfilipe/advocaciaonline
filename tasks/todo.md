@@ -182,7 +182,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 6a, 4b, 2b. **Escopo:** decisão de acesso aplicada em cada operação.
   **Áreas previstas (≤5):** autorização; política de operações; filtros de dados.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos).
-  **Estado:** política por operação/tribunal implementada, testada e aplicada aos consumidores de monitoramento existentes. A consulta de comunicações e suas respostas por tribunal ainda não existem; a verificação de 6b nessas superfícies permanece pendente.
+  **Estado:** política por operação/tribunal implementada e aplicada aos monitoramentos e às APIs de comunicações e dashboard. Testes HTTP verificaram equipes sem grupos, escopo TJSP, composição e negação explícita; o checkpoint 2 e a interface administrativa permanecem pendentes.
 
 - [ ] **6c — Aplicar a decisão de autorização da dashboard.**
   **Aceite:** (1) decidir o acesso à dashboard conforme política aprovada, tenant e escopo de tribunal; (2) aplicar a decisão no servidor e não retornar valores protegidos quando negada, sem definir sua representação visual.
@@ -191,7 +191,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 6b, 2b–2c. **Escopo:** decisão e aplicação server-side da autorização da dashboard.
   **Áreas previstas (≤5):** autorização; consulta/agregação; filtros server-side.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos); [SPEC-consulta.md — Requisitos](../SPEC-consulta.md#requisitos-e-critérios-observáveis).
-  **Estado:** a decisão `consultar_dashboard` integra o catálogo e a matriz testada; não existe operação real de dashboard/agregação à qual aplicá-la ou submetê-la ao smoke exigido.
+  **Estado:** autorização de dashboard aplicada à API real; testes HTTP cobrem concessão, negação, escopo parcial e ausência de consulta numérica quando negada. Smoke HTTP confirmou `*` para equipe restrita; a interface e o checkpoint 2 permanecem pendentes.
 
 ## Checkpoint 2 — após tarefas 4–6
 - [ ] Onboarding, expiração em sessão ativa, isolamento e regras de autorização demonstrados nos cenários propostos.
@@ -379,6 +379,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 12b, 11c, 6b. **Escopo:** leitura, agrupamento visual e detalhe.
   **Áreas previstas (≤5):** consulta; interface de resultados; detalhe; projeção de dados de origem.
   **Rastreio:** [SPEC-consulta.md — Escopo e contratos lógicos](../SPEC-consulta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis).
+  **Estado:** backend implementado em `backend/app/controllers/communications_controller.rb` e `backend/app/services/communication_query.rb`, com lista por tribunal, detalhe, pendências e escape JSON. O smoke HTTP verificou preservação do HTML da primeira versão sem marcação literal na resposta. A interface visual e seu escape após decodificação continuam pendentes; item não encerrado.
 
 - [ ] **14b — Autorizar lista, detalhe e agregações.**
   **Aceite:** (1) filtrar cada resposta no servidor pelo tenant autenticado e tribunais permitidos; (2) não permitir acesso cruzado por ID/tenant enviado pelo cliente; (3) aplicar restrição também a detalhes e agregações, não apenas à lista/UI.
@@ -387,6 +388,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 14a, 4b, 6b–6c, 12b. **Escopo:** autorização de todas as superfícies de consulta.
   **Áreas previstas (≤5):** consulta; filtros de autorização; detalhes; agregações.
   **Rastreio:** [SPEC-consulta.md — Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Fronteiras](../SPEC-consulta.md#fronteiras).
+  **Estado:** backend implementado e testado em lista, detalhe e agregações com sessão, RLS e autorização por tribunal; a suíte cobre identificadores de outro tenant e tribunal proibido. O fechamento integral aguarda a conclusão da dependência 14a e dos checkpoints anteriores.
 
 ### 15. Dashboard e restrição
 
@@ -397,6 +399,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 14b, 2c, 12a–12b, 13a. **Escopo:** agregações da dashboard, sem notificação por e-mail.
   **Áreas previstas (≤5):** consulta/agregação; critérios de métricas; autorização; interface da dashboard.
   **Rastreio:** [SPEC-consulta.md — Objetivo](../SPEC-consulta.md#objetivo); [Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-consulta.md#questões-abertas-e-bloqueios); [Critérios de sucesso](../SPEC-consulta.md#critérios-de-sucesso).
+  **Estado:** agregações implementadas em `backend/app/services/dashboard_snapshot.rb`, com janelas de Brasília, primeira persistência e processos CNJ distintos. Testes de fronteira e smoke HTTP confirmaram as métricas; o fechamento formal aguarda 14b.
 
 - [ ] **15b — Exibir `*` e avisos de falha sem vazamento.**
   **Aceite:** (1) exibir `*` para valores numericamente negados e nunca entregar os valores protegidos por rota/aggregate alternativo; (2) avisar tribunal com falha persistente e distingui-la de sucesso com zero publicações; (3) manter acesso a cada aviso/métrica dentro de tenant e tribunal autorizados.
@@ -405,6 +408,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 15a, 6c, 13a, 14b. **Escopo:** apresentação protegida e estado operacional.
   **Áreas previstas (≤5):** dashboard; aviso por tribunal; autorização; consulta de estado.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Fronteiras](../SPEC-autorizacao.md#fronteiras); [SPEC-consulta.md — Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Fronteiras](../SPEC-consulta.md#fronteiras).
+  **Estado:** backend retorna `*` sem consultar métricas quando negado e identifica falhas por tribunal legível. Testes cobrem falha, pendência, recuperação e isolamento; smoke HTTP confirmou parcial, máscara e recuperação. A exibição na interface permanece pendente; item não encerrado.
 
 ## Checkpoint 5 — após tarefas 13–15
 - [ ] Recuperação no mesmo dia, consulta, volumetrias, `*`, isolamento e diferença entre falha/zero demonstrados nos cenários propostos.
