@@ -211,7 +211,7 @@ O despachante é um processo separado da API: usa uma conexão PostgreSQL exclus
 
 **Smoke histórico, anterior à restrição ao meio D:** na imagem final do despachante então vigente, usou catálogo TJAC controlado e dois tenants: os dois slots terminaram em `planned`, com advogado, parte e processo, meios D/E, critérios e vínculos conferidos para cada tenant. Repetir a execução reutilizou os mesmos slots; o despachante executou como UID/GID `1000:1000` e o PostgreSQL como `70:70`. Não houve coleta de publicações. Esse registro preserva a evidência anterior, não autoriza trabalhos E na regra vigente.
 
-O workflow `.github/workflows/backend.yml` constrói as imagens da API, do despachante e do processador e executa as suítes contra PostgreSQL descartável em rede isolada; também exercita a imagem final do despachante com catálogo controlado. O banco e os processos das imagens iniciam sem root; a autenticação `trust` é restrita à rede de teste descartável e não é configuração de produção. A verificação automatizada não comprova login Google real nem cobertura global do DJEN.
+O workflow `.github/workflows/backend.yml` constrói as imagens da API, do despachante e do processador e executa as suítes contra PostgreSQL descartável em rede isolada; também exercita a imagem final do despachante com catálogo controlado. O smoke seleciona uma data posterior aos planos globais deixados pelas suítes, sem reutilizar um slot criado antes do advogado de teste. O banco e os processos das imagens iniciam sem root; a autenticação `trust` é restrita à rede de teste descartável e não é configuração de produção. A verificação automatizada não comprova login Google real nem cobertura global do DJEN.
 
 ### Processador DJEN
 
