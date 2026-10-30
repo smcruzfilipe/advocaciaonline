@@ -1,0 +1,46 @@
+# Checklist de integração dos endpoints — web
+
+Fonte: `backend/config/routes.rb`. Itens indicam integração e verificação no frontend, não implementação do backend. Rotas administrativas de coleta e callback OAuth devem ser avaliadas conforme sua finalidade; não presumir que todas exigem tela.
+
+- [ ] `GET /auth/google` — `google_sessions#new`
+- [ ] `GET /auth/google/callback` — `google_sessions#create`
+- [ ] `GET /api/session` — `sessions#show`
+- [ ] `PATCH /api/session/membership` — `sessions#update`
+- [ ] `DELETE /api/session` — `sessions#destroy`
+- [ ] `GET /api/team/credentials` — `team_credentials#index`
+- [ ] `POST /api/team/credentials` — `team_credentials#create`
+- [ ] `PATCH /api/team/credentials/:id` — `team_credentials#update`
+- [ ] `POST /api/team/credentials/:id/renewal` — `team_credentials#renew`
+- [ ] `DELETE /api/team/credentials/:id` — `team_credentials#destroy`
+- [ ] `POST /api/team/credentials/:id/invitation` — `team_credentials#reissue`
+- [ ] `POST /api/team/invitations/accept` — `team_invitations#create`
+- [ ] `GET /api/authorization/catalog` — `authorization_groups#catalog`
+- [ ] `GET /api/authorization/groups` — `authorization_groups#index`
+- [ ] `POST /api/authorization/groups` — `authorization_groups#create`
+- [ ] `GET /api/authorization/groups/:id` — `authorization_groups#show`
+- [ ] `PATCH /api/authorization/groups/:id` — `authorization_groups#update`
+- [ ] `DELETE /api/authorization/groups/:id` — `authorization_groups#destroy`
+- [ ] `POST /api/authorization/groups/:id/rules` — `authorization_groups#create_rule`
+- [ ] `PATCH /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#update_rule`
+- [ ] `DELETE /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#destroy_rule`
+- [ ] `PUT /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#assign_membership`
+- [ ] `DELETE /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#remove_membership`
+- [ ] `GET /api/onboarding` — `onboardings#show`
+- [ ] `POST /api/onboarding` — `onboardings#create`
+- [ ] `GET /api/monitorings/lawyer` — `lawyer_monitorings#show`
+- [ ] `GET /api/courts` — `court_catalogs#index`
+- [ ] `GET /api/monitorings/parties` — `party_monitorings#index`
+- [ ] `POST /api/monitorings/parties` — `party_monitorings#create`
+- [ ] `GET /api/monitorings/parties/:id` — `party_monitorings#show`
+- [ ] `PATCH /api/monitorings/parties/:id` — `party_monitorings#update`
+- [ ] `GET /api/monitorings/processes` — `process_monitorings#index`
+- [ ] `POST /api/monitorings/processes` — `process_monitorings#create`
+- [ ] `GET /api/monitorings/processes/:id` — `process_monitorings#show`
+- [ ] `PATCH /api/monitorings/processes/:id` — `process_monitorings#update`
+- [ ] `GET /api/collection-runs` — `collection_runs#index`
+- [ ] `GET /api/collection-runs/:id/jobs` — `collection_runs#jobs`
+- [ ] `GET /api/collection-runs/:id/events` — `escrevente#events`
+- [ ] `GET /api/collection-runs/:id/execution` — `escrevente#execution`
+- [ ] `GET /api/communications` — `communications#index`
+- [ ] `GET /api/communications/:id` — `communications#show`
+- [ ] `GET /api/dashboard` — `dashboard#show`

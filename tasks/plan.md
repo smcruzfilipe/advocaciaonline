@@ -85,6 +85,15 @@ O escopo desta branch é o backend: as interfaces e a aprovação dos checkpoint
 3. **Integração:** `backend/config/routes.rb` expõe os endpoints; testes HTTP próprios em `backend/test/integration/` verificam tenants, grupos, tribunais, pendências, janelas, falhas e recuperação. O README registra os contratos HTTP e suas limitações. Não há frontend nem alteração das fontes de coleta.
 4. **Verificação:** executar testes focados e suíte existente usando PostgreSQL descartável com roles reais; exercitar o caminho HTTP definitivo com dados controlados, inclusive negação e estado terminal. As tarefas 14a e 15b só serão encerradas integralmente quando a interface também for entregue.
 
+#### Branch frontend-web — implementação da interface
+
+**Escopo:** implementar em `apps/web/` as telas de identidade, monitoramentos, consulta, dashboard, equipe, grupos e histórico operacional de [SPEC-web.md](../apps/web/SPEC-web.md), integradas à API existente. A exportação Banani é referência visual; regras aprovadas e o design system prevalecem sobre dados ou controles ilustrativos.
+
+1. **Base e identidade:** Next.js App Router, TypeScript e npm com dependências fixadas; manter sessão, cookies seguros, Origin e CSRF da API Rails. O callback Google atualmente retorna JSON: o frontend deve encaminhá-lo ao Rails, preservar os cookies e concluir a navegação. Aceite de convite deve preservar o fragmento sem expor segredo.
+2. **Fatias independentes:** monitoramentos de advogado, partes e processos; consulta/dashboard e histórico; equipe e grupos. Todas usam o mesmo cliente HTTP, respostas reais e estados de erro, sem dados fictícios, cache compartilhado, editais ou funcionalidades de agenda.
+3. **Integração:** verificar autorização, dados de dois tenants, texto da fonte como texto inerte, falha/zero/máscara e formulários no navegador headless, com API Rails e PostgreSQL descartável. Login Google real depende de credenciais externas; cenários preparados não comprovam OAuth real.
+4. **Entrega:** executar build, verificações focadas e CI; documentar comandos, configurações e limitações. Nenhuma aprovação humana de checkpoint ou deploy é presumida. Imagens devem respeitar as regras de usuário não root e gates de containerização.
+
 **Checkpoint após 13–15:** rever o estado de falhas por tribunal, a aplicação da autorização nas respostas e os critérios de volumetria acordados.
 
 ### Fase 5 — Validação integrada
