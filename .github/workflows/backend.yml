@@ -84,7 +84,11 @@ jobs:
               CourtCatalog.define_singleton_method(:fetch) { [{ code: "TJAC" }, { code: "TRF1" }] }
               runner = DespachanteRunner.new(despachante_url: ENV.fetch("DESPACHANTE_DATABASE_URL"),
                 first: "04:00", second: "16:00")
-              now = Time.utc(2200, 1, 1, 20)
+              # Earlier suites retain global runs; avoid reusing one created before this fixture.
+              date = PG.connect(ENV.fetch("DESPACHANTE_DATABASE_URL")) do |db|
+                Date.iso8601(db.exec("SELECT (COALESCE(MAX(collection_date), current_date) + 1)::text FROM public.collection_runs").getvalue(0, 0))
+              end
+              now = Time.utc(date.year, date.month, date.day, 20)
               ids = runner.run_once(now: now)
               raise "slots are not distinct or idempotent" unless ids.length == 2 && ids.uniq.length == 2 &&
                 runner.run_once(now: now) == ids

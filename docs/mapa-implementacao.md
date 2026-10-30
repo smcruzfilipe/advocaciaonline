@@ -1,18 +1,18 @@
 # Mapa físico do monorepo para as fatias
 
-Este mapa reúne caminhos existentes e previstos dentro do mesmo repositório; o estado de cada componente está na [estrutura do monorepo](../README.md#estrutura-do-monorepo). `backend/`, `backend/despachante/`, `backend/test/`, `etl/` e `etl/test/` existem; `frontend/` e `frontend/tests/` ainda são previstos. Antes de iniciar cada fatia, confirmar os arquivos exatos no checklist e subdividir quando exceder cinco arquivos; geradores, migrations e configuração podem acrescentar arquivos. Nunca marcar uma fatia pronta apenas por criar diretórios.
+Este mapa reúne caminhos existentes e previstos dentro do mesmo repositório; o estado de cada componente está na [estrutura do monorepo](../README.md#estrutura-do-monorepo). `backend/`, `backend/despachante/`, `backend/test/`, `etl/`, `etl/test/` e `apps/web/` existem. Antes de iniciar cada fatia, confirmar os arquivos exatos no checklist e subdividir quando exceder cinco arquivos; geradores, migrations e configuração podem acrescentar arquivos. Nunca marcar uma fatia pronta apenas por criar diretórios.
 
 | IDs | Áreas físicas existentes ou previstas | Responsabilidade |
 |---|---|---|
-| 4 | `backend/app/models/`, `backend/app/controllers/`, `backend/app/services/`, `frontend/app/` | onboarding, identidade e tenant |
-| 5–6 | `backend/app/models/`, `backend/app/services/`, `backend/app/controllers/`, `frontend/app/` | credenciais, grupos e autorização |
-| 7–8 | `backend/app/models/`, `backend/app/services/`, `backend/app/controllers/`, `frontend/app/` | monitoramentos, filtros e navegação |
+| 4 | `backend/app/models/`, `backend/app/controllers/`, `backend/app/services/`, `apps/web/src/app/` | onboarding, identidade e tenant |
+| 5–6 | `backend/app/models/`, `backend/app/services/`, `backend/app/controllers/`, `apps/web/src/app/` | credenciais, grupos e autorização |
+| 7–8 | `backend/app/models/`, `backend/app/services/`, `backend/app/controllers/`, `apps/web/src/app/` | monitoramentos, filtros e navegação |
 | 9 | `backend/app/models/`, `backend/app/services/`, `backend/db/migrate/` | Escrevente, permissões e retenção |
 | 10 | `backend/despachante/`, `backend/app/models/`, `backend/db/migrate/` | planejamento e agenda persistente |
 | 11–12 | `etl/`, `backend/app/models/`, `backend/db/migrate/` | DJEN, persistência, deduplicação e vínculos |
 | 13 | `backend/despachante/`, `etl/`, `backend/app/models/` | execução, tentativas e estado |
-| 14–15 | `backend/app/controllers/`, `backend/app/services/`, `frontend/app/`, `frontend/components/` | consulta, métricas e dashboard |
-| 16 | `backend/test/`, `frontend/tests/`, `etl/test/` | integração e carga |
+| 14–15 | `backend/app/controllers/`, `backend/app/services/`, `apps/web/src/app/`, `apps/web/src/components/` | consulta, métricas e dashboard |
+| 16 | `backend/test/`, `apps/web/`, `etl/test/` | integração e carga |
 
 O mapa não implica que todas as rotas, modelos, migrations ou bibliotecas das fatias estejam implementados. Confirmar os arquivos e comandos de cada componente antes da execução, sem tratar caminhos previstos como existentes. A garantia de isolamento e a análise de impacto são verificadas por fatia, não substituídas por este mapa.
 

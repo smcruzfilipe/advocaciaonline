@@ -2,14 +2,14 @@
 
 Este documento registra a arquitetura do monorepo e distingue componentes existentes dos ainda previstos. O estado funcional e as verificações já registradas estão no [README](../README.md); a stack e as versões centrais estão em [stack.md](stack.md). As especificações funcionais prevalecem sobre exemplos de estrutura.
 
-A apresentação do frontend segue a [direção visual de UI, tipografia e cores](design-system.md): composição plana monocromática, cantos retos e fonte de sistema. O guia é documental; não indica frontend implementado nem altera os contratos funcionais.
+A apresentação do frontend segue a [direção visual de UI, tipografia e cores](design-system.md): composição plana monocromática, cantos retos e fonte de sistema. O guia não altera os contratos funcionais.
 
 ## Estrutura do monorepo e fronteiras
 
 Frontend Next.js, backend Rails API-only e processos de coleta pertencem ao mesmo repositório. A [estrutura na raiz](../README.md#estrutura-do-monorepo) registra os caminhos e seu estado atual. Não há repositório separado para a UI; separar dependências, imagens e processos não altera essa organização.
 
 - `backend/`: Rails API-only, identidade, autorização, monitoramentos, consulta e persistência. `backend/app/` contém controllers, models e serviços; `backend/test/` contém testes Rails. Sessões são armazenadas no servidor; cookies de sessão são `Secure`, `HttpOnly` e `SameSite=Lax`, com proteção CSRF nas operações mutáveis. Google OpenID Connect autentica identidade por `iss` e `sub`, valida assinatura, audiência, expiração, nonce e e-mail verificado; dados fornecidos pelo cliente não constituem prova.
-- `frontend/` (**previsto, ainda não criado**): Next.js com TypeScript e App Router; páginas em `frontend/app/`, componentes em `frontend/components/` e testes previstos em `frontend/tests/`. Tokens e estilos da UI pertencem a esse componente, orientados por `docs/design-system.md`. O navegador usa endpoints da mesma origem; um proxy no frontend encaminhará chamadas para o backend sem expor segredos ao navegador.
+- `apps/web/`: Next.js com TypeScript e App Router; páginas em `apps/web/src/app/`, componentes compartilhados em `apps/web/src/components/` e estilos no próprio aplicativo. O navegador usa endpoints da mesma origem; o proxy encaminha chamadas ao backend sem expor sua origem interna ou segredos ao navegador.
 - `backend/despachante/` (**existente**): processo Ruby separado que planeja as duas execuções em Brasília e persiste trabalhos duráveis no PostgreSQL. Tem `Gemfile` e lockfile próprios, target Docker `despachante` em `backend/Dockerfile` e entrada `ruby despachante/run.rb` dentro da imagem. Integra o backend no mesmo monorepo, mas não inicializa nem executa dentro do servidor Rails. Usa conexão e role PostgreSQL próprias.
 - `etl/` (**existente**): processo Ruby separado que seleciona continuamente um trabalho planejado por vez, consulta o DJEN e persiste resultados por transação. A seleção e a concessão são atômicas no PostgreSQL; múltiplas instâncias ignoram trabalhos bloqueados ou com concessão ativa. Possui `Gemfile`, lockfile e imagem próprios; não executa dentro da API ou do despachante. Não é necessário Redis ou novo servidor de banco.
 - `docs/` e `tasks/`: documentos e checklist existentes. PostgreSQL é o banco compartilhado; em deploy usa-se exclusivamente a instância já existente. Frontend e backend terão imagens distintas; empacotamento dos processos de planejamento e ETL deve obedecer às regras de usuário não root.
@@ -35,13 +35,13 @@ Dados de bootstrap de identidade e associação devem ser acessados por interfac
 - Swagger UI e especificação OpenAPI são protegidos separadamente do login Google com HTTP Basic servido exclusivamente por HTTPS no backend. Usuário e hash de senha são fornecidos por configuração externa de segredo; sem configuração, negar acesso. Comparar senha pelo algoritmo de hash escolhido na implementação e limitar tentativas; nunca embutir credenciais ou valores padrão. A proteção deve abranger HTML, JSON/YAML e assets privados.
 - No onboarding, nome e OAB seguem os critérios de [monitoramentos](../SPEC-monitoramentos.md#contratos-lógicos): nome não vazio após normalização de espaços; número OAB textual não vazio e UF válida; inscrição principal obrigatória e secundárias opcionais. Um par número/UF repetido no mesmo perfil é recusado; preservam-se zeros e sufixos. Não se presume consulta a registro externo.
 
-## Ferramentas e comandos previstos
+## Ferramentas e comandos
 
-Após a geração e instalação autorizadas, executar no diretório `backend/`: `bin/rails server`, `bin/rails test` e `bin/rubocop`; em `frontend/`: `npm run dev`, `npm run build`, `npm run lint` e `npm test`. Os scripts e RuboCop devem ser incluídos no projeto gerado antes desses comandos serem exigidos. São comandos planejados, não executados ou verificados nesta fase; versões de bibliotecas transitivas e compatibilidade dependem de lockfiles e verificação real. Antes de implementar cada fatia, registrar os nomes exatos de arquivos e subdividir se ultrapassar cinco; não presumir que um gerador manterá os caminhos propostos.
+Os comandos do frontend são `npm ci --ignore-scripts`, `npm run dev`, `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`, executados em `apps/web/` dentro de um container Node não root. O README descreve a configuração e as verificações observadas. Para o backend, use os comandos e imagens descritos no README.
 
-## Ferramentas propostas
+## Ferramentas de verificação
 
-Rails usa Minitest padrão e testes de integração; frontend usa TypeScript e ESLint, testes de componentes com Vitest e testes de navegador com Playwright. Ruby 4.0.9, Rails 8.1.4, Next.js 16.4.1, PostgreSQL 18.6 e Node.js 24.22.1 são referências de versão; [Node.js 24.22.1](https://nodejs.org/en/blog/release/v24.22.1) é LTS. Dependências exatas e lockfiles serão gerados e validados quando a implementação for autorizada; nenhuma instalação ocorreu. Comandos reais só podem ser confirmados após criação da aplicação; não se declara que comandos ou integração estejam funcionando.
+Rails usa Minitest e testes de integração. No frontend, ESLint usa a configuração oficial Next.js/TypeScript, os testes comportamentais usam `node:test` e os fluxos visuais são verificados com navegador headless. O lockfile de `apps/web/` fixa as dependências; a versão de referência do runtime é Node.js 24.22.1.
 
 ## Verificação de arquitetura
 

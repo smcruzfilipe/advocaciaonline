@@ -7,7 +7,7 @@
 - Banco de dados: PostgreSQL com Row-Level Security (RLS).
 - Tenant: advogado independente, não escritório; RLS deve preservar esse isolamento.
 
-As versões centrais selecionadas estão documentadas abaixo. [Arquitetura e contratos propostos](arquitetura.md) escolhem Ruby para despachante e ETL, layout e ferramentas; dependências exatas e deploy continuam sujeitos a validação. Por instrução do solicitante, runtimes e dependências não devem ser instalados no host: a implementação e as verificações usam Docker. O frontend fica para uma etapa posterior.
+As versões centrais selecionadas estão documentadas abaixo. [Arquitetura e contratos](arquitetura.md) descrevem Ruby para despachante e ETL, layout e ferramentas; deploy continua sujeito a validação. Por instrução do solicitante, runtimes e dependências não devem ser instalados no host: a implementação e as verificações usam Docker.
 
 ## Versões selecionadas
 
@@ -21,7 +21,7 @@ Referência da consulta: 28/10/2026. Seleção de releases estáveis documentada
 | PostgreSQL | 18.6, com RLS | [Política oficial de versões](https://www.postgresql.org/support/versioning/): minor atual da linha 18, suportada até novembro de 2030 |
 | Node.js, referência de runtime do frontend | 24.22.1 LTS | [Anúncio oficial](https://nodejs.org/en/blog/release/v24.22.1); [requisito do Next.js 16](https://nextjs.org/docs/app/guides/upgrading/version-16): Node.js `>= 20.9.0` |
 
-Ruby 4.0.9 satisfaz o requisito numérico do gem Rails 8.1.4. Isso não substitui uma matriz explícita de suporte. Node.js 24.22.1 satisfaz o mínimo documentado do Next.js 16; suas dependências serão fixadas na etapa de frontend.
+Ruby 4.0.9 satisfaz o requisito numérico do gem Rails 8.1.4; isso não substitui uma matriz explícita de suporte. Node.js 24.22.1 satisfaz o mínimo documentado do Next.js 16. A aplicação `apps/web/` fixa Next.js 16.4.3, patch posterior da mesma linha, e suas demais dependências no lockfile.
 
 As versões de referência também se aplicam ao runtime Ruby proposto para despachante e ETL. Em teste local descartável, PostgreSQL 18.6 inicializou como UID 70 e preservou dados após reinicialização; uma aplicação Rails API-only temporária executou teste de persistência contra esse banco. Isso não comprova o funcionamento da aplicação do repositório, da imagem final ou a integração futura com Next.js.
 
