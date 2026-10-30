@@ -2,7 +2,7 @@
 
 Monorepo da plataforma de monitoramento de publicações judiciais voltada a advogados independentes e suas equipes, reunindo backend Rails API-only e frontend Next.js no mesmo repositório. A fonte inicial é o Diário de Justiça Eletrônico Nacional (DJEN), exclusivamente Diário Eletrônico (`D`), sem coleta de editais (`E`): na primeira coleta, cadernos com fallback paginado; na segunda, API paginada diretamente.
 
-> **Estado atual:** o backend contém onboarding, identidade de equipe, grupos, permissões, cadastros de monitoramento, geração de planos de coleta e Escrevente. O processador ETL executa os trabalhos de coleta; frontend, consulta de comunicações, dashboard e Swagger UI ainda não estão implementados.
+> **Estado atual:** o backend contém onboarding, identidade de equipe, grupos, permissões, cadastros, planejamento, coleta, consulta de comunicações e dados da dashboard. O frontend e o Swagger UI ainda não estão implementados.
 
 ## Estrutura do monorepo
 
@@ -13,7 +13,7 @@ A raiz é compartilhada pelo produto inteiro; não é a raiz de uma aplicação 
 | `backend/` | API Rails, domínio, persistência e testes; dependências em `backend/Gemfile` e `backend/Gemfile.lock`. | Existente. |
 | `backend/despachante/` | Despachante de coletas, processo Ruby separado da API, com `Gemfile` e lockfile próprios. | Existente; pertence ao backend e ao mesmo monorepo, mas não executa dentro do servidor Rails. |
 | `frontend/` | Interface Next.js com TypeScript e App Router; páginas, componentes e estilos do produto. | Previsto, ainda não criado. |
-| `etl/` | Execução da coleta, em processo separado da API e do despachante. | Existente; acionamento automático dos trabalhos pertence à tarefa 13. |
+| `etl/` | Execução da coleta, em processo separado da API e do despachante. | Existente; processador automático com retomada. |
 | `docs/` | Especificação geral, arquitetura, contratos técnicos e direção visual compartilhados. | Existente. |
 | `tasks/` | Plano, gates e checklist de implementação do monorepo. | Existente. |
 | `SPEC-*.md` e `CAPABILITIES.md` | Contratos funcionais e mapa de capacidades do produto. | Existentes na raiz. |
@@ -126,7 +126,7 @@ A identidade Google pode ter vínculos em vários tenants. `GET /api/session` in
 
 O titular administra credenciais em `GET`/`POST /api/team/credentials`, `PATCH`/`DELETE /api/team/credentials/:id`, `POST /api/team/credentials/:id/renewal` e `POST /api/team/credentials/:id/invitation`. A criação recebe `email`, `validity_days` e `group_ids` opcional. O convite é enviado por SMTP após o commit: se a entrega não for confirmada, a credencial permanece criada e o titular pode reemitir o convite. A reemissão invalida o link anterior sem reiniciar a validade. O link usa fragmento `#token=...`; o cliente deve enviar o token em `POST /api/team/invitations/accept`, com sessão Google, `Origin` e CSRF. O frontend que lê esse fragmento ainda não existe. Não registrar o token nem o conteúdo do convite.
 
-O titular administra grupos, regras e associações em `/api/authorization/groups`, suas rotas `/:id/rules` e `/:id/memberships/:membership_id`; `GET /api/authorization/catalog` lista as operações. Uma regra contém `operation`, `effect` (`allow` ou `deny`) e `court` (`null` para escopo geral). Sem grupos, equipe recebe as leituras padrão; com grupos, concessões se somam e negação explícita prevalece. Escritas exigem concessões distintas. A política de consulta por tribunal e dashboard existe como decisão de autorização; as APIs de comunicações e dashboard ainda não existem e deverão aplicá-la ao serem implementadas.
+O titular administra grupos, regras e associações em `/api/authorization/groups`, suas rotas `/:id/rules` e `/:id/memberships/:membership_id`; `GET /api/authorization/catalog` lista as operações. Uma regra contém `operation`, `effect` (`allow` ou `deny`) e `court` (`null` para escopo geral). Sem grupos, equipe recebe as leituras padrão; com grupos, concessões se somam e negação explícita prevalece. Escritas exigem concessões distintas. A consulta e a dashboard aplicam a política por tribunal e operação no servidor.
 
 ### API de monitoramentos
 
@@ -142,6 +142,28 @@ As operações abaixo exigem sessão válida; alterações exigem também `Origi
 | `GET`, `PATCH /api/monitorings/processes/:id` | Lê, edita, desativa ou reativa um processo do tenant. |
 
 No cadastro de parte, `name` é obrigatório e sua chave de equivalência ignora caixa, diacríticos e espaços excedentes, mantendo pontuação significativa. A chave canônica aceita até 2.000 bytes; entradas maiores retornam `422`, evitando exceder o limite do índice PostgreSQL. No cadastro de processo, `number` aceita 20 dígitos ASCII ou a máscara CNJ; a resposta preserva os 20 dígitos e zeros iniciais. Duplicatas no mesmo tenant geram conflito mesmo quando desativadas. `courts` ausente ou `null` significa todos os tribunais disponíveis; uma lista explícita deve ser não vazia e conter somente códigos do catálogo atual. A seleção salva não é ampliada se um tribunal deixar de estar disponível.
+
+### API de comunicações e dashboard
+
+As rotas exigem sessão válida e tenant selecionado no servidor. Não aceitam tenant nem escopo fornecidos pelo cliente; respostas protegidas usam `Cache-Control: no-store`.
+
+| Método e caminho | Resposta |
+|---|---|
+| `GET /api/communications` | `{ courts: [{ court, communications: [...] }] }`, com publicações independentes, `id`, `source`, `identity_status`, `warning` e `process_number` quando fornecido pela fonte. |
+| `GET /api/communications/:id` | Detalhe, `payload` da primeira versão persistida e `links` dos monitoramentos em tribunais legíveis. Identificador inválido, inexistente ou não autorizado retorna `404`. |
+| `GET /api/dashboard` | Estado, tribunais legíveis, avisos e métricas de comunicações e processos para hoje, semana civil e últimos sete dias de calendário. |
+
+A identidade incompleta aparece com `identity_status: "pending"` e `warning: "possible_duplicate"`; essas comunicações não entram nas métricas. O corpo JSON escapa caracteres HTML, mas o JSON decodificado continua contendo texto da fonte: **o consumidor deve renderizar como texto e escapar todos os campos**, inclusive conteúdo de caderno preservado; não inserir HTML bruto. Campos ausentes não são inventados. A origem é o tribunal do vínculo mais antigo da comunicação; se houver empate entre tribunais diferentes, a origem é ambígua e o registro não é exposto. Uma sigla de tribunal válida conflitante no payload exige autorização também para essa sigla. Vínculos posteriores não concedem acesso à primeira versão.
+
+A dashboard usa `America/Sao_Paulo`, `as_of` e `periods` com `today`, `week` e `last_seven_days`; cada período contém `start`, `end`, `communications` e `processes`. O início é inclusivo e o fim exclusivo. Uma comunicação completa é contada na primeira persistência; processos usam CNJ canônico válido e são distintos por janela. A agregação considera somente tribunais autorizados cujo trabalho esteja integralmente concluído. `state` distingue `succeeded`, `partial`, `running`, `failed`, `no_work`, `unavailable` e `masked`; sem tribunal concluído, números são `null`, não zero. Sem permissão de dashboard, cada número é `*`, sem valor subjacente na resposta.
+
+Para o estado corrente de cada tribunal usa-se o último slot relevante do dia; um planejamento posterior falho, interrompido ou sem trabalho não herda o sucesso anterior. Avisos de falhas persistentes incluem apenas tribunais legíveis e permanecem até sucesso integral em slot posterior do mesmo dia. Falhas não recuperadas em dias anteriores continuam sinalizadas sem iniciar coleta retroativa. As telas e a apresentação visual ainda não existem.
+
+**Verificação:** em PostgreSQL 18.6 descartável, com roles segregadas, `ruby bin/rails test test/integration/communications_http_test.rb test/integration/dashboard_http_test.rb` executou 47 testes e 691 assertions; `ruby bin/rails test` executou 460 testes e 10.503 assertions, sem falhas, erros ou skips. No smoke HTTP em servidor Rails não root, o processador persistiu comunicação e pendência, registrou falha de tribunal e recuperou no segundo slot; a API retornou estado parcial, máscara para equipe restrita e contagens de 2 comunicações e 2 processos após a recuperação. O smoke usou fonte controlada e sessões preparadas, não Google OAuth real.
+
+Referências: [Rails API-only 8.1](https://guides.rubyonrails.org/v8.1/api_app.html), [escape JSON Rails 8.1](https://api.rubyonrails.org/v8.1.4/classes/ActiveSupport/JSON.html#method-c-encode), [RLS PostgreSQL 18](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) e [agregações PostgreSQL 18](https://www.postgresql.org/docs/18/functions-aggregate.html).
+
+Não houve alteração de schema nem novas variáveis nesta fatia. A implantação continua condicionada ao procedimento de atualização do banco existente descrito abaixo; reverter o código da API remove os endpoints sem modificar dados de coleta.
 
 ### Planejamento de coleta
 
@@ -172,7 +194,7 @@ Após uma tentativa frustrada, o processador libera a concessão enquanto aguard
 
 Cada trabalho consulta somente Diário Eletrônico (`D`) no dia corrente de `America/Sao_Paulo`. Na primeira coleta, valida integralmente o ZIP do caderno e, após esgotar as tentativas, percorre a API paginada até a primeira página vazia válida; na segunda, inicia diretamente pela API, sem caderno. Contadores, etapa e espera são persistidos; falha posterior não publica páginas parciais. Somente para resultados da API, Loofah converte o campo `texto` em texto simples, removendo HTML, scripts e estilos e decodificando entidades; cadernos são persistidos sem essa sanitização. Como a primeira versão é preservada na deduplicação, uma comunicação inicialmente obtida de caderno pode continuar contendo HTML mesmo se também aparecer na API. Todo texto da fonte deve ser escapado pelo consumidor na renderização.
 
-`collection_communications`, `collection_communication_links`, `collection_job_results` e `collection_job_failures` armazenam resultados, vínculos e falhas fora dos marcos do Escrevente. A função `app_private.collection_court_states(uuid)` agrega o estado do tribunal sob a sessão autenticada; contagens ficam `NULL` quando o tribunal não terminou integralmente. As telas e APIs de consulta de comunicações ainda não existem.
+`collection_communications`, `collection_communication_links`, `collection_job_results` e `collection_job_failures` armazenam resultados, vínculos e falhas fora dos marcos do Escrevente. A função `app_private.collection_court_states(uuid)` agrega o estado do tribunal sob a sessão autenticada; contagens ficam `NULL` quando o tribunal não terminou integralmente. As telas de consulta ainda não existem.
 
 Para os testes de integração isolados, forneça também `PROCESSADOR_TEST_ADMIN_DATABASE_URL` de um PostgreSQL descartável e execute `docker run --rm --network <rede-de-teste> -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL <imagem-de-teste-do-processador>`. A conexão administrativa é exclusiva da preparação de dados sintéticos; não deve ser fornecida ao processador de produção.
 

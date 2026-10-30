@@ -44,7 +44,7 @@ class ApplicationController < ActionController::API
 
   # Call only inside DatabaseContext.with_session, next to the protected query.
   # Authentication/CSRF callbacks may have observed a now-revoked membership.
-  def authorize_session!(*operations, owner_only: false)
+  def authorize_session!(*operations, owner_only: false, court_scoped: false)
     connection = ApplicationRecord.connection
     locked_tenant = connection.uncached { connection.select_value("SELECT app_private.lock_authorization(false)") }
     context = connection.uncached { IdentityStore.context(session_token) }
@@ -54,8 +54,9 @@ class ApplicationController < ActionController::API
       raise AuthorizationDenied
     end
 
+    raise AuthorizationDenied if court_scoped && (!block_given? || operations.any? || owner_only)
     return block_given? ? yield(context, []) : context if context["role"] == "owner"
-    raise AuthorizationDenied if owner_only || operations.empty?
+    raise AuthorizationDenied if owner_only || (operations.empty? && !court_scoped)
 
     rules = connection.uncached { connection.select_value("SELECT app_private.session_group_rules()") }
     groups = rules.is_a?(String) ? JSON.parse(rules) : rules

@@ -76,6 +76,15 @@ Executar as fatias em ordem de dependência. IDs são os principais do checklist
 - **ID 14:** consulta independente de comunicações, após IDs 6 e 12.
 - **ID 15:** dashboard numérica e sua UI, avisos e restrição de acesso, após IDs 2, 13 e 14. O ID 6 estabelece a política de autorização e escopo que a dashboard aplica; a interface e as volumetrias pertencem somente ao ID 15.
 
+#### Branch 14a–15b — backend de consulta e dashboard
+
+O escopo desta branch é o backend: as interfaces e a aprovação dos checkpoints permanecem pendentes. Os endpoints de consulta e dashboard reutilizam a sessão autenticada, o bloqueio de autorização e as políticas RLS existentes; o tenant nunca é aceito do cliente.
+
+1. **Consulta:** `backend/app/controllers/communications_controller.rb` e eventuais serviços específicos consultam comunicações e vínculos preservados pela coleta, aplicando a autorização por tribunal à lista e ao detalhe. As comunicações permanecem independentes; pendências de identidade mantêm o aviso. O conteúdo da fonte é não confiável e a futura interface deve escapá-lo.
+2. **Dashboard:** `backend/app/controllers/dashboard_controller.rb` e eventuais serviços específicos calculam as duas métricas e as três janelas aprovadas, com recorte por tribunais autorizados e estados operacionais. Negação da dashboard devolve `*` sem disponibilizar o valor protegido; falha, ausência de conclusão e zero permanecem distintos.
+3. **Integração:** `backend/config/routes.rb` expõe os endpoints; testes HTTP próprios em `backend/test/integration/` verificam tenants, grupos, tribunais, pendências, janelas, falhas e recuperação. O README registra os contratos HTTP e suas limitações. Não há frontend nem alteração das fontes de coleta.
+4. **Verificação:** executar testes focados e suíte existente usando PostgreSQL descartável com roles reais; exercitar o caminho HTTP definitivo com dados controlados, inclusive negação e estado terminal. As tarefas 14a e 15b só serão encerradas integralmente quando a interface também for entregue.
+
 **Checkpoint após 13–15:** rever o estado de falhas por tribunal, a aplicação da autorização nas respostas e os critérios de volumetria acordados.
 
 ### Fase 5 — Validação integrada

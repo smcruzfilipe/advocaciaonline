@@ -38,4 +38,7 @@ Rails.application.routes.draw do
   get "/api/collection-runs/:id/jobs", to: "collection_runs#jobs", defaults: { format: :json }
   get "/api/collection-runs/:id/events", to: "escrevente#events", defaults: { format: :json }
   get "/api/collection-runs/:id/execution", to: "escrevente#execution", defaults: { format: :json }
+  get "/api/communications", to: "communications#index", defaults: { format: :json }
+  get "/api/communications/:id", to: "communications#show", defaults: { format: :json }
+  get "/api/dashboard", to: "dashboard#show", defaults: { format: :json }
 end
