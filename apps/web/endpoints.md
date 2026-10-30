@@ -1,6 +1,6 @@
 # Checklist de integração dos endpoints — web
 
-Fonte: `backend/config/routes.rb`. `[x]` indica integração e comportamento exercitados pela interface ou pelo relay contra Rails e PostgreSQL descartável; não implica autorização de deploy. Os convites foram enviados a um SMTP local descartável com STARTTLS, não a um serviço externo. O callback inválido foi verificado (303 para login), mas o retorno válido do Google permanece pendente; o catálogo real retornou 503 após a fonte responder 403 neste ambiente.
+Fonte: `apps/backend/config/routes.rb`. `[x]` indica integração e comportamento exercitados pela interface ou pelo relay contra Rails e PostgreSQL descartável; não implica autorização de deploy. Os convites foram enviados a um SMTP local descartável com STARTTLS, não a um serviço externo. O callback inválido foi verificado (303 para login), mas o retorno válido do Google permanece pendente; o catálogo real retornou 503 após a fonte responder 403 neste ambiente.
 
 - [x] `GET /auth/google` — `google_sessions#new`; início com ingresso autenticado
 - [ ] `GET /auth/google/callback` — `google_sessions#create`; retorno válido do Google ainda não exercitado

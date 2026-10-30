@@ -58,7 +58,7 @@ Um cliente reserva pelo link individual; o compromisso aparece na agenda da plat
 
 ## Contexto do projeto
 
-- `backend/app/services/google_oidc.rb:14–18` solicita atualmente apenas `openid email`. Login Google não concede acesso ao calendário; a integração exige autorização adicional.
+- `apps/backend/app/services/google_oidc.rb:14–18` solicita atualmente apenas `openid email`. Login Google não concede acesso ao calendário; a integração exige autorização adicional.
 - `docs/arquitetura.md` registra Rails API e frontend Next.js previsto, ainda não criado. Esta proposta descreve uma capacidade futura, não uma interface existente.
 - `docs/especificacao.md` deixa envio de e-mails fora da primeira entrega de monitoramento jurídico. Os e-mails transacionais desta proposta são novo escopo; seu registro aqui não altera aquela especificação nem libera implementação.
 
