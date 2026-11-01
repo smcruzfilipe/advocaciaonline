@@ -133,6 +133,17 @@ class DiscoveryTest < Minitest::Test
       name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: "0188263-19.2026.1.00.0000")
   end
 
+  def test_find_status_requires_complete_pages_even_after_an_active_match
+    http = FakeHTTP.new({
+      ["sim", 1] => page([row], pages: 2, total: 2),
+      ["sim", 2] => STF::SourceUnavailable.new("late failure")
+    })
+    assert_raises(STF::SourceUnavailable) do
+      STF::Discovery.new(http: http).find_status(
+        name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: "0188263-19.2026.1.00.0000")
+    end
+  end
+
   def test_find_status_absence_wrong_name_id_or_cnj_does_not_prove_inactive
     http = FakeHTTP.new({
       ["sim", 1] => page([row(id: 1), row(cnj: "0000000-00.2026.1.00.0000"), row(name: "OUTRA PESSOA")]),

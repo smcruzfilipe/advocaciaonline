@@ -39,13 +39,17 @@ module STF
       expected_name = canonical_name(name)
       expected_cnj = cnj.delete("-.")
       %w[sim nao].each do |filter|
+        found = nil
         each_record(name: name, type: "PARTE", active: filter) do |record|
           next unless canonical_name(record.fetch("pessoaNome")) == expected_name
           next unless record.fetch("processoId") == incidente
           next unless record.fetch("processoNumeroUnico").delete("-.") == expected_cnj
 
-          return record.fetch("processoEmTramitacao") == "Sim" ? :active : :inactive
+          status = record.fetch("processoEmTramitacao") == "Sim" ? :active : :inactive
+          raise InvalidSource, "Situações contraditórias para processo STF" if found && found != status
+          found = status
         end
+        return found if found
       end
       nil
     end

@@ -10,7 +10,7 @@
 - Documentação acompanha a mudança que altera o contrato. Toda variável criada/alterada entra no README na mesma folha, com nome, default ou `Nenhum`, obrigatoriedade e finalidade; nenhuma variável foi criada por esta autoria.
 - Reusar contratos SQL, PostgreSQL/RLS, autorização, registro operacional e consulta existentes quando compatíveis. Campos e funções hoje exclusivos DJEN exigem migração explícita; não afrouxar o contrato DJEN nem migrar toda a arquitetura como refatoração lateral.
 - Desenvolvimento/testes não usam banco persistente do usuário, credenciais reais de teste em commits nem a instância de deploy. Containers de prova são descartáveis e não root. Não parar a aplicação local que o usuário está testando.
-- O planejador fornece contexto confiável. Nenhum parâmetro de tenant enviado pelo cliente concede acesso. Não criar novo usuário, perfil profissional ou vínculo advogado–parte para fazer a prova passar.
+- O planejador fornece contexto confiável. Nenhum parâmetro de tenant enviado pelo cliente concede acesso. Não criar cadastro/modelo paralelo de usuário, perfil profissional ou vínculo advogado–parte no produto para fazer a prova passar. Fixtures sintéticas de identidade nos bancos descartáveis de prova são permitidas para exercitar os contratos reais de autenticação/isolamento; não são contas reais, bypass de runtime nem dependência do produto.
 - Evidência registra comando/cenário, resultado observado e artefato. Resultado zero e dados de relógio controlado devem ser descritos como tais. HTTP 401/403, página de login ou bloqueio não significam zero movimentos.
 - Sem retries, abstração de fontes, mensageria, agendamento genérico, MNI, backfill, downloader de documentos, alertas ou infra de deploy “aproveitando” a tarefa.
 
@@ -93,7 +93,7 @@ A fase seguinte só começa depois do gate anterior observado e registrado. Pend
 
 - [x] Integrar fatias com uma única rodada agregada dos checks necessários, corrigindo causas e repetindo somente verificações afetadas.
 - [x] Registrar comandos e contagens observadas, resultado da execução e dados/vínculos persistidos; assegurar ausência de alterações em dados reais ou credenciais.
-- [ ] Publicar a branch e um único PR draft com escopo, issue, evidências e limitações reais. Não marcar C1–C9 ou o gate final como completos pela abertura do PR.
+- [x] Publicar a branch e um único PR draft com escopo, issue, evidências e limitações reais. Não marcar C1–C9 ou o gate final como completos pela abertura do PR.
 
 **Aceite:** gate Execução inicial demonstrado e feature no PR draft. **Dependências:** STF04. **Arquivos:** conjunto implementado e este checklist, sem nova camada funcional. **Verificação:** smoke e checks agregados correspondentes ao escopo inicial. **Critérios:** C8, C9.
 
@@ -165,7 +165,7 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 | Spec STF | Criada em `SPEC-stf.md` |
 | Checklist STF | Este documento; itens de execução não realizados permanecem abertos |
 | Issue e plano/handoff publicado | [#20](https://github.com/smcruzfilipe/advocaciaonline/issues/20), [plano técnico](plan-stf.md); gate documental STF00 concluído |
-| PR STF | Não criado; só será publicado draft após STF05 |
+| PR STF | [#21](https://github.com/smcruzfilipe/advocaciaonline/pull/21), draft; execução inicial publicada no commit `2e1c8c8` |
 | Testes/smoke de execução inicial | Aplicativo STF: 46 testes/185 assertions aprovados; SQL STF coberto na suíte backend, que encontrou uma assertion incidental de nome de constraint removida (rejeição de editais permaneceu aprovada: teste focado 1/10). Smoke CLI real: 2 movimentos/2 links cada; zero movimentos, nenhum elegível e falha distintos; leitura via `advocacia_runtime`, UID1000. |
 | Ativação diária/deploy | Não realizada; depende dos gates e condições de acesso |
 
