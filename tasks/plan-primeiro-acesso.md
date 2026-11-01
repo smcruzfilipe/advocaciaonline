@@ -1,5 +1,18 @@
 # Plano: primeiro acesso controlado
 
+## Autorização de implementação e pipeline
+
+O solicitante autorizou executar este plano e criar a [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16), com [plano e handoff publicados](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6554202739). As restrições históricas de entrega apenas documental abaixo descrevem PA00, não impedem esta execução autorizada.
+
+| Fase do pipeline | Unidades | Gate |
+|---|---|---|
+| Planejamento | PA00 e preparação | Fontes, contratos, inventário, decisões e plano publicados na issue. |
+| Execução inicial | PA01–PA12 | Folhas e checkpoints aprovados; corte integrado; um único PR draft após PA12. |
+| Refinamento | PA13–PA15 | Conferência de consumidores, documentação e validação integrada real em ambiente descartável. |
+| Finalização | Fechamento do mesmo PR | Caminho definitivo antes de limpar provas, DoD integral, reviews resolvidas e CI terminal verde; retirar draft somente depois. |
+
+A publicação em draft após PA12 é exceção expressamente autorizada à regra anterior de branch não publicada. Permanecem as revisões humanas R02–R18 e todos os checkpoints; não inferir aprovação antecipada de resultados. Não há autorização de deploy nem de ações destrutivas em banco persistente.
+
 ## Estado, objetivo e limites da autorização
 
 **Estado: plano aprovado pelo solicitante; PA00 concluída documentalmente.** A [SPEC-primeiro-acesso.md](../SPEC-primeiro-acesso.md) registra as [decisões escolhidas por delegação](../SPEC-primeiro-acesso.md#decisões-de-pa00), integradas e revisadas independentemente. Foram conferidos links, critérios, dependências, limites das folhas e sintaxe dos exemplos de shell. Isso não comprova execução da aplicação nem autoriza implementação, testes da aplicação, infraestrutura ou deploy; os comandos abaixo permanecem propostas de verificação futura.
