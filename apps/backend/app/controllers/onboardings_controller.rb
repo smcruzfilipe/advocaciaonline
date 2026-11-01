@@ -23,6 +23,8 @@ class OnboardingsController < ApplicationController
     api_error("invalid_profile", error.message, :unprocessable_entity, details: error.details)
   rescue LawyerOnboarding::AlreadyOnboarded
     api_error("already_onboarded", "Seu perfil profissional já foi cadastrado.", :conflict)
+  rescue LawyerOnboarding::NotAuthorized
+    api_error("first_access_required", "É necessário um convite da plataforma para cadastrar seu perfil.", :forbidden)
   rescue LawyerOnboarding::Unauthenticated
     api_error("authentication_required", "Entre na sua conta para continuar.", :unauthorized)
   end

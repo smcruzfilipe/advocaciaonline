@@ -11,7 +11,7 @@ class MonitoringAuthorizationHttpTest < ActionDispatch::IntegrationTest
     @admin = PG.connect(ENV.fetch("MIGRATION_DATABASE_URL"))
     assert_equal "advocacia_migrator", @admin.exec("SELECT current_user").getvalue(0, 0)
     assert_equal "advocacia_runtime", ApplicationRecord.connection.select_value("SELECT current_user")
-    @owner, @owner_csrf = authenticated_session
+    @owner, @owner_csrf = authenticated_session(owner: true)
     @lawyer = LawyerOnboarding.call(token: @owner, input: profile_payload)
     @member, @csrf = authenticated_session
     identity = IdentityStore.context(@member).fetch("identity_id")
@@ -224,7 +224,7 @@ class MonitoringAuthorizationHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "monitoring permission never changes the tenant selected by the verified membership" do
-    other, = authenticated_session
+    other, = authenticated_session(owner: true)
     lawyer = LawyerOnboarding.call(token: other, input: profile_payload)
     other_party = DatabaseContext.with_session(other) do
       PartyMonitoring.create!(tenant_id: lawyer.tenant_id, name: "Outra parte")

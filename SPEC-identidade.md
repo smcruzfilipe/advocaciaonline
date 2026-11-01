@@ -2,7 +2,7 @@
 
 **Estado:** aprovada pelo solicitante como base funcional; decisões técnicas ainda pendentes continuam bloqueantes antes da implementação. **ID:** `identidade`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [stack](docs/stack.md).
 
-O artefato separado [primeiro acesso controlado](SPEC-primeiro-acesso.md#decisões-de-pa00) registra as decisões de PA00. Sua atualização documental não altera o código atual nem os contratos implementados descritos aqui.
+O [primeiro acesso controlado](SPEC-primeiro-acesso.md#decisões-de-pa00) define o cadastro exclusivo por convite, a liberação de titularidade e a distinção entre endereço de login e prova real da caixa postal. Senha, TOTP e sessão são compartilhados entre administradora, advogado e equipe.
 
 ## Objetivo
 
@@ -24,8 +24,10 @@ Usuários de equipe pertencem ao tenant do advogado que os convidou; autorizaç�
 - **Revogação:** interrompe imediatamente novas operações protegidas, inclusive em sessões abertas. Renovação não reativa credencial revogada; para restabelecer acesso, é necessária uma nova credencial.
 - **Fronteira com autorização:** este módulo fornece o contexto autenticado e seu estado de validade; não fornece permissões, associação a grupos ou escopo de tribunais/dashboard.
 - **Login:** advogado e equipe usam senha local e código temporário de aplicativo autenticador (TOTP), ambos obrigatórios. A sessão só é criada após validação dos dois fatores.
-- **Recuperação de senha:** link enviado ao e-mail confirmado, válido por 30 minutos e de uso único. Novo pedido invalida o anterior. A confirmação altera somente a senha e revoga sessões e desafios existentes; preserva o autenticador, seu estado de inscrição e a proteção contra reutilização de códigos. Não autentica automaticamente nem oferece recuperação de TOTP.
+- **Recuperação de senha:** link enviado ao endereço canônico de acesso, válido por 30 minutos e de uso único. Isso não comprova a caixa postal. Novo pedido invalida o anterior; a confirmação altera somente a senha e revoga sessões e desafios, preservando TOTP e sua proteção contra replay. Não autentica automaticamente, recupera TOTP ou ativa preparação pendente.
 - **Convite de equipe:** o advogado informa e-mail e grupos; a pessoa aceita o convite após verificar o mesmo e-mail e autenticar-se com os dois fatores. Autenticação isoladamente não concede participação em um tenant. Identidade implementa a aceitação; autorização administra vínculo e grupos.
+- **Primeiro acesso:** o advogado usa convite administrativo de 24 horas; preparar senha/autenticador não ativa identidade, reset ou sessão. Confirmar o primeiro TOTP conclui conta, liberação, consumo e sessão atomicamente. Perfil/tenant são uma transação posterior e exigem liberação também na função de banco. Contas e titulares existentes são preservados.
+- **Prova da caixa postal:** `identities.verified_email` conserva o nome histórico, mas representa o endereço canônico de login; somente `email_verified_at` não nulo comprova verificação real. Convite administrativo não preenche esse instante; equipe exige confirmação contextual antes do aceite.
 - **E-mail de acesso:** o convite faz parte da primeira entrega e é distinto dos relatórios e avisos diários de coleta, que continuam futuros.
 
 O contrato técnico de login, sessão, convite e documentação está registrado em [arquitetura](docs/arquitetura.md#identidade-convites-e-documentação). Autenticação não substitui a autorização nem a checagem de validade da credencial.
@@ -64,16 +66,16 @@ Exemplos verificáveis da política 2a:
 
 Convites e sessões não alteram o início da validade da credencial. O protocolo, o prazo técnico do convite e a revogação de sessões no provedor continuam decisões de implementação; em qualquer caso, o servidor nega operações protegidas no vencimento ou após revogação.
 
-## Ambiente de implementação e teste: pendências bloqueantes
+## Ambiente de implementação e teste
 
-Stack base definida: API central em Ruby on Rails exclusivamente no modo API (`--api`), frontend Next.js e PostgreSQL com Row-Level Security (RLS), conforme [stack](docs/stack.md). Versões, ferramentas e dependências, comandos e caminhos físicos da aplicação continuam pendentes; não inventar comandos de build, teste ou lint, diretórios, sintaxe de implementação, dependências ou snippet de estilo. Ainda não há aplicação nem código real que sirva de referência para estilo.
+O monorepo contém API Rails em `apps/backend` e frontend Next.js em `apps/web`, com PostgreSQL/RLS e roles segregadas. Comandos, imagens e evidências estão no README; contratos HTTP web em `apps/web/endpoints.md`.
 
 As políticas de RLS não substituem RBAC nem as verificações de identidade e autorização da aplicação; o tenant efetivo deve ser derivado no servidor do contexto autenticado, nunca de dado enviado pelo cliente. Ver também [stack](docs/stack.md).
 
-- **Comandos:** build, execução de testes, lint e desenvolvimento local — não definidos; nenhum comando é proposto.
-- **Estrutura:** diretórios de aplicação, testes e configuração — não definidos.
-- **Estilo:** não há código real que sirva de referência. Convenções e snippet dependem do repositório de implementação e de seu estilo, ainda não estabelecidos.
-- **Estratégia de teste:** framework, localização e comandos são pendências. Os testes de aceitação devem cobrir onboarding do perfil profissional, derivação server-side do tenant, isolamento de tenant e expiração aplicada a solicitações com sessão ativa. Isso é uma estratégia comportamental, não escolha de ferramenta nem repetição de testes já feitos sobre a fonte de dados.
+- **Backend:** Minitest em imagem Docker de testes contra PostgreSQL descartável, com runtime e migrator separados.
+- **Frontend:** testes `node:test`, typecheck, lint, formatação e build existentes, executados em container Node não root; fluxos visuais em Chromium headless.
+- **Estilo:** implementação vigente e design system do repositório, sem nova convenção.
+- **Aceite:** fatores, origem/CSRF, bootstrap autorizado, perfis, vínculos, expiração/revogação, recuperação, isolamento e concorrência são cobertos nos testes e no smoke integrado.
 - **Desempenho:** 300 usuários simultâneos são referência de planejamento; medição futura não bloqueia esta entrega.
 
 ## Fronteiras

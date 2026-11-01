@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { useState, type FormEvent } from "react";
+import { api, ApiError, authRequest } from "@/lib/api";
 import { navigateAfterIdentityChange } from "@/lib/identity-navigation";
 import { destination, useSession } from "@/components/session-provider";
 import { AlertBanner } from "@/components/ui";
@@ -19,10 +19,35 @@ export default function InvitationPage() {
     logout,
   } = useSession();
   const [working, setWorking] = useState<
-    "accept" | "discard" | "account" | null
+    "accept" | "discard" | "account" | "verify" | null
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+
+  async function requestVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (working || invitationMismatch || !invitationFingerprint) return;
+    setWorking("verify");
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await authRequest<{ message: string }>(
+        "/api/auth/team-register",
+        { email },
+        invitationFingerprint,
+      );
+      setMessage(result.message);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Não foi possível solicitar a confirmação.",
+      );
+    } finally {
+      setWorking(null);
+    }
+  }
 
   async function accept() {
     if (working || invitationMismatch || !invitationFingerprint) return;
@@ -164,6 +189,40 @@ export default function InvitationPage() {
                 servidor verificará a conta, o prazo e a disponibilidade da
                 credencial.
               </p>
+              <form
+                className="flex flex-col gap-3 border-t border-border pt-4"
+                onSubmit={requestVerification}
+              >
+                <p>
+                  Se ainda não confirmou a caixa postal deste e-mail, solicite
+                  uma confirmação antes de aceitar.
+                </p>
+                <label
+                  className="flex flex-col gap-1.5"
+                  htmlFor="invited-email"
+                >
+                  E-mail convidado
+                  <input
+                    id="invited-email"
+                    type="email"
+                    autoComplete="email"
+                    maxLength={254}
+                    required
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="w-full border border-border bg-input px-3 py-2"
+                  />
+                </label>
+                <button
+                  className="border border-border bg-background px-4 py-2 font-medium disabled:opacity-50"
+                  type="submit"
+                  disabled={Boolean(working)}
+                >
+                  {working === "verify"
+                    ? "Solicitando…"
+                    : "Solicitar confirmação de e-mail"}
+                </button>
+              </form>
               <div className="flex flex-col gap-3 border-t border-border pt-4">
                 <button
                   className="w-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"

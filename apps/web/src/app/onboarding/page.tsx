@@ -42,6 +42,7 @@ type Registration = { id: number; number: string; uf: string };
 export default function OnboardingPage() {
   const router = useRouter();
   const { session, loading, pendingInvitation } = useSession();
+  const canCreateTenant = session?.can_create_tenant === true;
   const [name, setName] = useState("");
   const [office, setOffice] = useState("");
   const [primaryNumber, setPrimaryNumber] = useState("");
@@ -53,14 +54,15 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, string[]>>({});
   const errorRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (loading || !session) return;
-    if (pendingInvitation) router.replace("/convite");
-    else if (!session.authenticated) router.replace("/login");
-    else if (session.selection_required) router.replace("/vinculos");
-    else if (session.onboarded) router.replace("/dashboard");
-  }, [loading, pendingInvitation, router, session]);
+    if (!session.authenticated) router.replace("/login");
+    else if (!canCreateTenant && pendingInvitation) router.replace("/convite");
+    else if (!canCreateTenant && session.selection_required)
+      router.replace("/vinculos");
+    else if (!canCreateTenant && session.onboarded)
+      router.replace("/dashboard");
+  }, [canCreateTenant, loading, pendingInvitation, router, session]);
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
@@ -120,9 +122,8 @@ export default function OnboardingPage() {
   if (
     loading ||
     !session?.authenticated ||
-    session.onboarded ||
-    session.selection_required ||
-    pendingInvitation
+    (!canCreateTenant &&
+      (session.onboarded || session.selection_required || pendingInvitation))
   ) {
     return (
       <section className="mx-auto max-w-xl px-4 py-12 sm:px-0" aria-busy="true">
@@ -130,6 +131,22 @@ export default function OnboardingPage() {
         <p className="text-sm text-muted-foreground" role="status">
           Consultando seu acesso…
         </p>
+      </section>
+    );
+  }
+  if (!canCreateTenant) {
+    return (
+      <section className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 py-12 sm:px-0">
+        <h1 className="font-headings text-2xl font-semibold">
+          Perfil profissional
+        </h1>
+        <p>
+          É necessário um convite da plataforma para cadastrar seu perfil
+          profissional.
+        </p>
+        <Link className="text-accent underline" href="/">
+          Voltar ao meu acesso
+        </Link>
       </section>
     );
   }

@@ -47,7 +47,14 @@ test("public origin requires HTTPS and rejects credentials or non-origin compone
 test("proxy only accepts existing API resource paths", () => {
   for (const path of [
     "/api/session",
-    "/api/auth/register",
+    "/api/auth/team-register",
+    "/api/auth/first-access/inspect",
+    "/api/auth/first-access",
+    "/api/auth/first-access/confirm",
+    "/api/admin/invitations",
+    "/api/admin/invitations/abc/link",
+    "/api/admin/invitations/abc/email",
+    "/api/admin/invitations/abc/reissue",
     "/api/auth/verify-email",
     "/api/auth/login",
     "/api/auth/totp",
@@ -59,6 +66,9 @@ test("proxy only accepts existing API resource paths", () => {
   ])
     assert.equal(isApiPath(path), true, path);
   for (const path of [
+    "/api/auth/register",
+    "/api/admin/invitations/abc",
+    "/api/admin/invitations/abc/other",
     "https://attacker.test/api/session",
     "//attacker.test",
     "/api/../auth/login",

@@ -555,7 +555,7 @@ class CollectionPlanningTest < ActiveSupport::TestCase
   end
 
   def create_lawyer(name: "Ana de Ávila", number: "001234-A", uf: "SP", secondary_oabs: [{ "number" => "00a-B", "uf" => "RJ" }])
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     input = profile_payload.merge("full_name" => name, "primary_oab" => { "number" => number, "uf" => uf },
       "secondary_oabs" => secondary_oabs)
     [token, LawyerOnboarding.call(token: token, input: input)]

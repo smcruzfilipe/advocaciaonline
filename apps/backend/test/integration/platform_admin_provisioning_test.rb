@@ -20,7 +20,7 @@ class PlatformAdminProvisioningTest < ActiveSupport::TestCase
     secret = PasswordAuthentication.new_secret
     codes = PasswordAuthentication.new_recovery_codes
     identity = @operator.exec_params(
-      "INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [email]
+      "INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id", [email]
     ).getvalue(0, 0)
     @operator.exec_params(
       "INSERT INTO app_private.password_credentials(identity_id,password_hash,totp_secret) VALUES ($1,$2,$3)",
@@ -41,7 +41,7 @@ class PlatformAdminProvisioningTest < ActiveSupport::TestCase
     assert_empty stored & codes
     assert_equal "0", @operator.exec_params("SELECT count(*) FROM app_private.sessions WHERE identity_id=$1", [identity]).getvalue(0, 0)
 
-    other = @operator.exec_params("INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id",
+    other = @operator.exec_params("INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id",
       ["second-#{email}"]).getvalue(0, 0)
     assert_raises(PG::UniqueViolation) do
       @operator.exec_params("INSERT INTO app_private.platform_administrator(identity_id) VALUES ($1)", [other])

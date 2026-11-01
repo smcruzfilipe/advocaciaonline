@@ -18,7 +18,7 @@ class ProcessMonitoringsHttpTest < ActionDispatch::IntegrationTest
     https!
     host! URI(AppSettings.origin).host
     assert_equal "advocacia_runtime", ApplicationRecord.connection.select_value("SELECT current_user")
-    @token, @csrf = authenticated_session
+    @token, @csrf = authenticated_session(owner: true)
     @tenant_id = LawyerOnboarding.call(token: @token, input: profile_payload).tenant_id
     cookies[ApplicationController::SESSION_COOKIE] = @token
   end
@@ -356,7 +356,7 @@ class ProcessMonitoringsHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "the same canonical number is independent in different tenants and client tenant IDs never choose the owner" do
-    second_token, second_csrf = authenticated_session
+    second_token, second_csrf = authenticated_session(owner: true)
     second_tenant = LawyerOnboarding.call(token: second_token, input: profile_payload).tenant_id
 
     with_catalog do
@@ -385,7 +385,7 @@ class ProcessMonitoringsHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "cross-tenant resource IDs cannot be read edited deactivated or reactivated even with the owning tenant ID" do
-    second_token, second_csrf = authenticated_session
+    second_token, second_csrf = authenticated_session(owner: true)
     second_tenant = LawyerOnboarding.call(token: second_token, input: profile_payload).tenant_id
 
     with_catalog do

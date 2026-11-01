@@ -281,7 +281,7 @@ class FirstAccessInvitationsTest < ActiveSupport::TestCase
   end
 
   def identity(email)
-    id = @admin.exec_params("INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [email]).getvalue(0, 0)
+    id = @admin.exec_params("INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id", [email]).getvalue(0, 0)
     @ids << id
     @admin.exec_params("INSERT INTO app_private.password_credentials(identity_id,password_hash,totp_secret,totp_confirmed) VALUES ($1,'hash','secret',true)", [id])
     id
@@ -290,6 +290,7 @@ class FirstAccessInvitationsTest < ActiveSupport::TestCase
   def make_owner(ident, session_hash)
     tenant = SecureRandom.uuid
     @admin.transaction do |db|
+      db.exec_params("INSERT INTO app_private.first_access_grants(identity_id) VALUES ($1) ON CONFLICT DO NOTHING", [ident])
       membership = db.exec_params(<<~SQL, [tenant, ident]).getvalue(0, 0)
         INSERT INTO app_private.tenant_memberships(tenant_id,identity_id,role,accepted_at)
         VALUES ($1,$2,'owner',clock_timestamp()) RETURNING id

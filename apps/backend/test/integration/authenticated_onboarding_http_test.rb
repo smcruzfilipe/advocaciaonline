@@ -16,17 +16,9 @@ class AuthenticatedOnboardingHttpTest < ActionDispatch::IntegrationTest
     ENV["AUTH_INGRESS_SECRET"] = @previous_ingress
   end
 
-  def register
-    sent = []
-    VerificationMailer.stub(:deliver!, ->(**args) { sent << args.fetch(:token) }) do
-      post "/api/auth/register", params: { email: @email, password: @password }, as: :json, headers: @headers
-    end
-    assert_response :accepted
-    sent.fetch(0)
-  end
-
-  def verify(token)
-    post "/api/auth/verify-email", params: { token: token }, as: :json, headers: @headers
+  def create_owner_fixture
+    id = fixture_identity(email: @email, password: @password, secret: PasswordAuthentication.new_secret, verified: true)
+    grant_fixture_owner(id)
   end
 
   def login
@@ -38,9 +30,7 @@ class AuthenticatedOnboardingHttpTest < ActionDispatch::IntegrationTest
   end
 
   def sign_in
-    token = register
-    verify(token)
-    assert_response :ok
+    create_owner_fixture
     login
     assert_equal "totp_setup", response.parsed_body.fetch("next")
     secret = response.parsed_body.fetch("secret")
@@ -49,13 +39,10 @@ class AuthenticatedOnboardingHttpTest < ActionDispatch::IntegrationTest
     secret
   end
 
-  test "email verification and a valid TOTP are both required before onboarding" do
-    verification = register
-    login
-    assert_response :unauthorized
+  test "a valid TOTP is required before onboarding" do
+    create_owner_fixture
     get "/api/session"
     assert_equal false, response.parsed_body.fetch("authenticated")
-    verify(verification)
     assert_response :ok
     login
     assert_response :ok
@@ -77,35 +64,10 @@ class AuthenticatedOnboardingHttpTest < ActionDispatch::IntegrationTest
     assert_equal true, response.parsed_body.fetch("onboarded")
   end
 
-  test "email token is browser bound, single use and does not create a session" do
-    token = register
-    other = ActionDispatch::Integration::Session.new(Rails.application)
-    other.https!
-    other.host! URI(AppSettings.origin).host
-    other.post "/api/auth/verify-email", params: { token: token }, as: :json, headers: @headers
-    assert_equal 422, other.response.status
-    verify(token)
-    assert_response :ok
-    verify(token)
-    assert_response :unprocessable_entity
-    get "/api/session"
-    assert_equal false, response.parsed_body.fetch("authenticated")
-  end
-
-  test "an unverified registration cannot reserve another person's email" do
-    register
-    other = ActionDispatch::Integration::Session.new(Rails.application)
-    other.https!
-    other.host! URI(AppSettings.origin).host
-    sent = []
-    VerificationMailer.stub(:deliver!, ->(**args) { sent << args.fetch(:token) }) do
-      other.post "/api/auth/register", params: { email: @email, password: "outra senha segura" }, as: :json, headers: @headers
-    end
-    assert_equal 202, other.response.status
-    other.post "/api/auth/verify-email", params: { token: sent.fetch(0) }, as: :json, headers: @headers
-    assert_equal 200, other.response.status
-    login
-    assert_response :unauthorized
+  test "public registration endpoint is unavailable" do
+    post "/api/auth/register", params: { email: @email, password: @password }, as: :json, headers: @headers
+    assert_response :not_found
+    assert_nil IdentityStore.call("password_lookup", @email)
   end
 
   test "rate limiting applies to login attempts regardless of password" do
@@ -119,7 +81,7 @@ class AuthenticatedOnboardingHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "setup persists across login and a TOTP cannot be replayed" do
-    verify(register)
+    create_owner_fixture
     login
     secret = response.parsed_body.fetch("secret")
     login

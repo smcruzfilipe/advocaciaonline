@@ -273,3 +273,66 @@ test("queued administrative recovery retains the identity shown when it was prep
   );
   assert.equal(recoveryStarted, false);
 });
+
+test("first access redemption uses the displayed authenticated session and CSRF", async () => {
+  let sent;
+  globalThis.fetch = async (path, options) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "csrf-a",
+        membership_id: "a",
+      });
+    sent = { path, options };
+    return Response.json({ authenticated: true });
+  };
+  await authRequest("/api/auth/first-access", { token: "invitation" });
+  assert.equal(sent.path, "/api/auth/first-access");
+  assert.equal(sent.options.headers.get("X-CSRF-Token"), "csrf-a");
+  assert.deepEqual(JSON.parse(sent.options.body), { token: "invitation" });
+});
+
+test("team registration requires the fingerprint of the invitation opened in this tab", async () => {
+  setDisplayedSession(null);
+  let sent;
+  globalThis.fetch = async (path, options) => {
+    sent = { path, options };
+    return Response.json({ message: "accepted" }, { status: 202 });
+  };
+  await assert.rejects(
+    authRequest("/api/auth/team-register", { email: "person@example.test" }),
+    (error) =>
+      error instanceof ApiError && error.code === "invitation_context_changed",
+  );
+  assert.equal(sent, undefined);
+  await authRequest(
+    "/api/auth/team-register",
+    { email: "person@example.test" },
+    "a".repeat(64),
+  );
+  assert.equal(
+    sent.options.headers.get("X-Invitation-Fingerprint"),
+    "a".repeat(64),
+  );
+  assert.equal(JSON.parse(sent.options.body).token, undefined);
+});
+
+test("a replaced session cannot redeem a first-access invitation", async () => {
+  let redemptionSent = false;
+  globalThis.fetch = async (path) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "other",
+        membership_id: "a",
+      });
+    redemptionSent = true;
+    return Response.json({});
+  };
+  await assert.rejects(
+    authRequest("/api/auth/first-access", { token: "invitation" }),
+    (error) =>
+      error instanceof ApiError && error.code === "session_context_changed",
+  );
+  assert.equal(redemptionSent, false);
+});

@@ -1,8 +1,8 @@
 class PlatformAdminInvitationsController < ApplicationController
   before_action :require_platform_administration
   before_action :check_origin
-  before_action :verify_csrf, only: [:create, :reissue]
-  before_action :require_json, only: [:create, :reissue]
+  before_action :verify_csrf, only: [:create, :reissue, :email]
+  before_action :require_json, only: [:create, :reissue, :email]
 
   rescue_from IdentityStore::AuthenticationRejected do
     api_error("authentication_required", "Entre na sua conta para continuar.", :unauthorized)
@@ -19,6 +19,14 @@ class PlatformAdminInvitationsController < ApplicationController
   rescue_from IdentityStore::Conflict do
     api_error("invitation_conflict", "Não foi possível emitir o convite. Se já houver cadastro, use o login. Um convite ativo só pode ser substituído por reemissão explícita.", :conflict)
   end
+  rescue_from FirstAccessInvitationMailer::DeliveryFailed do |error|
+    message = if error.is_a?(FirstAccessInvitationMailer::DeliveryUnknown)
+      "O resultado do envio é desconhecido. O convite continua disponível para cópia ou reenvio explícito."
+    else
+      "Não foi possível enviar o convite. Ele continua disponível para cópia ou reenvio explícito."
+    end
+    api_error("invitation_email_failed", message, :service_unavailable)
+  end
 
   def index
     render json: { invitations: FirstAccessInvitationStore.list(token: session_token) }
@@ -32,6 +40,15 @@ class PlatformAdminInvitationsController < ApplicationController
   def link
     return invitation_not_found unless valid_identifier?
     render json: FirstAccessInvitationStore.link(token: session_token, id: params[:id])
+  end
+
+  def email
+    return invitation_not_found unless valid_identifier?
+    invitation = FirstAccessInvitationStore.list(token: session_token).find { |item| item.fetch("id") == params[:id].downcase }
+    return invitation_not_found unless invitation
+    link = FirstAccessInvitationStore.link(token: session_token, id: params[:id])
+    FirstAccessInvitationMailer.deliver!(email: invitation.fetch("email"), link: link.fetch(:link))
+    render json: { accepted: true, message: "Mensagem aceita pelo servidor SMTP; isso não confirma entrega na caixa postal." }
   end
 
   def reissue

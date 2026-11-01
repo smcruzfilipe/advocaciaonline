@@ -381,7 +381,7 @@ class PlatformAdminAuthorizationTest < ActiveSupport::TestCase
   end
 
   def insert_identity(db, email)
-    id = db.exec_params("INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [email]).getvalue(0, 0)
+    id = db.exec_params("INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id", [email]).getvalue(0, 0)
     @identities << id
     id
   end

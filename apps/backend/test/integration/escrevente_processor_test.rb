@@ -25,9 +25,9 @@ class EscreventeProcessorTest < ActiveSupport::TestCase
       @migrator => "advocacia_migrator", @despachante => "advocacia_despachante" }.each do |connection, role|
       assert_equal role, connection.exec("SELECT current_user").getvalue(0, 0)
     end
-    @session_a, = authenticated_session
+    @session_a, = authenticated_session(owner: true)
     @lawyer_a = LawyerOnboarding.call(token: @session_a, input: profile_payload)
-    @session_b, = authenticated_session
+    @session_b, = authenticated_session(owner: true)
     @lawyer_b = LawyerOnboarding.call(token: @session_b, input: profile_payload.merge("full_name" => "Bruno Lima"))
     date = @despachante.exec(<<~SQL).getvalue(0, 0)
       SELECT COALESCE(MAX(collection_date) + 1, DATE '2080-01-01')::text FROM public.collection_runs

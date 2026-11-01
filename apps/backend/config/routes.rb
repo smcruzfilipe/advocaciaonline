@@ -1,6 +1,9 @@
 Rails.application.routes.draw do
-  post "/api/auth/register", to: "password_auth#register", defaults: { format: :json }
+  post "/api/auth/team-register", to: "password_auth#team_register", defaults: { format: :json }
   post "/api/auth/verify-email", to: "password_auth#verify_email", defaults: { format: :json }
+  post "/api/auth/first-access/inspect", to: "password_auth#inspect_first_access", defaults: { format: :json }
+  post "/api/auth/first-access", to: "password_auth#first_access", defaults: { format: :json }
+  post "/api/auth/first-access/confirm", to: "password_auth#confirm_first_access", defaults: { format: :json }
   post "/api/auth/login", to: "password_auth#login", defaults: { format: :json }
   post "/api/auth/totp", to: "password_auth#totp", defaults: { format: :json }
   post "/api/auth/password-reset", to: "password_auth#password_reset", defaults: { format: :json }
@@ -10,6 +13,7 @@ Rails.application.routes.draw do
   get "/api/admin/invitations", to: "platform_admin_invitations#index", defaults: { format: :json }
   post "/api/admin/invitations", to: "platform_admin_invitations#create", defaults: { format: :json }
   get "/api/admin/invitations/:id/link", to: "platform_admin_invitations#link", defaults: { format: :json }
+  post "/api/admin/invitations/:id/email", to: "platform_admin_invitations#email", defaults: { format: :json }
   post "/api/admin/invitations/:id/reissue", to: "platform_admin_invitations#reissue", defaults: { format: :json }
   get "/api/session", to: "sessions#show", defaults: { format: :json }
   patch "/api/session/membership", to: "sessions#update", defaults: { format: :json }

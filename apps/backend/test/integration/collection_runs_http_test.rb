@@ -244,7 +244,7 @@ class CollectionRunsHttpTest < ActionDispatch::IntegrationTest
   private
 
   def create_lawyer(name: "Ana de Ávila", number: "001234-A", uf: "SP")
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     input = profile_payload.merge("full_name" => name,
       "primary_oab" => { "number" => number, "uf" => uf })
     [token, LawyerOnboarding.call(token: token, input: input)]

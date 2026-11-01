@@ -15,6 +15,7 @@ const accessPaths: Record<string, true> = {
   "/login": true,
   "/verify-email": true,
   "/reset-password": true,
+  "/primeiro-acesso": true,
   "/onboarding": true,
   "/vinculos": true,
   "/convite": true,
@@ -110,10 +111,17 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
         ? "Membro da equipe"
         : "Conta autenticada";
   const identity = session?.authenticated ? (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
       <span className="max-w-xs break-words text-sm text-error">
         {accountLabel}
       </span>
+      {accessPage &&
+        session?.can_create_tenant === true &&
+        pathname !== "/onboarding" && (
+          <Link href="/onboarding" className="text-xs text-accent underline">
+            Concluir meu cadastro
+          </Link>
+        )}
       <button
         type="button"
         className="text-xs text-muted-foreground underline ml-1 disabled:opacity-40"
@@ -148,6 +156,15 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
     administrativePage
       ? [
           { href: "/admin", label: "Administração", owner: false },
+          ...(session?.can_create_tenant === true
+            ? [
+                {
+                  href: "/onboarding",
+                  label: "Concluir meu cadastro",
+                  owner: false,
+                },
+              ]
+            : []),
           ...(session?.onboarded
             ? [
                 {
@@ -160,6 +177,15 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
         ]
       : [
           ...navigation,
+          ...(session?.can_create_tenant === true
+            ? [
+                {
+                  href: "/onboarding",
+                  label: "Concluir meu cadastro",
+                  owner: false,
+                },
+              ]
+            : []),
           ...(administrator
             ? [{ href: "/admin", label: "Administração", owner: false }]
             : []),
@@ -243,7 +269,9 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
           ) : accessPage ? (
             <div
               key={
-                pathname === "/reset-password" || pathname === "/login"
+                pathname === "/reset-password" ||
+                pathname === "/login" ||
+                pathname === "/primeiro-acesso"
                   ? pathname
                   : (session?.csrf_token ?? "anonymous")
               }

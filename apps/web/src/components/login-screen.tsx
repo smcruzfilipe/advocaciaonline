@@ -15,7 +15,14 @@ type RecoverySetup = { challenge: string; secret: string; otpauth_uri: string };
 
 export function LoginScreen() {
   const router = useRouter();
-  const { session, loading, pendingInvitation, refresh } = useSession();
+  const {
+    session,
+    loading,
+    pendingInvitation,
+    invitationMismatch,
+    invitationFingerprint,
+    refresh,
+  } = useSession();
   const [mode, setMode] = useState<"login" | "register" | "recovery">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,7 +76,17 @@ export function LoginScreen() {
         setRecoveryCode("");
         setCode("");
       } else if (mode === "register") {
-        await authRequest("/api/auth/register", { email, password });
+        if (!pendingInvitation || invitationMismatch || !invitationFingerprint)
+          throw new Error("Abra novamente o link de convite nesta aba.");
+        await authRequest(
+          "/api/auth/team-register",
+          {
+            email,
+            password,
+            password_confirmation: confirmation,
+          },
+          invitationFingerprint,
+        );
         setPassword("");
         setConfirmation("");
         setRegistered(true);
@@ -228,9 +245,9 @@ export function LoginScreen() {
         >
           <h2 className="font-semibold">Confira seu e-mail</h2>
           <p>
-            Se o endereço puder ser cadastrado, você receberá um link de
-            confirmação. Abra o link neste mesmo navegador e confirme seu e-mail
-            antes de entrar.
+            Se o convite estiver disponível, enviaremos instruções para
+            confirmação do e-mail. Confirme sua caixa antes de entrar para
+            aceitar o convite de equipe.
           </p>
           <button
             className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
@@ -431,25 +448,30 @@ export function LoginScreen() {
               </button>
             </>
           )}
-          <button
-            className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
-            type="button"
-            disabled={working}
-            onClick={() => switchMode(mode === "login" ? "register" : "login")}
-          >
-            {mode === "recovery"
-              ? "Voltar ao login"
-              : mode === "login"
-                ? "Criar conta"
-                : "Já tenho conta"}
-          </button>
+          {(mode === "recovery" ||
+            (pendingInvitation && !invitationMismatch)) && (
+            <button
+              className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
+              type="button"
+              disabled={working}
+              onClick={() =>
+                switchMode(mode === "login" ? "register" : "login")
+              }
+            >
+              {mode === "recovery"
+                ? "Voltar ao login"
+                : mode === "login"
+                  ? "Criar conta para convite de equipe"
+                  : "Já tenho conta"}
+            </button>
+          )}
         </form>
       )}
       <div className="flex flex-col gap-1 text-center text-xs text-muted-foreground">
         <h2 className="font-medium">Primeiro acesso?</h2>
         <p>
-          Confirme seu e-mail e configure o autenticador. Depois você poderá
-          cadastrar seu perfil profissional ou aceitar um convite válido.
+          O cadastro está disponível apenas por convite. Entre em contato com o
+          responsável pela plataforma para solicitar acesso.
         </p>
       </div>
     </section>

@@ -10,7 +10,7 @@ Permitir que advogados e equipes autorizadas acessem, configurem monitoramentos 
 
 | Módulo existente | Telas e responsabilidades | Dependências |
 |---|---|---|
-| identidade | Cadastro com e-mail verificado, senha e aplicativo autenticador, seleção de vínculo, aceite de convite e saída | Sessão e endpoints de identidade existentes |
+| identidade | Primeiro acesso por convite administrativo, senha e aplicativo autenticador; cadastro de equipe mediante convite e confirmação real de e-mail; seleção de vínculo, aceite e saída | Sessão e endpoints de identidade existentes |
 | autorizacao | Equipe, credenciais, convites, grupos, regras e membros; decisões por operação e tribunal | identidade; somente titular administra equipe/grupos |
 | monitoramentos | Perfil monitorado, lista, cadastro, detalhe, edição, desativação e reativação de partes e processos; filtros de tribunal | identidade e autorizacao |
 | consulta | Dashboard, lista por tribunal e detalhe independente de comunicações; estados, avisos e pendências | identidade, autorizacao e coleta |
@@ -20,7 +20,7 @@ Ordem proposta: identidade → autorização e monitoramentos → consulta/dashb
 
 ## Comportamento e critérios de aceite
 
-- Login com senha e TOTP obrigatório; onboarding inclui nome completo, OAB principal, OABs secundárias opcionais e escritório opcional. Vínculo selecionado e validade são reconhecidos pelo servidor; convite exige e-mail verificado.
+- Login com senha e TOTP obrigatório; convite administrativo prepara senha e autenticador sem criar sessão até a confirmação do primeiro código, e não comprova posse da caixa postal. Onboarding inclui nome completo, OAB principal, OABs secundárias opcionais e escritório opcional, após liberação administrativa. Equipe exige convite e confirmação real do mesmo e-mail; vínculo e validade são reconhecidos pelo servidor.
 - **Esqueci minha senha:** `/reset-password` solicita o link e recebe seu token por fragmento, removido da barra e mantido apenas em memória. Nova senha e confirmação seguem a política do cadastro; sucesso somente após `204`, sem login automático. Expiração, link inválido/consumido e falhas de transporte possuem estado explícito. TOTP continua obrigatório.
 - Usuários de equipe e grupos seguem `SPEC-identidade.md` e `SPEC-autorizacao.md`: sem grupos há leituras padrão, não escrita implícita; concessões se somam e negação explícita prevalece. Administração é exclusiva do titular; remover último grupo não revoga credencial.
 - Partes e processos usam catálogo real de tribunais; sem filtro significa todos, seleção explícita não vazia. CNJ e OAB preservam zeros. Erro de catálogo não produz opções inventadas.
@@ -31,6 +31,9 @@ Ordem proposta: identidade → autorização e monitoramentos → consulta/dashb
 - Leituras, alterações e troca de vínculo em abas da aplicação são coordenadas com Web Locks; leituras conferem a sessão antes e depois da solicitação, e mutações comparam sessão e vínculo antes de enviar. Navegador sem Web Locks recebe erro e não envia operações protegidas. O backend continua responsável pela autorização efetiva.
 - A limitação de autenticação deve ser aplicada no servidor; detalhes de ingresso e variáveis estão no README.
 - O link `/invite/accept#token=...` emitido pelo backend é recebido pela interface; o fragmento é removido da barra de endereço e o token fica em cookie HttpOnly de curta duração. A confirmação compara a impressão digital do convite aberto naquela aba, evitando aceitar um convite de outra aba. Não armazenar o token no cliente.
+- `/primeiro-acesso#token=...` captura o segredo separadamente do convite de equipe, remove o fragmento e o mantém apenas na memória da tela. Conta existente usa login/TOTP na mesma tela antes do resgate; após confirmação, a sessão comum segue ao onboarding sem repetir o fator.
+- A sessão informa `can_create_tenant` quando existe liberação para criar tenant próprio. O perfil pode ser retomado pelo menu mesmo com vínculo de equipe ativo; a capacidade na interface não substitui a autorização do servidor.
+- `/admin/convites` usa a sessão comum e exige autorização no servidor. Emissão, cópia, envio e reemissão são ações distintas; aceitação SMTP não comprova entrega e falha de envio não impede copiar o link ativo.
 
 ## Visual e acessibilidade
 

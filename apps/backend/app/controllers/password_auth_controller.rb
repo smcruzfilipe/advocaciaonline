@@ -5,21 +5,30 @@ class PasswordAuthController < ApplicationController
 
   before_action :check_origin_and_ingress
   before_action :limit_ip
-  before_action :verify_recovery_csrf, only: [:admin_recovery, :confirm_admin_recovery]
+  before_action :verify_recovery_csrf, only: [:admin_recovery, :confirm_admin_recovery, :team_register,
+    :verify_email, :inspect_first_access, :first_access, :confirm_first_access]
 
-  def register
+  def team_register
     email = normalized_email
-    password = valid_password_input
-    return invalid_input unless email && password
+    invitation = request.request_parameters["token"]
+    identity = IdentityStore.session_identity(session_token)
+    password = valid_password_input unless identity
+    confirmation = request.request_parameters["password_confirmation"]
+    return invalid_input unless email && valid_token?(invitation) &&
+      (identity || (password && password == confirmation))
     return unless limit("account:#{email}")
     token = SecureRandom.urlsafe_base64(32)
     browser = cookies[REGISTRATION_COOKIE]
     browser = SecureRandom.urlsafe_base64(32) unless valid_token?(browser)
-    row = IdentityStore.call("register_password", IdentityStore.digest(token), IdentityStore.digest(browser), email,
-      PasswordAuthentication.password_hash(password), PasswordAuthentication.encrypt(PasswordAuthentication.new_secret))
-    cookies[REGISTRATION_COOKIE] = cookie_options(expires: 24.hours.from_now).merge(value: browser)
-    VerificationMailer.deliver!(email: email, token: token) if row.fetch("created")
-    render json: { message: "Se o endereço puder ser cadastrado, enviaremos um e-mail de confirmação." }, status: :accepted
+    row = IdentityStore.call("register_team_password", IdentityStore.digest(invitation), IdentityStore.digest(token),
+      IdentityStore.digest(browser), email, password && PasswordAuthentication.password_hash(password),
+      password && PasswordAuthentication.encrypt(PasswordAuthentication.new_secret),
+      identity && IdentityStore.digest(session_token))
+    if row.fetch("created")
+      cookies[REGISTRATION_COOKIE] = cookie_options(expires: 24.hours.from_now).merge(value: browser)
+      VerificationMailer.deliver!(email: email, token: token)
+    end
+    render json: { message: "Se o convite estiver disponível, enviaremos instruções para confirmação do e-mail." }, status: :accepted
   rescue VerificationMailer::DeliveryFailed
     api_error("email_delivery_failed", "Não foi possível enviar o e-mail de confirmação. Tente novamente.", :service_unavailable)
   end
@@ -28,10 +37,49 @@ class PasswordAuthController < ApplicationController
     token = request.request_parameters["token"]
     browser = cookies[REGISTRATION_COOKIE]
     return invalid_input unless valid_token?(token) && valid_token?(browser)
-    row = IdentityStore.call("verify_password_email", IdentityStore.digest(token), IdentityStore.digest(browser))
+    row = IdentityStore.call("verify_team_email", IdentityStore.digest(token), IdentityStore.digest(browser),
+      session_token && IdentityStore.digest(session_token))
     return api_error("verification_invalid", "O link é inválido ou expirou.", :unprocessable_entity) unless row.fetch("verified")
     cookies.delete(REGISTRATION_COOKIE, **cookie_options(expires: Time.at(0)))
     render json: { verified: true }
+  end
+
+  def inspect_first_access
+    invitation = FirstAccessInvitationStore.inspect_token(bearer: request.request_parameters["token"])
+    render json: invitation.slice("email", "expires_at", "requires_login")
+  rescue IdentityStore::NotFound, IdentityStore::InvalidInput
+    first_access_invalid
+  end
+
+  def first_access
+    bearer = request.request_parameters["token"]
+    invitation = FirstAccessInvitationStore.inspect_token(bearer: bearer)
+    if invitation.fetch("requires_login")
+      return api_error("authentication_required", "Entre na sua conta para continuar.", :unauthorized) unless IdentityStore.session_identity(session_token)
+      FirstAccessInvitationStore.consume(bearer: bearer, session: session_token)
+      render_session(session_token)
+    else
+      pending = FirstAccessInvitationStore.prepare(bearer: bearer, password: request.request_parameters["password"],
+        confirmation: request.request_parameters["password_confirmation"])
+      render json: pending, status: :accepted
+    end
+  rescue IdentityStore::NotFound, IdentityStore::Conflict, IdentityStore::AuthenticationRejected
+    first_access_invalid
+  rescue IdentityStore::InvalidInput
+    invalid_input
+  end
+
+  def confirm_first_access
+    bearer = request.request_parameters["token"]
+    challenge = request.request_parameters["challenge"]
+    return first_access_invalid unless valid_token?(bearer) && valid_token?(challenge)
+    return unless limit("challenge:#{IdentityStore.digest(challenge)}")
+    token = FirstAccessInvitationStore.finish(bearer: bearer, challenge: challenge,
+      code: request.request_parameters["code"], session: session_token)
+    cookies[SESSION_COOKIE] = cookie_options(expires: 12.hours.from_now).merge(value: token)
+    render_session(token)
+  rescue IdentityStore::NotFound, IdentityStore::Conflict, IdentityStore::InvalidInput
+    first_access_invalid
   end
 
   def password_reset
@@ -124,6 +172,12 @@ class PasswordAuthController < ApplicationController
     return rejected unless result.fetch("created")
     cookies.delete(AUTH_COOKIE, **cookie_options(expires: Time.at(0)))
     cookies[SESSION_COOKIE] = cookie_options(expires: 12.hours.from_now).merge(value: token)
+    render_session(token)
+  end
+
+  private
+
+  def render_session(token)
     context = IdentityStore.session_identity(token)
     selected = IdentityStore.context(token)
     memberships = IdentityStore.memberships(token)
@@ -131,10 +185,12 @@ class PasswordAuthController < ApplicationController
       csrf_token: context.fetch("csrf_token"), membership_id: selected&.fetch("membership_id"),
       tenant_id: selected&.fetch("tenant_id"), role: selected&.fetch("role"),
       selection_required: memberships.any? && selected&.fetch("tenant_id").blank?, memberships: memberships,
-      platform_admin: IdentityStore.platform_admin?(token) }
+      platform_admin: IdentityStore.platform_admin?(token), can_create_tenant: IdentityStore.can_create_tenant?(token) }
   end
 
-  private
+  def first_access_invalid
+    api_error("first_access_invalid", "O convite é inválido ou expirou.", :unprocessable_entity)
+  end
 
   def verify_recovery_csrf
     identity = IdentityStore.session_identity(session_token)

@@ -6,7 +6,7 @@ class TeamCredentialsHttpTest < ActionDispatch::IntegrationTest
   setup do
     https!
     host! URI(AppSettings.origin).host
-    @owner, @csrf = authenticated_session
+    @owner, @csrf = authenticated_session(owner: true)
     LawyerOnboarding.call(token: @owner, input: profile_payload)
     cookies[ApplicationController::SESSION_COOKIE] = @owner
     @email = "http-member-#{SecureRandom.hex(6)}@example.test"

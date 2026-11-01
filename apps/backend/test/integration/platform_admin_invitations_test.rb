@@ -129,6 +129,110 @@ class PlatformAdminInvitationsTest < ActionDispatch::IntegrationTest
     assert_empty response.parsed_body.fetch("invitations")
   end
 
+  test "explicit email sends the same active invitation without changing its expiry" do
+    issue
+    assert_response :created
+    invitation = response.parsed_body
+    id = invitation.fetch("id")
+    get "/api/admin/invitations/#{id}/link", headers: @headers
+    original = response.parsed_body
+    deliveries = []
+    FirstAccessInvitationMailer.stub(:deliver!, ->(**args) { deliveries << args }) do
+      2.times do
+        post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers, as: :json
+        assert_response :ok
+        assert_equal({ "accepted" => true, "message" => "Mensagem aceita pelo servidor SMTP; isso não confirma entrega na caixa postal." }, response.parsed_body)
+        refute_includes response.body, original.fetch("link")
+      end
+    end
+    assert_equal [{ email: @email, link: original.fetch("link") }] * 2, deliveries
+    get "/api/admin/invitations/#{id}/link", headers: @headers
+    assert_equal original, response.parsed_body
+    assert_equal invitation.fetch("expires_at"), original.fetch("expires_at")
+  end
+
+  test "failed or uncertain email leaves the original link available for copying" do
+    issue
+    assert_response :created
+    invitation = response.parsed_body
+    id = invitation.fetch("id")
+    get "/api/admin/invitations/#{id}/link", headers: @headers
+    original = response.parsed_body
+    [FirstAccessInvitationMailer::DeliveryFailed, FirstAccessInvitationMailer::DeliveryUnknown].each do |failure|
+      FirstAccessInvitationMailer.stub(:deliver!, ->(**) { raise failure, "secret #{@email} #{original.fetch('link')}" }) do
+        post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers, as: :json
+      end
+      assert_response :service_unavailable
+      assert_equal "invitation_email_failed", response.parsed_body.fetch("error").fetch("code")
+      refute_includes response.body, original.fetch("link")
+      refute_includes response.body, @email
+      if failure == FirstAccessInvitationMailer::DeliveryUnknown
+        assert_match(/desconhecido/i, response.parsed_body.fetch("error").fetch("message"))
+      end
+      get "/api/admin/invitations/#{id}/link", headers: @headers
+      assert_response :ok
+      assert_equal original, response.parsed_body
+    end
+  end
+
+  test "email requires administrator origin csrf and an active invitation" do
+    issue
+    assert_response :created
+    id = response.parsed_body.fetch("id")
+    FirstAccessInvitationMailer.stub(:deliver!, ->(**) { flunk "unauthorized or inactive invitation was sent" }) do
+      post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers.merge("Origin" => "https://evil.test"), as: :json
+      assert_response :forbidden
+      post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers.except("X-CSRF-Token"), as: :json
+      assert_response :forbidden
+      post "/api/admin/invitations/#{SecureRandom.uuid}/email", params: {}, headers: @headers, as: :json
+      assert_response :not_found
+      post "/api/admin/invitations/not-a-uuid/email", params: {}, headers: @headers, as: :json
+      assert_response :not_found
+      token, csrf = authenticated_session
+      remember_identity(token)
+      cookies[ApplicationController::SESSION_COOKIE] = token
+      post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers.merge("X-CSRF-Token" => csrf), as: :json
+      assert_response :forbidden
+      cookies.delete(ApplicationController::SESSION_COOKIE)
+      post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers, as: :json
+      assert_response :unauthorized
+      cookies[ApplicationController::SESSION_COOKIE] = @token
+      @operator.exec_params("WITH t AS (SELECT clock_timestamp() AS now) UPDATE app_private.first_access_invitations i SET created_at = t.now - interval '25 hours', expires_at = t.now - interval '1 hour' FROM t WHERE i.id = $1", [id])
+      post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers, as: :json
+      assert_response :not_found
+    end
+  end
+
+  test "email revalidates the administrator session at link retrieval" do
+    issue
+    assert_response :created
+    id = response.parsed_body.fetch("id")
+    list = FirstAccessInvitationStore.method(:list)
+    revoke_after_list = lambda do |token:|
+      invitations = list.call(token: token)
+      IdentityStore.call("revoke_session", IdentityStore.digest(token))
+      invitations
+    end
+    FirstAccessInvitationStore.stub(:list, revoke_after_list) do
+      FirstAccessInvitationMailer.stub(:deliver!, ->(**) { flunk "revoked session sent an invitation" }) do
+        post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers, as: :json
+      end
+    end
+    assert_response :unauthorized
+  end
+
+  test "reissuing invalidates the prior invitation for email too" do
+    issue
+    assert_response :created
+    id = response.parsed_body.fetch("id")
+    post "/api/admin/invitations/#{id}/reissue", params: {}, headers: @headers, as: :json
+    assert_response :created
+    FirstAccessInvitationMailer.stub(:deliver!, ->(**) { flunk "replaced invitation was sent" }) do
+      post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers, as: :json
+    end
+    assert_response :not_found
+  end
+
   private
 
   def remember_identity(token)

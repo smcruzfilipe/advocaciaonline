@@ -24,7 +24,7 @@ A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha 
 
 ## Escopo funcional
 
-- Login para advogado e equipe com senha e aplicativo autenticador (TOTP) obrigatório; o cadastro requer confirmação do e-mail.
+- Login comum com senha e TOTP; painel administrativo em `/admin/convites` para convidar advogados por e-mail ou copiar o link. Cadastro de advogado exclusivamente por convite, sem confirmação adicional de caixa postal; equipe exige convite e confirmação real do e-mail.
 - Isolamento por tenant do advogado, autorização por grupos e tribunal, monitoramentos de advogados/partes/processos e consulta de comunicações.
 - Duas coletas diárias do DJEN, somente Diário Eletrônico (`D`), sem editais (`E`): cadernos e fallback paginado na primeira execução, API paginada diretamente na segunda e deduplicação pela combinação de `id` e `hash`.
 - Dashboard e registros append-only do fluxo de coleta.
@@ -273,7 +273,7 @@ end
 
 A transação é materializada antes das chamadas PostgreSQL parametrizadas: erro ou segunda administradora fazem rollback integral, sem substituir a conta existente. Não imprimir exceções ou seus parâmetros; consultar somente o estado sanitizado. Os códigos só são exibidos após commit e persistidos como hashes. Guarde-os fora da plataforma e preserve `SECRET_KEY_BASE`.
 
-Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha por e-mail mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. `/admin` é o destino administrativo autorizado; o backend de convites está disponível conforme abaixo, mas sua interface, relay web e envio por SMTP ainda pertencem às próximas folhas.
+Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. A administradora entra pelo login comum e usa `/admin/convites` para emitir, enviar, copiar e reemitir links.
 
 ### Recuperação administrativa e sessão comum
 
@@ -302,12 +302,13 @@ A administradora entra por `/login` e segue a `/admin`, sem precisar de tenant. 
 | `POST /api/admin/invitations` | JSON com `email` | `201 { id, email, created_at, expires_at }`; normaliza o e-mail, não cria tenant nem substitui convite ativo. |
 | `GET /api/admin/invitations/:id/link` | Identificador do convite ativo | `200 { link, expires_at }`; link opaco em `/primeiro-acesso#token=...`, sem renovar o prazo. |
 | `POST /api/admin/invitations/:id/reissue` | JSON `{}` | `201` com novos metadados; substitui convite/preparação anteriores atomicamente e reinicia as 24 horas. |
+| `POST /api/admin/invitations/:id/email` | JSON `{}` | `200 { accepted, message }` significa aceitação pelo SMTP, não entrega na caixa postal; reenvia o mesmo link sem prorrogar. Falha `503` mantém o convite copiável; timeout informa resultado desconhecido. |
 
 Todas revalidam sessão e capacidade administrativa no PostgreSQL; owner/member comuns não são administradores. Mutações exigem JSON, `Origin` igual a `APP_ORIGIN` e CSRF da sessão atual. Leituras aceitam essa origem ou, sem `Origin`, `Sec-Fetch-Site: same-origin`; origem explícita indevida sempre é recusada. Não há cookie, dependência ou variável nova. Respostas usam `no-store`; não registrar seus corpos sensíveis. Sessão ausente/revogada retorna `401`; falta de capacidade, origem ou CSRF retorna `403`; duplicidade ou identidade desativada/titular com tenant retorna `409`; e-mail inválido retorna `422`; identificador sem convite ativo retorna `404`.
 
 Há no máximo um convite ativo por e-mail, com prazo absoluto de 24 horas. Cópia retorna sempre o mesmo token e prazo; somente reemissão explícita substitui ambos. O banco guarda digest e cópia cifrada autenticada, nunca o token em claro. Consumo, substituição e expurgo removem convite e preparação; a liberação consumida permanece vinculada à identidade. Listar/emitir/copiar/resgatar executam expurgo oportunista, sem tarefa agendada: sem atividade, não há promessa de prazo físico de remoção.
 
-O store também mantém preparação pendente sem criar identidade, sessão, reset ou liberação. Consumo exige sessão MFA válida da mesma identidade e pode participar da transação de ativação de PA09. Este grupo não publica endpoints de cadastro/resgate, não altera a verificação de caixa de e-mail e não implementa envio SMTP; esses caminhos permanecem nas folhas previstas.
+Em `/primeiro-acesso#token=...`, o formulário captura o segredo apenas em memória e remove o fragmento. Preparar senha/autenticador não cria identidade, sessão, reset ou liberação. A confirmação inicial de TOTP conclui conta, liberação, consumo e sessão comum numa transação, seguindo diretamente ao perfil sem novo login/TOTP. Conta existente usa sua sessão MFA do mesmo e-mail sem alterar credenciais. Perfil/tenant são outra transação; falha nessa etapa não reabre convite consumido. A capacidade server-side `can_create_tenant` permite retomar `/onboarding`, inclusive quando já há vínculo de equipe, e nunca substitui a guarda SQL.
 
 **Restore:** antes de reabrir o tráfego, a operação protegida deve executar `DELETE FROM app_private.first_access_invitations` na instância restaurada com a role de migration. Isso invalida todos os convites restaurados e elimina suas preparações por FK; não apagar identidades nem `app_private.first_access_grants`. A role da API não pode executar esse DELETE; não existe endpoint ou função runtime de manutenção. Preserve `SECRET_KEY_BASE`; não tentar recuperar links antigos com outra chave.
 
@@ -317,8 +318,11 @@ O store também mantém preparação pendente sem criar identidade, sessão, res
 
 | Método e caminho | Comportamento |
 |---|---|
-| `POST /api/auth/register` | Solicita cadastro com e-mail e senha; a confirmação é enviada por e-mail. |
-| `POST /api/auth/verify-email` | Confirma o e-mail usando token de uso único. |
+| `POST /api/auth/first-access/inspect` | JSON com `token`; consulta e-mail fixado, expiração e necessidade de login, sem consumir. |
+| `POST /api/auth/first-access` | Token e senha/`password_confirmation` preparam conta nova; retorna challenge, segredo TOTP e URI, sem sessão. Conta existente autenticada resgata com token e CSRF, sem alterar credenciais. |
+| `POST /api/auth/first-access/confirm` | Token, challenge e `code` confirmam primeiro TOTP e criam sessão comum somente após commit. |
+| `POST /api/auth/team-register` | Convite de equipe no token, e-mail correspondente e senha iniciam confirmação real; não concedem titularidade. Conta existente autenticada pode confirmar seu e-mail nesse contexto sem redefinir credenciais. |
+| `POST /api/auth/verify-email` | Confirmação vinculada ao convite de equipe e ao navegador; não há cadastro público genérico nem alias de `/api/auth/register`. |
 | `POST /api/auth/login` | Valida senha e inicia o desafio TOTP, sem criar sessão. |
 | `POST /api/auth/totp` | Valida o código do autenticador e cria sessão somente após sucesso. |
 | `POST /api/auth/password-reset` | Recebe `email` e responde `202` genérico após o envio das instruções; não revela existência da conta. |

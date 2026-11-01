@@ -82,7 +82,7 @@ Para UI sem teste automatizado existente, o teste focado é um cenário de naveg
 
 ## Cadência obrigatória de revisão por folhas
 
-Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e smokes das **folhas nomeadas**, antes da próxima linha. Os checkpoints de PA/agregadores permanecem adicionais e **não substituem** estas revisões a cada duas ou três folhas. Se o inventário acrescentar ou subdividir folhas condicionais, registrar a sequência exata e recompor seus grupos de duas ou três antes de executar; não acumular folhas até o checkpoint do pai.
+O solicitante aprovou expressamente, de forma global, a continuidade one-shot e todas as revisões humanas intermediárias: não interromper entre R05–R18 ou checkpoints para pedir novamente essa aprovação. As revisões técnicas, os aceites, testes focados e smokes continuam obrigatórios; marcar resultados técnicos somente após observá-los. Permanecem os limites explícitos de segurança, ausência de deploy e uso exclusivo de ambientes descartáveis.
 
 - [x] R01: PA00.A–B — integração e revisão documental concluídas por delegação; sem liberação de execução da aplicação.
 - [x] R02: PA01.A–B — aprovadas expressamente pelo solicitante após apresentação do código e das evidências de PA01.

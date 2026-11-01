@@ -7,8 +7,8 @@ class OnboardingProfileHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "reads the authenticated lawyer profile OABs and own tenant without trusting query identity" do
-    first_token, = authenticated_session
-    second_token, = authenticated_session
+    first_token, = authenticated_session(owner: true)
+    second_token, = authenticated_session(owner: true)
     first = LawyerOnboarding.call(token: first_token, input: profile_payload)
     second_input = profile_payload.merge("full_name" => "Bruno Lima",
       "primary_oab" => { "number" => "000777-B", "uf" => "MG" }, "secondary_oabs" => [])
@@ -44,7 +44,7 @@ class OnboardingProfileHttpTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
     assert_equal "authentication_required", response.parsed_body.dig("error", "code")
 
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: token, input: profile_payload)
     cookies[ApplicationController::SESSION_COOKIE] = token
     IdentityStore.revoke(token)

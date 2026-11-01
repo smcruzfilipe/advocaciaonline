@@ -63,7 +63,8 @@ class FirstAccessInvitationStore
     row = IdentityStore.call("first_access_prepare", IdentityStore.digest(bearer), IdentityStore.digest(challenge),
       PasswordAuthentication.password_hash(password), PasswordAuthentication.encrypt(secret))
     raise IdentityStore::NotFound, "Resource unavailable" unless row
-    { challenge: challenge, secret: secret, otpauth_uri: PasswordAuthentication.uri(row.fetch("email"), secret) }
+    { challenge: challenge, secret: secret, otpauth_uri: PasswordAuthentication.uri(row.fetch("email"), secret),
+      expires_at: row.fetch("expires_at") }
   end
 
   def self.prepared(bearer:, challenge:)
@@ -77,6 +78,21 @@ class FirstAccessInvitationStore
     validate_token!(bearer)
     IdentityStore.call("first_access_consume", IdentityStore.digest(bearer), IdentityStore.digest(session)) ||
       raise(IdentityStore::NotFound, "Resource unavailable")
+  end
+
+  def self.finish(bearer:, challenge:, code:, session:)
+    require_top_level_transaction!
+    pending = prepared(bearer: bearer, challenge: challenge)
+    secret = PasswordAuthentication.decrypt(pending.fetch("totp_secret"))
+    step = PasswordAuthentication.matching_step(secret, code)
+    raise IdentityStore::NotFound, "Resource unavailable" unless step
+    token = SecureRandom.urlsafe_base64(32)
+    csrf = SecureRandom.urlsafe_base64(32)
+    result = IdentityStore.call("first_access_finish", IdentityStore.digest(bearer), IdentityStore.digest(challenge),
+      pending.fetch("totp_secret"), step.to_s, IdentityStore.digest(token), csrf,
+      session.present? ? IdentityStore.digest(session) : "")
+    raise IdentityStore::NotFound, "Resource unavailable" unless result&.fetch("created")
+    token
   end
 
   def self.valid_token?(value)

@@ -4,7 +4,7 @@ class TenantMembershipsTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
   def create_owner
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: token, input: profile_payload)
     token
   end

@@ -76,9 +76,10 @@ class FirstAccessInvitationStoreTest < ActiveSupport::TestCase
     issued, bearer = invitation("prepare")
     password = "synthetic password one"
     first = FirstAccessInvitationStore.prepare(bearer: bearer, password: password, confirmation: password)
-    assert_equal [:challenge, :otpauth_uri, :secret], first.keys.sort
     assert first.fetch(:otpauth_uri).start_with?("otpauth://totp/")
     row = FirstAccessInvitationStore.prepared(bearer: bearer, challenge: first.fetch(:challenge))
+    assert_equal row.fetch("expires_at"), first.fetch(:expires_at)
+    assert_operator first.fetch(:expires_at), :<=, issued.fetch("expires_at")
     assert PasswordAuthentication.valid_password?(password, row.fetch("password_hash"))
     assert PasswordAuthentication.decrypt(row.fetch("totp_secret")) == first.fetch(:secret)
     refute row.fetch("password_hash").include?(password)
@@ -189,7 +190,7 @@ class FirstAccessInvitationStoreTest < ActiveSupport::TestCase
   end
 
   def identity_session(address)
-    id = @operator.exec_params("INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [address]).getvalue(0, 0)
+    id = @operator.exec_params("INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id", [address]).getvalue(0, 0)
     @identities << id
     secret = PasswordAuthentication.new_secret
     password_hash = PasswordAuthentication.password_hash("synthetic fixture password")

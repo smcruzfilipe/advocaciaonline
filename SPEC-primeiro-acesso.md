@@ -1,6 +1,6 @@
 # Especificação proposta: primeiro acesso controlado
 
-**Estado:** base funcional e plano aprovados; decisões vinculantes em [Decisões de PA00](#decisões-de-pa00). A implementação foi autorizada na [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16). PA01/PA02 e o checkpoint após PA00–PA02 foram aprovados expressamente pelo solicitante; progresso técnico e revisões humanas posteriores são registrados nas [tarefas](tasks/todo-primeiro-acesso.md), sem aprovação antecipada. A feature integral e o cutover ainda não estão concluídos; não há autorização de deploy. Fases e gates no [plano](tasks/plan-primeiro-acesso.md); contrato de identidade atual em [identidade](SPEC-identidade.md).
+**Estado:** implementação integrada na branch, autorizada na [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16). O solicitante aprovou globalmente a continuidade one-shot e as revisões intermediárias; aceites técnicos permanecem verificáveis nas [tarefas](tasks/todo-primeiro-acesso.md) e no README. Decisões vinculantes em [Decisões de PA00](#decisões-de-pa00). Nenhum deploy ou uso de dados persistentes autorizado.
 
 ## Objetivo
 

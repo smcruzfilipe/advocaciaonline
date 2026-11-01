@@ -297,7 +297,7 @@ class PlatformAdminSessionsHttpTest < ActionDispatch::IntegrationTest
   private
 
   def insert_identity(db, email, password, secret)
-    id = db.exec_params("INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [email]).getvalue(0, 0)
+    id = db.exec_params("INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id", [email]).getvalue(0, 0)
     @identities << id
     db.exec_params("INSERT INTO app_private.password_credentials(identity_id, password_hash, totp_secret, totp_confirmed) VALUES ($1, $2, $3, true)",
       [id, PasswordAuthentication.password_hash(password), PasswordAuthentication.encrypt(secret)])

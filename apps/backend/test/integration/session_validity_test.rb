@@ -14,7 +14,7 @@ class SessionValidityTest < ActiveSupport::TestCase
   end
 
   test "session expires at its exact server-side deadline without granting a tenant" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: token, input: profile_payload)
     administer do |connection|
       connection.exec_params("UPDATE app_private.sessions SET expires_at = statement_timestamp() WHERE session_hash = $1", [IdentityStore.digest(token)])
@@ -25,7 +25,7 @@ class SessionValidityTest < ActiveSupport::TestCase
   end
 
   test "disabled identity invalidates an already open session" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: token, input: profile_payload)
     administer do |connection|
       connection.exec_params(<<~SQL, [IdentityStore.digest(token)])
@@ -38,7 +38,7 @@ class SessionValidityTest < ActiveSupport::TestCase
   end
 
   test "concurrent onboarding creates exactly one complete lawyer tenant" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     input = profile_payload
     ready = Queue.new
     start = Queue.new

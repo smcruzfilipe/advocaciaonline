@@ -57,6 +57,12 @@ export default async function AdministrationPage() {
           um perfil profissional ou vínculo com equipe.
         </p>
       </div>
+      <Link
+        href="/admin/convites"
+        className="self-start text-sm font-medium text-accent underline"
+      >
+        Gerenciar convites de primeiro acesso
+      </Link>
     </section>
   );
 }

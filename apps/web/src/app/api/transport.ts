@@ -38,7 +38,7 @@ export function publicOrigin(): URL {
 }
 
 export function isApiPath(path: string): boolean {
-  return /^\/api\/(?:auth\/(?:register|verify-email|login|totp|password-reset(?:\/confirm)?)|admin\/auth\/recovery(?:\/confirm)?|session(?:\/membership)?|onboarding|courts|dashboard|communications(?:\/[A-Za-z0-9_-]+)?|monitorings\/(?:lawyer|(?:parties|processes)(?:\/[A-Za-z0-9_-]+)?)|team\/(?:invitations\/accept|credentials(?:\/[A-Za-z0-9_-]+(?:\/(?:renewal|invitation))?)?)|authorization\/(?:catalog|groups(?:\/[A-Za-z0-9_-]+(?:\/rules(?:\/[A-Za-z0-9_-]+)?|\/memberships\/[A-Za-z0-9_-]+)?)?)|collection-runs(?:\/[A-Za-z0-9_-]+\/(?:jobs|events|execution))?)$/.test(
+  return /^\/api\/(?:auth\/(?:team-register|first-access(?:\/(?:inspect|confirm))?|verify-email|login|totp|password-reset(?:\/confirm)?)|admin\/(?:auth\/recovery(?:\/confirm)?|invitations(?:\/[A-Za-z0-9_-]+\/(?:link|email|reissue))?)|session(?:\/membership)?|onboarding|courts|dashboard|communications(?:\/[A-Za-z0-9_-]+)?|monitorings\/(?:lawyer|(?:parties|processes)(?:\/[A-Za-z0-9_-]+)?)|team\/(?:invitations\/accept|credentials(?:\/[A-Za-z0-9_-]+(?:\/(?:renewal|invitation))?)?)|authorization\/(?:catalog|groups(?:\/[A-Za-z0-9_-]+(?:\/rules(?:\/[A-Za-z0-9_-]+)?|\/memberships\/[A-Za-z0-9_-]+)?)?)|collection-runs(?:\/[A-Za-z0-9_-]+\/(?:jobs|events|execution))?)$/.test(
     path,
   );
 }

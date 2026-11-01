@@ -17,7 +17,7 @@ class DashboardHttpTest < ActionDispatch::IntegrationTest
     assert_equal "advocacia_migrator", @admin.exec("SELECT current_user").getvalue(0, 0)
     assert_equal "advocacia_despachante", @planner.exec("SELECT current_user").getvalue(0, 0)
     assert_equal "advocacia_runtime", ApplicationRecord.connection.select_value("SELECT current_user")
-    @owner, = authenticated_session
+    @owner, = authenticated_session(owner: true)
     @lawyer = LawyerOnboarding.call(token: @owner, input: profile_payload)
     @member, = authenticated_session
     identity = IdentityStore.context(@member).fetch("identity_id")
@@ -404,7 +404,7 @@ class DashboardHttpTest < ActionDispatch::IntegrationTest
     first = create_job
     succeed(first)
     persist(first, at: @midnight)
-    other_token, = authenticated_session
+    other_token, = authenticated_session(owner: true)
     other_lawyer = LawyerOnboarding.call(token: other_token, input: profile_payload)
     other_job = create_job(lawyer: other_lawyer)
     succeed(other_job)

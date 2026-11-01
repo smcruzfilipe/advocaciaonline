@@ -5,8 +5,8 @@ class DatabaseContextTest < ActiveSupport::TestCase
 
   setup do
     assert_equal "advocacia_runtime", ApplicationRecord.connection.select_value("SELECT current_user")
-    @token_a, = authenticated_session
-    @token_b, = authenticated_session
+    @token_a, = authenticated_session(owner: true)
+    @token_b, = authenticated_session(owner: true)
     @lawyer_a = LawyerOnboarding.call(token: @token_a, input: profile_payload)
     @lawyer_b = LawyerOnboarding.call(token: @token_b, input: profile_payload.merge("full_name" => "Bruno Lima"))
     assert_equal [], Lawyer.pluck(:id)
@@ -77,7 +77,7 @@ class DatabaseContextTest < ActiveSupport::TestCase
   end
 
   test "onboarding inside an outer transaction commits a complete profile without leaking context" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     lawyer_id = nil
     ApplicationRecord.transaction do
       lawyer = LawyerOnboarding.call(token: token, input: profile_payload)
@@ -93,8 +93,8 @@ class DatabaseContextTest < ActiveSupport::TestCase
   end
 
   test "nested onboarding for two sessions preserves both profiles and deferred checks at outer commit" do
-    token_a, = authenticated_session
-    token_b, = authenticated_session
+    token_a, = authenticated_session(owner: true)
+    token_b, = authenticated_session(owner: true)
     lawyer_a = nil
     lawyer_b = nil
     ApplicationRecord.transaction do

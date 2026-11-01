@@ -21,6 +21,7 @@ export type Session = {
   authenticated: boolean;
   onboarded: boolean;
   platform_admin?: boolean;
+  can_create_tenant?: boolean;
   csrf_token?: string;
   membership_id?: string | null;
   tenant_id?: string | null;
@@ -72,7 +73,11 @@ async function invitationRequest(
 }
 
 function captureInvitation(): Promise<void> {
-  if (["/verify-email", "/reset-password"].includes(window.location.pathname))
+  if (
+    ["/verify-email", "/reset-password", "/primeiro-acesso"].includes(
+      window.location.pathname,
+    )
+  )
     return Promise.resolve();
   const fragment = new URLSearchParams(window.location.hash.slice(1));
   if (
