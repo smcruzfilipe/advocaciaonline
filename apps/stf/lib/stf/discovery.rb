@@ -20,6 +20,7 @@ module STF
       each_record(name: name, type: type, active: type == "PARTE" ? "sim" : nil) do |record|
         next unless canonical_name(record.fetch("pessoaNome")) == canonical_name(name)
         next unless record.fetch("processoEmTramitacao") == "Sim"
+        next unless publicity(record) == :public
 
         process = process_from(record)
         id = process.fetch("incidente")
@@ -34,18 +35,22 @@ module STF
     def find_status(name:, incidente:, cnj:)
       validate_name!(name)
       raise ArgumentError, "Incidente inválido" unless incidente.is_a?(Integer) && incidente.positive?
-      raise ArgumentError, "CNJ inválido" unless cnj.is_a?(String) && CNJ.match?(cnj)
+      raise ArgumentError, "CNJ inválido" unless cnj.nil? || (cnj.is_a?(String) && CNJ.match?(cnj))
 
       expected_name = canonical_name(name)
-      expected_cnj = cnj.delete("-.")
+      expected_cnj = cnj&.delete("-.")
       %w[sim nao].each do |filter|
         found = nil
         each_record(name: name, type: "PARTE", active: filter) do |record|
           next unless canonical_name(record.fetch("pessoaNome")) == expected_name
           next unless record.fetch("processoId") == incidente
-          next unless record.fetch("processoNumeroUnico").delete("-.") == expected_cnj
-
-          status = record.fetch("processoEmTramitacao") == "Sim" ? :active : :inactive
+          if publicity(record) == :restricted
+            status = :restricted
+          else
+            record_cnj = optional_cnj(record)
+            next if expected_cnj && record_cnj && record_cnj.delete("-.") != expected_cnj
+            status = record.fetch("processoEmTramitacao") == "Sim" ? :active : :inactive
+          end
           raise InvalidSource, "Situações contraditórias para processo STF" if found && found != status
           found = status
         end
@@ -89,8 +94,8 @@ module STF
         unless rows.empty?
           # Association ids are not stable process identities; compare the actual observed rows.
           fingerprint = rows.map do |record|
-            [record["pessoaNome"], record["processoId"], record["processoIdentificacao"],
-             record["processoNumeroUnico"], record["processoEmTramitacao"]]
+            JSON.generate([record["pessoaNome"], record["processoId"], record["processoIdentificacao"],
+                           record["processoNumeroUnico"], record["processoEmTramitacao"], record["processoPublicidade"]])
           end.sort
           raise InvalidSource, "Página STF repetida" if seen_pages.key?(fingerprint)
           seen_pages[fingerprint] = true
@@ -108,17 +113,38 @@ module STF
     def validate_record!(record)
       unless record.is_a?(Hash) && record["pessoaNome"].is_a?(String) && !record["pessoaNome"].strip.empty? &&
              record["processoId"].is_a?(Integer) && record["processoId"].positive? &&
-             record["processoIdentificacao"].is_a?(String) && /\A\s*\S(?:.*?\S)?\s+[0-9][0-9.]*\s*\z/.match?(record["processoIdentificacao"]) &&
-             record["processoNumeroUnico"].is_a?(String) && CNJ.match?(record["processoNumeroUnico"]) &&
              %w[Sim Não].include?(record["processoEmTramitacao"])
         raise InvalidSource, "Registro de descoberta STF inválido"
       end
+      publicity(record)
+    end
+
+    def publicity(record)
+      value = record["processoPublicidade"]
+      normalized = canonical_name(value) if value.is_a?(String)
+      return :public if normalized == "publico"
+      return :restricted if ["privado", "sigiloso", "sigilo", "restrito", "nao publico", "segredo de justica"].include?(normalized)
+
+      raise InvalidSource, "Publicidade de processo STF desconhecida"
+    end
+
+    def optional_cnj(record)
+      cnj = record["processoNumeroUnico"]
+      return nil if cnj.nil? || (cnj.is_a?(String) && cnj.strip.empty?)
+      raise InvalidSource, "CNJ de processo STF inválido" unless cnj.is_a?(String) && CNJ.match?(cnj)
+
+      cnj
     end
 
     def process_from(record)
-      identification = record.fetch("processoIdentificacao").strip
-      { "incidente" => record.fetch("processoId"), "cnj" => record.fetch("processoNumeroUnico"),
-        "classe" => identification.sub(/\s+[0-9][0-9.]*\z/, ""), "identificacao" => identification }
+      identification = record["processoIdentificacao"]
+      unless identification.is_a?(String) && /\A\s*\S(?:.*?\S)?\s+[0-9][0-9.]*\s*\z/.match?(identification)
+        raise InvalidSource, "Identificação de processo STF inválida"
+      end
+      identification = identification.strip
+      { "incidente" => record.fetch("processoId"), "cnj" => optional_cnj(record),
+        "classe" => identification.sub(/\s+[0-9][0-9.]*\z/, ""), "identificacao" => identification,
+        "publicidade" => "Público" }
     end
 
     def validate_name!(name)

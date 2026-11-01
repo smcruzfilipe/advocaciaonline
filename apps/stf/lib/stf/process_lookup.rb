@@ -32,18 +32,19 @@ module STF
       identificacao = clean(detail.at_css("#classe-numero-processo")&.[]("value"))
       match = identificacao&.match(/\A(.+?)\s+([0-9]+)\z/)
       cnj_text = detail.css(".processo-rotulo").map { |node| clean(node.text) }.find { |text| text&.match?(/\ANúmero Único\s*:/i) }
-      cnj = cnj_text&.sub(/\ANúmero Único\s*:\s*/i, "")
-      unless incidente_text&.match?(/\A[1-9][0-9]*\z/) && match && cnj && CNJ.match?(cnj)
+      cnj = clean(cnj_text&.sub(/\ANúmero Único\s*:\s*/i, ""))
+      unless incidente_text&.match?(/\A[1-9][0-9]*\z/) && match && (cnj.nil? || CNJ.match?(cnj))
         raise InvalidSource, "Detalhe de processo inválido ou incompleto"
       end
-      if number && number.delete("-.") != cnj.delete("-.")
+      if number && (cnj.nil? || number.delete("-.") != cnj.delete("-."))
         raise InvalidSource, "Número CNJ divergente"
       end
       if classe && (classe.strip.casecmp?(match[1]) == false || source_number.to_i != match[2].to_i)
         raise InvalidSource, "Identificação STF divergente"
       end
 
-      process = { "incidente" => incidente_text.to_i, "cnj" => cnj, "classe" => match[1], "identificacao" => identificacao }
+      process = { "incidente" => incidente_text.to_i, "cnj" => cnj, "classe" => match[1],
+                  "identificacao" => identificacao, "publicidade" => "Público" }
       parties = Nokogiri::HTML.fragment(html_text(@http.get("#{PORTAL}/abaPartes.asp?incidente=#{process.fetch('incidente')}")))
       container = parties.at_css("#todas-partes")
       raise InvalidSource, "Aba de partes inválida" unless container
@@ -54,15 +55,17 @@ module STF
         raise InvalidSource, "Parte incompleta" unless role && name
         name unless role.match?(/\AADV/i) || name.casecmp?("SEM REPRESENTAÇÃO NOS AUTOS")
       end.uniq
-      inactive = false
+      active = inactive = false
       names.each do |name|
         case @discovery.find_status(name: name, incidente: process.fetch("incidente"), cnj: cnj)
-        when :active then return process
+        when :active then active = true
         when :inactive then inactive = true
+        when :restricted then return nil
         when nil then next
         else raise InvalidSource, "Situação de processo desconhecida"
         end
       end
+      return process if active
       return nil if inactive
 
       raise InvalidSource, "Situação do processo não comprovada"

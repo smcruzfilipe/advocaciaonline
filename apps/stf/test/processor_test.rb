@@ -76,6 +76,42 @@ class ProcessorTest < Minitest::Test
     assert_equal "0", scalar("SELECT count(*)::text FROM public.stf_captures WHERE tenant_id = $1", [@tenant])
   end
 
+  def test_masked_private_process_is_ineligible_without_fetching_movements
+    response = JSON.parse(discovery)
+    response.fetch("partes").first.merge!("processoPublicidade" => "Sigiloso", "processoNumeroUnico" => "***", "processoIdentificacao" => nil)
+    @responses << JSON.generate(response)
+    result = processor.call(@job)
+    assert_equal "succeeded", result.fetch("state")
+    assert_equal 0, result.fetch("eligible_process_count")
+    assert_equal 1, @http.requests.size
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.stf_captures WHERE tenant_id = $1", [@tenant])
+  end
+
+  def test_unknown_publicity_fails_instead_of_empty_success
+    response = JSON.parse(discovery)
+    response.fetch("partes").first.delete("processoPublicidade")
+    @responses << JSON.generate(response)
+    assert_equal "failed", processor.call(@job).fetch("state")
+    assert_equal 1, @http.requests.size
+    assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_job_results WHERE job_id = $1", [@job])
+  end
+
+  def test_public_process_without_cnj_preserves_identity_and_movement_links
+    response = JSON.parse(discovery)
+    response.fetch("partes").first["processoNumeroUnico"] = nil
+    @responses.concat([JSON.generate(response), movements])
+    assert_equal "succeeded", processor.call(@job).fetch("state")
+    metadata = JSON.parse(scalar("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1", [@tenant]))
+    assert_nil metadata.fetch("cnj")
+    assert_equal 7728350, metadata.fetch("incidente")
+    assert_equal "Rcl", metadata.fetch("classe")
+    assert_equal "Rcl 101463", metadata.fetch("identificacao")
+    assert_equal "Público", metadata.fetch("publicidade")
+    payload = JSON.parse(scalar("SELECT payload FROM public.collection_communications WHERE tenant_id = $1", [@tenant]))
+    assert_equal "https://portal.stf.jus.br/processos/downloadPeca.asp?id=1", payload.fetch("stf").fetch("links").first.fetch("url")
+    assert_equal @job, scalar("SELECT job_id FROM public.stf_capture_links WHERE tenant_id = $1", [@tenant])
+  end
+
   def test_day_change_interrupts_before_second_request_and_never_commits_partial_data
     @responses << discovery
     @after_request = -> { @date_source = -> { @date + 1 } }
@@ -104,6 +140,7 @@ class ProcessorTest < Minitest::Test
     metadata = JSON.parse(scalar("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1", [@tenant]))
     assert_equal "0188263-19.2026.1.00.0000", metadata.fetch("cnj")
     assert_equal "Sim", metadata.fetch("em_tramitacao")
+    assert_equal "Público", metadata.fetch("publicidade")
     assert_equal @job, scalar("SELECT job_id FROM public.stf_capture_links WHERE tenant_id = $1", [@tenant])
   end
 
@@ -155,7 +192,7 @@ class ProcessorTest < Minitest::Test
   def discovery
     JSON.generate("totalDePaginas" => 1, "totalDeRegistros" => 1, "partes" => [{
       "pessoaNome" => "Maria Silva", "processoId" => 7728350, "processoIdentificacao" => "Rcl 101463",
-      "processoNumeroUnico" => "0188263-19.2026.1.00.0000", "processoEmTramitacao" => "Sim"
+      "processoNumeroUnico" => "0188263-19.2026.1.00.0000", "processoEmTramitacao" => "Sim", "processoPublicidade" => "Público"
     }])
   end
 

@@ -4,7 +4,7 @@ require_relative "../lib/stf/process_lookup"
 
 class ProcessLookupTest < Minitest::Test
   CNJ = "0188263-19.2026.1.00.0000".freeze
-  EXPECTED = { "incidente" => 7728350, "cnj" => CNJ, "classe" => "Rcl", "identificacao" => "Rcl 101463" }.freeze
+  EXPECTED = { "incidente" => 7728350, "cnj" => CNJ, "classe" => "Rcl", "identificacao" => "Rcl 101463", "publicidade" => "Público" }.freeze
   DETAIL = <<~HTML.freeze
     <div class="processo-titulo"><input id="incidente" value="7728350">
     <input id="classe-numero-processo" value="Rcl 101463"></div>
@@ -87,4 +87,28 @@ class ProcessLookupTest < Minitest::Test
     assert_raises(STF::InvalidSource) { lookup.resolve("number" => "123") }
     assert_raises(STF::InvalidSource) { lookup.resolve("classe" => "Rcl") }
   end
+  def test_class_number_without_detail_cnj_can_be_confirmed_by_incidente
+    detail = DETAIL.sub(/<div class="processo-rotulo">.*?<\/div>/, "")
+    discovery = Discovery.new("ROBERTO FERREIRA DA SILVA" => :active)
+    result = STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: discovery).resolve("classe" => "Rcl", "numeroProcesso" => "101463")
+    assert_equal EXPECTED.merge("cnj" => nil), result
+    assert_nil discovery.calls.last.last
+    assert_raises(STF::InvalidSource) do
+      STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: discovery).resolve("number" => CNJ)
+    end
+  end
+
+  def test_restricted_status_is_ineligible_even_when_detail_is_accessible
+    discovery = Discovery.new("COMPANHIA RIOGRANDENSE DE SANEAMENTO - CORSAN" => :restricted,
+                              "ROBERTO FERREIRA DA SILVA" => :active)
+    assert_nil STF::ProcessLookup.new(http: Http.new, discovery: discovery).resolve("number" => CNJ)
+  end
+
+  def test_nonempty_malformed_cnj_in_detail_is_rejected_for_class_lookup
+    detail = DETAIL.sub(CNJ, "123")
+    assert_raises(STF::InvalidSource) do
+      STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: Discovery.new({})).resolve("classe" => "Rcl", "numeroProcesso" => "101463")
+    end
+  end
+
 end

@@ -22,9 +22,9 @@ class DiscoveryTest < Minitest::Test
     end
   end
 
-  def row(id: 7728350, name: "ROBERTO FERREIRA DA SILVA", cnj: "0188263-19.2026.1.00.0000", status: "Sim", identification: "Rcl 101463")
+  def row(id: 7728350, name: "ROBERTO FERREIRA DA SILVA", cnj: "0188263-19.2026.1.00.0000", status: "Sim", identification: "Rcl 101463", publicity: "Público")
     { "pessoaNome" => name, "processoId" => id, "processoIdentificacao" => identification,
-      "processoNumeroUnico" => cnj, "processoEmTramitacao" => status }
+      "processoNumeroUnico" => cnj, "processoEmTramitacao" => status, "processoPublicidade" => publicity }
   end
 
   def page(rows, pages: 1, total: rows.size)
@@ -39,7 +39,7 @@ class DiscoveryTest < Minitest::Test
     result = STF::Discovery.new(http: http).search(name: "  Roberto Ferreira da SILVA ", type: "ADVOGADO")
 
     assert_equal [7728350, 12], result.map { |process| process.fetch("incidente") }
-    assert_equal({ "incidente" => 7728350, "cnj" => "0188263-19.2026.1.00.0000", "classe" => "Rcl", "identificacao" => "Rcl 101463" }, result.first)
+    assert_equal({ "incidente" => 7728350, "cnj" => "0188263-19.2026.1.00.0000", "classe" => "Rcl", "identificacao" => "Rcl 101463", "publicidade" => "Público" }, result.first)
     assert_equal ["1", "2"], http.requests.map { |_, params| params["pagina"] }
     http.requests.each do |uri, params|
       assert_equal "https://digital.stf.jus.br/integracoes-processos/api/public/partes/processos", "#{uri.scheme}://#{uri.host}#{uri.path}"
@@ -157,4 +157,47 @@ class DiscoveryTest < Minitest::Test
     http = FakeHTTP.new({ ["sim", 1] => page([row(id: 1)], pages: 2, total: 2), ["sim", 2] => error })
     assert_raises(STF::SourceUnavailable) { STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: "0188263-19.2026.1.00.0000") }
   end
+
+  def test_search_filters_masked_restricted_and_inactive_before_validating_consumed_fields
+    http = FakeHTTP.new({
+      [nil, 1] => page([row(publicity: "Sigiloso", cnj: "***", identification: nil),
+                        row(id: 2, status: "Não", cnj: nil, identification: nil),
+                        row(id: 3, cnj: "", identification: "RE 1519008")])
+    })
+    assert_equal [{ "incidente" => 3, "cnj" => nil, "classe" => "RE",
+                   "identificacao" => "RE 1519008", "publicidade" => "Público" }],
+                 STF::Discovery.new(http: http).search(name: "Roberto Ferreira da Silva", type: "ADVOGADO")
+  end
+
+  def test_unknown_publicity_and_malformed_present_cnj_fail
+    [row(publicity: nil), row(publicity: "desconhecido"), row(cnj: "123")].each do |record|
+      http = FakeHTTP.new({ [nil, 1] => page([record]) })
+      assert_raises(STF::InvalidSource) { STF::Discovery.new(http: http).search(name: "Roberto Ferreira da Silva", type: "ADVOGADO") }
+    end
+  end
+
+  def test_status_restricted_masked_and_optional_cnj
+    http = FakeHTTP.new({ ["sim", 1] => page([row(publicity: "Privado", cnj: "***", identification: nil)]) })
+    assert_equal :restricted, STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: nil)
+    http = FakeHTTP.new({ ["sim", 1] => page([row(cnj: nil)]) })
+    assert_equal :active, STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: "01882631920261000000")
+  end
+  def test_status_accepts_public_without_detail_cnj_but_rejects_malformed_present_cnj
+    http = FakeHTTP.new({ ["sim", 1] => page([row(publicity: "PUBLICO")]) })
+    assert_equal :active, STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: nil)
+    http = FakeHTTP.new({ ["sim", 1] => page([row(cnj: "123")]) })
+    assert_raises(STF::InvalidSource) do
+      STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: nil)
+    end
+  end
+
+
+  def test_restricted_match_still_checks_all_pages
+    http = FakeHTTP.new({ ["sim", 1] => page([row(publicity: "Sigiloso", cnj: nil, identification: nil)], pages: 2, total: 2),
+                          ["sim", 2] => STF::SourceUnavailable.new("late failure") })
+    assert_raises(STF::SourceUnavailable) do
+      STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: nil)
+    end
+  end
+
 end

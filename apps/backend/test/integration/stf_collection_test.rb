@@ -171,11 +171,64 @@ class StfCollectionTest < ActiveSupport::TestCase
     @runtime.exec("ROLLBACK") if @runtime.transaction_status != PG::PQTRANS_IDLE
   end
 
+  test "public processes without CNJ retain empty and positive captures and tenant-isolated links" do
+    empty = process_record(123, []).merge("cnj" => nil)
+    link = { "url" => "https://portal.stf.jus.br/documento.pdf", "href" => "/documento.pdf", "texto" => "Documento" }
+    item = movement("2026-11-01T10:00:00Z", incident: 555).merge("numero_processo" => nil)
+      .deep_merge("stf" => { "links" => [link] })
+    positive = process_record(555, [item]).merge("cnj" => nil)
+    first = start(@job_a)
+    result = commit(@job_a, first, [empty, positive])
+    assert_equal [1, 2], result.values_at("matched_count", "eligible_process_count")
+    second = start(@job_a2)
+    assert_equal result, commit(@job_a2, second, [empty, positive])
+    assert_equal result, commit(@job_a, first, nil)
+    assert_equal result, commit(@job_a, first, [positive.merge("publicidade" => "Sigiloso")])
+    assert_raises(PG::InvalidParameterValue) do
+      commit(@job_b, start(@job_b), [positive.merge("publicidade" => "Sigiloso")])
+    end
+    rows = @migrator.exec_params(<<~SQL, [@lawyer_a.tenant_id]).to_a
+      SELECT capture.id, capture.incidente, capture.process_data, capture.semantic_items,
+        (SELECT count(*) FROM public.stf_capture_links link WHERE link.capture_id = capture.id) AS links
+      FROM public.stf_captures capture WHERE capture.tenant_id = $1 ORDER BY capture.incidente
+    SQL
+    assert_equal %w[123 555], rows.map { |row| row.fetch("incidente") }
+    assert_equal [empty, positive].map { |process| process.except("items") },
+      rows.map { |row| JSON.parse(row.fetch("process_data")) }
+    assert_equal %w[2 2], rows.map { |row| row.fetch("links") }
+    assert_equal [], JSON.parse(rows.first.fetch("semantic_items"))
+    payload = @migrator.exec_params("SELECT payload FROM public.collection_communications WHERE stf_capture_id = $1",
+      [rows.last.fetch("id")]).getvalue(0, 0)
+    assert_equal item, JSON.parse(payload)
+    assert_equal "2", @migrator.exec_params("SELECT count(*) FROM public.collection_communication_links WHERE communication_id IN (SELECT id FROM public.collection_communications WHERE stf_capture_id = $1)",
+      [rows.last.fetch("id")]).getvalue(0, 0)
+    @runtime.exec("BEGIN")
+    @runtime.exec_params("SELECT set_config('app.session_hash', $1, true)", [IdentityStore.digest(@session_b)])
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.stf_captures").getvalue(0, 0)
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.stf_capture_links").getvalue(0, 0)
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.collection_communications WHERE source = 'STF'").getvalue(0, 0)
+  ensure
+    @runtime.exec("ROLLBACK") if @runtime.transaction_status != PG::PQTRANS_IDLE
+  end
+
+  test "a different job cannot overwrite a capture made without CNJ" do
+    original = process_record(123, []).merge("cnj" => nil)
+    expected = commit(@job_a, start(@job_a), [original])
+    proof = start(@job_a2)
+    assert_raises(PG::InvalidParameterValue) do
+      commit(@job_a2, proof, [original.merge("cnj" => "0188263-19.2026.1.00.0000")])
+    end
+    assert_equal expected, commit(@job_a2, proof, [original])
+  end
+
   test "new results require complete source metadata and matching item incident and date" do
     proof = start(@job_a)
     valid = process_record(123, [movement("2026-11-01T10:00:00Z")])
     invalid = [
-      valid.except("cnj"), valid.merge("cnj" => "123"), valid.merge("cnj" => nil),
+      valid.except("cnj"), valid.merge("cnj" => "123"), valid.merge("cnj" => ""),
+      valid.merge("cnj" => 123), valid.merge("cnj" => {}), valid.merge("cnj" => "0188263-19.2026.1.00.000X"),
+      valid.except("publicidade"), valid.merge("publicidade" => nil), valid.merge("publicidade" => "Privado"),
+      valid.merge("publicidade" => ""), valid.merge("publicidade" => true),
       valid.merge("classe" => ""), valid.merge("identificacao" => " "),
       valid.merge("em_tramitacao" => "Não"), valid.except("em_tramitacao"),
       valid.merge("items" => [movement("2026-11-01T10:00:00Z", incident: 555)]),
@@ -184,12 +237,16 @@ class StfCollectionTest < ActiveSupport::TestCase
     ]
     invalid.each { |entry| assert_raises(PG::InvalidParameterValue) { commit(@job_a, proof, [entry]) } }
     assert_equal "0", @migrator.exec_params("SELECT count(*) FROM public.stf_captures WHERE tenant_id = $1", [@lawyer_a.tenant_id]).getvalue(0, 0)
-    assert_equal 1, commit(@job_a, proof, [valid]).fetch("matched_count")
+    unmasked = process_record(555, []).merge("cnj" => "01882631920261000000")
+    assert_equal 1, commit(@job_a, proof, [valid, unmasked]).fetch("matched_count")
   end
 
   test "legacy capture without source metadata cannot be silently backfilled by another job" do
     @migrator.exec_params("INSERT INTO public.stf_captures (tenant_id, run_id, incidente, semantic_items) VALUES ($1,$2,123,'[]'::jsonb)",
       [@lawyer_a.tenant_id, @run])
+    legacy = process_record(555, []).except("items", "publicidade")
+    @migrator.exec_params("INSERT INTO public.stf_captures (tenant_id, run_id, incidente, semantic_items, process_data) VALUES ($1,$2,555,'[]'::jsonb,$3::jsonb)",
+      [@lawyer_a.tenant_id, @run, JSON.generate(legacy)])
     proof = start(@job_a)
     @migrator.exec_params(<<~SQL, [@job_a, @lawyer_a.tenant_id])
       INSERT INTO public.collection_job_results
@@ -198,9 +255,13 @@ class StfCollectionTest < ActiveSupport::TestCase
     SQL
     @migrator.exec_params("UPDATE public.collection_job_executions SET state = 'succeeded' WHERE job_id = $1", [@job_a])
     assert_equal [0, 1], commit(@job_a, proof, nil).values_at("matched_count", "eligible_process_count")
-    assert_raises(PG::InvalidParameterValue) { commit(@job_a2, start(@job_a2), [process_record(123, [])]) }
+    second = start(@job_a2)
+    assert_raises(PG::InvalidParameterValue) { commit(@job_a2, second, [process_record(123, [])]) }
     row = @migrator.exec_params("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1 AND incidente = 123", [@lawyer_a.tenant_id]).first
     assert_nil row.fetch("process_data")
+    assert_raises(PG::InvalidParameterValue) { commit(@job_a2, second, [process_record(555, [])]) }
+    saved_legacy = @migrator.exec_params("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1 AND incidente = 555", [@lawyer_a.tenant_id]).getvalue(0, 0)
+    assert_equal legacy, JSON.parse(saved_legacy)
     assert_equal "0", @migrator.exec_params("SELECT count(*) FROM public.stf_capture_links WHERE job_id = ANY($1::uuid[])",
       ["{#{@job_a},#{@job_a2}}"]).getvalue(0, 0)
   end
@@ -459,7 +520,7 @@ class StfCollectionTest < ActiveSupport::TestCase
 
   def process_record(incident, items)
     { "incidente" => incident, "cnj" => "0188263-19.2026.1.00.0000", "classe" => "Rcl",
-      "identificacao" => "Rcl 101463", "em_tramitacao" => "Sim", "items" => items }
+      "identificacao" => "Rcl 101463", "em_tramitacao" => "Sim", "publicidade" => "Público", "items" => items }
   end
 
   def movement(timestamp, incident: 123)

@@ -75,8 +75,9 @@ module STF
       sentinel = parsed.at_css(marker)
       incomplete_list = parsed.errors.any? do |error|
         error.line >= list.line &&
-          error.message.include?("End tag '#{container.name}' isn't allowed here. Currently open tags:") &&
-          error.message.lines.first.match?(/(?:\A|, )#{Regexp.escape(container.name)}, ul\.\s*\z/)
+          (error.message.match?(/End tag '(?:ul|li)' isn't allowed here\. Currently open tags:/) ||
+            (error.message.include?("End tag '#{container.name}' isn't allowed here. Currently open tags:") &&
+              error.message.lines.first.match?(/(?:\A|, )#{Regexp.escape(container.name)}, ul\.\s*\z/)))
       end
       if !sentinel || sentinel.ancestors.include?(container) || incomplete_list
         raise InvalidSource, "Lista de andamentos incompleta"

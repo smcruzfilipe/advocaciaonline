@@ -100,7 +100,9 @@ class AndamentosTest < Minitest::Test
       "<div class='processo-andamentos'><ul></div>",
       "<div class='processo-andamentos'><ul>#{movement}</div>",
       "<div class='processo-andamentos'><ul>#{inner_list}</div>",
-      "<div class='processo-andamentos'><ul>#{movement}</u"
+      "<div class='processo-andamentos'><ul>#{movement}</u",
+      "<div class='processo-andamentos'><ul><li><div class='andamento-item'><div class='andamento-data'>05/05/2026</div><div class='andamento-nome'>Título</div></ul></div>",
+      "<div class='processo-andamentos'><ul><li><div class='andamento-item'><div class='andamento-data'>05/05/2026</div><div class='andamento-nome'>Título</div></li></ul></div>"
     ].each do |html|
       assert_raises(STF::InvalidSource, html) do
         STF::Andamentos.new(http: Http.new(html)).fetch(process: PROCESSO, date: DATA, captured_at: CAPTURA)
