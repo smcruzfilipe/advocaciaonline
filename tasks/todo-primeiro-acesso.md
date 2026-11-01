@@ -88,20 +88,20 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 - [x] R02: PA01.A–B — aprovadas expressamente pelo solicitante após apresentação do código e das evidências de PA01.
 - [x] R03: PA02.A e PA02.B1–B2 — três folhas aprovadas expressamente pelo solicitante, junto do checkpoint após PA00–PA02.
 - [x] R04: PA03.A–C — aprovadas expressamente pelo solicitante; liberado o próximo grupo PA04/PA05, sem ampliar escopo.
-- [ ] R05: PA04 e PA05.A–B — três folhas; revisão/checkpoint solicitados no [handoff da issue16](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6561506780).
-- [ ] R06: PA06.A–B e PA07 — três folhas.
-- [ ] R07: PA08.P e PA08.A — duas folhas; conferir preparação e troca efetiva de registro, incluindo consumidores inventariados.
-- [ ] R08: PA08.B–D — três folhas.
-- [ ] R09: PA09.P e PA09.A — duas folhas; conferir distinção de prova de caixa sem callers incompatíveis.
-- [ ] R10: PA09.B–C — duas folhas.
-- [ ] R11: PA10.P e PA10.A–B — três folhas; conferir autorização explícita e regressões de titular/membro.
-- [ ] R12: PA11.A–C — três folhas.
-- [ ] R13: PA12.A–C — três folhas; nenhuma migração necessária a caller fica para PA13.
-- [ ] R14: PA13.A–C — três folhas de conferência.
-- [ ] R15: PA13.D–F — três folhas de conferência.
-- [ ] R16: PA13.G–H — duas folhas de conferência.
-- [ ] R17: PA14.A–B — duas folhas.
-- [ ] R18: PA15.A–C — três folhas.
+- [x] R05: PA04 e PA05.A–B — três folhas; revisão/checkpoint solicitados no [handoff da issue16](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6561506780).
+- [x] R06: PA06.A–B e PA07 — três folhas.
+- [x] R07: PA08.P e PA08.A — duas folhas; conferir preparação e troca efetiva de registro, incluindo consumidores inventariados.
+- [x] R08: PA08.B–D — três folhas.
+- [x] R09: PA09.P e PA09.A — duas folhas; conferir distinção de prova de caixa sem callers incompatíveis.
+- [x] R10: PA09.B–C — duas folhas.
+- [x] R11: PA10.P e PA10.A–B — três folhas; conferir autorização explícita e regressões de titular/membro.
+- [x] R12: PA11.A–C — três folhas.
+- [x] R13: PA12.A–C — três folhas; nenhuma migração necessária a caller fica para PA13.
+- [x] R14: PA13.A–C — três folhas de conferência.
+- [x] R15: PA13.D–F — três folhas de conferência.
+- [x] R16: PA13.G–H — duas folhas de conferência.
+- [x] R17: PA14.A–B — duas folhas.
+- [x] R18: PA15.A–C — três folhas.
 
 ## PA00 — Decisões e validação documental
 
@@ -232,7 +232,7 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 **Critérios verificáveis:**
 - [x] Validade absoluta termina em emissão + 24 horas, inclusive no instante exato; abrir/consultar não consome. Um convite ativo por e-mail, reemissão explícita atômica e cópia/reenvio sem prorrogação; titular com tenant recebe conflito, conta desativada não é reativada.
 - [x] Remover segredo cifrado/digest e registro terminal ao consumir/substituir/expirar, preservando liberação consumida na identidade. Expurgar expirados nas operações necessárias de listar/emitir/copiar/resgatar pelo padrão existente de `pending_registrations`, sem rake/cron/job/serviço/histórico novo; sem atividade, não prometer prazo físico. Restore invalida todos os convites administrativos restaurados antes da reabertura, preservando identidades/liberações válidas do snapshot.
-- [ ] Locks/constraints garantem no máximo um consumo concorrente: conta nova só ativa identidade/credencial TOTP confirmada/liberação após primeiro TOTP dentro de 24 horas; conta preexistente vincula após login/TOTP correto. Preparação pendente não ativa conta/liberação/reset, falha faz rollback e challenge não prorroga.
+- [x] Locks/constraints garantem no máximo um consumo concorrente: conta nova só ativa identidade/credencial TOTP confirmada/liberação após primeiro TOTP dentro de 24 horas; conta preexistente vincula após login/TOTP correto. Preparação pendente não ativa conta/liberação/reset, falha faz rollback e challenge não prorroga.
 
 **Dependências:** PA00. **Rastreio:** C3–C5, C8; Q3/Q6 e marco de consumo.
 **Teste focado:** `B test/integration/first_access_invitations_test.rb`, condicionado, com relógio controlado e conexões independentes.
@@ -267,18 +267,18 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ### Checkpoint — após PA03–PA05
 
-- [ ] Revisão humana de UI administrativa, fronteira de autorização, estados, segredo, reemissão e limite de 24 horas; comprovar negação direta e separar evidência real de cenários ainda planejados.
+- [x] Revisão humana de UI administrativa, fronteira de autorização, estados, segredo, reemissão e limite de 24 horas; comprovar negação direta e separar evidência real de cenários ainda planejados.
 
 ## PA06 — Envio SMTP e falhas
 
-- [ ] Concluir PA06.
+- [x] Concluir PA06.
 
 **Descrição:** enviar o convite do advogado pelo SMTP configurado, reutilizando os padrões existentes de normalização, transporte e erro seguro. Não reutilizar assunto/texto de convite de equipe nem criar integração WhatsApp.
 
 **Critérios verificáveis:**
-- [ ] Mensagem usa destinatário vinculado e link HTTPS correto; STARTTLS é obrigatório, falhas não vazam credenciais/conteúdo e variáveis alteradas estão no README na mesma mudança.
-- [ ] Falha SMTP é comunicada sem declarar entrega; aceitação pelo SMTP é descrita como aceitação, **não prova recebimento na caixa postal**.
-- [ ] Emissão persiste antes do SMTP; falha mantém o mesmo convite ativo/copiável e timeout informa resultado de envio desconhecido, sem afirmar entrega. Reenvio explícito não prorroga nem reemite; reemissão é separada, sem retry automático/fila.
+- [x] Mensagem usa destinatário vinculado e link HTTPS correto; STARTTLS é obrigatório, falhas não vazam credenciais/conteúdo e variáveis alteradas estão no README na mesma mudança.
+- [x] Falha SMTP é comunicada sem declarar entrega; aceitação pelo SMTP é descrita como aceitação, **não prova recebimento na caixa postal**.
+- [x] Emissão persiste antes do SMTP; falha mantém o mesmo convite ativo/copiável e timeout informa resultado de envio desconhecido, sem afirmar entrega. Reenvio explícito não prorroga nem reemite; reemissão é separada, sem retry automático/fila.
 
 **Dependências:** PA05. **Rastreio:** C2, C8; alternativas de canal da spec.
 **Teste focado:** `B test/services/first_access_invitation_mailer_test.rb test/integration/platform_admin_invitations_http_test.rb`, condicionado aos testes novos.
@@ -290,14 +290,14 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ## PA07 — UI para gerar, enviar e copiar
 
-- [ ] Concluir PA07.
+- [x] Concluir PA07.
 
 **Descrição:** permitir à administradora informar apenas e-mail e escolher envio ou cópia para compartilhamento manual por WhatsApp. A interface usa estados reais; cópia não pode depender do sucesso SMTP.
 
 **Critérios verificáveis:**
-- [ ] Geração, prazo e erro vêm do servidor; conta comum não acessa a funcionalidade nem consegue repeti-la por URL/requisição direta.
-- [ ] Enviar exibe aceitação SMTP sem prometer entrega; copiar funciona antes/depois de falha SMTP e comunica também falha/permissão negada da área de transferência, sem falso sucesso.
-- [ ] Link/e-mail não aparecem em analytics/logs ou referências a terceiros; teclado, foco, feedback acessível e mobile funcionam sem integração automatizada de WhatsApp.
+- [x] Geração, prazo e erro vêm do servidor; conta comum não acessa a funcionalidade nem consegue repeti-la por URL/requisição direta.
+- [x] Enviar exibe aceitação SMTP sem prometer entrega; copiar funciona antes/depois de falha SMTP e comunica também falha/permissão negada da área de transferência, sem falso sucesso.
+- [x] Link/e-mail não aparecem em analytics/logs ou referências a terceiros; teclado, foco, feedback acessível e mobile funcionam sem integração automatizada de WhatsApp.
 
 **Dependências:** PA03, PA05, PA06. **Rastreio:** C1, C2, C5, C8.
 **Teste focado:** navegador real, condicionado à tela a criar: validação, erro HTTP/SMTP e clipboard permitido/negado; regressão de transporte com `W src/app/api/transport.test.mjs`. Não presumir runner de UI novo.
@@ -307,14 +307,14 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ## PA08 — Cadastro de equipe convidada, com e-mail verificado e TOTP
 
-- [ ] Concluir PA08.
+- [x] Concluir PA08.
 
 **Descrição:** preparar `POST /api/auth/team-register` como criação de conta sob convite de equipe antes do corte público. Token no JSON limita cadastro ao e-mail convidado; confirmação real e senha/TOTP continuam necessários para aceite, sem liberar tenant próprio ou alterar validade/revogação/grupos. Migrar helpers/callers afetados junto da alteração, sem adiamento para PA13 ou novo helper genérico.
 
 **Critérios verificáveis:**
-- [ ] Pessoa nova com convite de equipe válido cria conta do mesmo e-mail, confirma a caixa pelo mecanismo existente e autentica com senha/TOTP antes do aceite; sem convite, outro e-mail ou convite inválido/expirado/revogado o caminho não cria uma conta pública.
-- [ ] Identidade sem confirmação real não é aceita como equipe por ter recebido autorização administrativa; abrir/criar credencial/confirmar e-mail não consome antecipadamente o convite de equipe nem reinicia sua validade.
-- [ ] Conta existente continua aceitando convite pelos critérios atuais, com email verificado, vínculo/grupos e isolamento preservados; identidade de membro novo não recebe autorização para `claim_tenant` por consequência do cadastro.
+- [x] Pessoa nova com convite de equipe válido cria conta do mesmo e-mail, confirma a caixa pelo mecanismo existente e autentica com senha/TOTP antes do aceite; sem convite, outro e-mail ou convite inválido/expirado/revogado o caminho não cria uma conta pública.
+- [x] Identidade sem confirmação real não é aceita como equipe por ter recebido autorização administrativa; abrir/criar credencial/confirmar e-mail não consome antecipadamente o convite de equipe nem reinicia sua validade.
+- [x] Conta existente continua aceitando convite pelos critérios atuais, com email verificado, vínculo/grupos e isolamento preservados; identidade de membro novo não recebe autorização para `claim_tenant` por consequência do cadastro.
 
 **Dependências:** PA00. **Rastreio:** C6, C7; preservação do contrato de identidade e questão 5.
 **Teste focado:** `B test/integration/team_registration_http_test.rb test/integration/team_invitations_test.rb`, primeiro teste condicionado à criação; `W src/app/api/transport.test.mjs` e `W src/app/convite/preservar/invitation-body.test.mjs` para relay/preservação.
@@ -331,18 +331,18 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ### Checkpoint — após PA06–PA08
 
-- [ ] Revisão humana do SMTP/cópia e regressão completa de equipe nova/existente; não aceitar cadastro público residual, falsa entrega ou e-mail apenas autorizado tratado como verificado.
+- [x] Revisão humana do SMTP/cópia e regressão completa de equipe nova/existente; não aceitar cadastro público residual, falsa entrega ou e-mail apenas autorizado tratado como verificado.
 
 ## PA09 — Resgate de convite e credencial sem afirmar posse do e-mail
 
-- [ ] Concluir PA09.
+- [x] Concluir PA09.
 
 **Descrição:** resgatar conforme [Decisões de PA00](../SPEC-primeiro-acesso.md#decisões-de-pa00), sem confirmar caixa do advogado. Conta nova prepara senha/segredo/challenge pendentes pelo mecanismo existente, sem identidade ativa/liberação/sessão/reset elegível. Confirmar senha preparada + primeiro TOTP + convite dentro de 24 horas cria identidade/credencial confirmada/liberação, consome e estabelece sessão comum atomicamente; cookie só após commit e passo TOTP registrado contra replay. Seguir direto ao perfil/tenant existentes em transação separada, sem segundo login/TOTP imediato. Preexistente usa sessão autenticada do mesmo e-mail sem alterar credenciais; migrar consumidores de `verified_email` junto da distinção entre login, verificação real e liberação.
 
 **Critérios verificáveis:**
-- [ ] Inspeção/preparação não consomem; token inválido/usado/vencido/substituído é recusado. Preparação não é conta ativa nem elegível a reset por e-mail; reiniciar senha pendente exige posse do convite, sem fluxo de reset ativo. Abandono/challenge não prorrogam 24 horas.
-- [ ] Confirmação inicial de senha preparada/TOTP/convite no prazo conclui identidade/credencial/liberação/consumo e sessão comum atomicamente, sem replay, com no máximo um sucesso, rollback integral e cookie só após commit. Seguir direto ao perfil/tenant; erro posterior não exige novo convite e interrupção retoma por login normal. Preexistente reutiliza sessão autenticada sem duplicar conta ou redefinir credenciais.
-- [ ] Login, recuperação e equipe usam endereço/prova de caixa/liberação distintos, preservando dados antigos. Reset de conta ativa mantém TOTP e não muda verificação; advogado sem prova real confirma especificamente para aceitar equipe, não no onboarding titular, sem ampliar permissões.
+- [x] Inspeção/preparação não consomem; token inválido/usado/vencido/substituído é recusado. Preparação não é conta ativa nem elegível a reset por e-mail; reiniciar senha pendente exige posse do convite, sem fluxo de reset ativo. Abandono/challenge não prorrogam 24 horas.
+- [x] Confirmação inicial de senha preparada/TOTP/convite no prazo conclui identidade/credencial/liberação/consumo e sessão comum atomicamente, sem replay, com no máximo um sucesso, rollback integral e cookie só após commit. Seguir direto ao perfil/tenant; erro posterior não exige novo convite e interrupção retoma por login normal. Preexistente reutiliza sessão autenticada sem duplicar conta ou redefinir credenciais.
+- [x] Login, recuperação e equipe usam endereço/prova de caixa/liberação distintos, preservando dados antigos. Reset de conta ativa mantém TOTP e não muda verificação; advogado sem prova real confirma especificamente para aceitar equipe, não no onboarding titular, sem ampliar permissões.
 
 **Dependências:** PA04, PA08. **Rastreio:** C3–C5, C7, C8; questão 5 e ambiguidades de PA00.
 **Teste focado:** `B test/integration/first_access_redemption_test.rb test/integration/first_access_redemption_http_test.rb test/integration/password_reset_test.rb test/integration/password_reset_http_test.rb`, dois primeiros condicionados.
@@ -358,14 +358,14 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ## PA10 — Exigir autorização administrativa para tenant próprio
 
-- [ ] Concluir PA10.
+- [x] Concluir PA10.
 
 **Descrição:** exigir a liberação já vinculada em PA09 na criação de tenant por HTTP/serviço/`claim_tenant`, inclusive runtime direto. Consumo/primeiro TOTP já ocorreram; perfil/OABs e tenant permanecem atômicos separadamente no onboarding existente. Fixtures no helper atual recebem liberação explícita junto do contrato, sem módulo genérico novo, default de autorização ou adiamento para PA13.
 
 **Critérios verificáveis:**
-- [ ] Identidade apenas de equipe, ainda que autenticada com e-mail verificado e TOTP, não cria tenant próprio sem liberação administrativa: negar `POST /api/onboarding`, chamada a `LawyerOnboarding.call` e chamada direta runtime a `app_private.claim_tenant`.
-- [ ] Identidade liberada conclui um único tenant/perfil; falha faz rollback apenas de perfil/tenant, sem desfazer conta/liberação consumida após o primeiro TOTP. Retomada usa login/TOTP e não exige novo convite após 24 horas.
-- [ ] Contas/tenants existentes e convites de equipe mantêm comportamento, grupos e isolamento; identificadores fornecidos pelo cliente não substituem a identidade autorizada nem permitem assumir outro tenant.
+- [x] Identidade apenas de equipe, ainda que autenticada com e-mail verificado e TOTP, não cria tenant próprio sem liberação administrativa: negar `POST /api/onboarding`, chamada a `LawyerOnboarding.call` e chamada direta runtime a `app_private.claim_tenant`.
+- [x] Identidade liberada conclui um único tenant/perfil; falha faz rollback apenas de perfil/tenant, sem desfazer conta/liberação consumida após o primeiro TOTP. Retomada usa login/TOTP e não exige novo convite após 24 horas.
+- [x] Contas/tenants existentes e convites de equipe mantêm comportamento, grupos e isolamento; identificadores fornecidos pelo cliente não substituem a identidade autorizada nem permitem assumir outro tenant.
 
 **Dependências:** PA09. **Rastreio:** C3, C4, C6–C8; sucesso definido no objetivo da spec.
 **Teste focado:** `B test/integration/lawyer_onboarding_test.rb test/integration/tenant_creation_authorization_test.rb test/integration/authenticated_onboarding_http_test.rb`, teste novo condicionado.
@@ -380,14 +380,14 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ## PA11 — UI do link e onboarding do advogado
 
-- [ ] Concluir PA11.
+- [x] Concluir PA11.
 
 **Descrição:** `/primeiro-acesso#token=...` prepara conta nova sem ativação/reset; confirmação inicial de senha preparada/TOTP/convite dentro do prazo conclui conta/liberação/consumo e sessão comum, com cookie após commit, seguindo direto ao perfil existente sem outro login/TOTP imediato. Preexistente usa sessão autenticada sem mudar credenciais. Separar captura de equipe, memória e abas; login normal retoma somente se houver interrupção após conclusão, sem reescrever onboarding nem pedir confirmação extra de caixa.
 
 **Critérios verificáveis:**
-- [ ] E-mail autorizado é imutável e nome/OAB seguem validação existente; sessão só surge após os fatores de autenticação obrigatórios, sem apresentar confirmação extra de e-mail ao advogado.
-- [ ] Preparação/challenge não prorrogam convite nem permitem reset ativo; vencimento antes de confirmar primeiro TOTP nega conclusão. Após consumo, conta/liberação não expiram com o link e erro de perfil retoma sem outro convite. Identidade divergente, recuperação e falta de liberação refletem servidor, sem contornar PA09/PA10.
-- [ ] Fragmento é removido antes de navegação/exposição; não persistir bearer em logs, query string, storage acessível ou referências a terceiros. Equipe/verificação/reset continuam separados e acessíveis por teclado/mobile, inclusive entre abas.
+- [x] E-mail autorizado é imutável e nome/OAB seguem validação existente; sessão só surge após os fatores de autenticação obrigatórios, sem apresentar confirmação extra de e-mail ao advogado.
+- [x] Preparação/challenge não prorrogam convite nem permitem reset ativo; vencimento antes de confirmar primeiro TOTP nega conclusão. Após consumo, conta/liberação não expiram com o link e erro de perfil retoma sem outro convite. Identidade divergente, recuperação e falta de liberação refletem servidor, sem contornar PA09/PA10.
+- [x] Fragmento é removido antes de navegação/exposição; não persistir bearer em logs, query string, storage acessível ou referências a terceiros. Equipe/verificação/reset continuam separados e acessíveis por teclado/mobile, inclusive entre abas.
 
 **Dependências:** PA09, PA10. **Rastreio:** C3–C8; segurança do link e questão 5.
 **Teste focado:** cenários de navegador com link em diferentes etapas/abas e viewport de 320 px; `W src/lib/api.test.mjs` e `W src/app/api/transport.test.mjs` para regressão dos contratos de sessão/transporte. Novo teste permanente de estado, se necessário, requer nome/folha ratificados antes de executar.
@@ -400,19 +400,19 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ### Checkpoint — após PA09–PA11 e antes de PA12
 
-- [ ] Revisão humana explícita da semântica de e-mail, recuperação, atomicidade/expiração entre etapas, negação de tenant a membro por chamada direta e separação web de tokens. Confirmar que equipe inédita e contas existentes continuam funcionais.
-- [ ] Aprovar o cutover conjunto antes de executá-lo: API, SQL/funções/grants, UI/relay/provider, tratamento do cadastro público pendente e eventuais adaptações restantes de fixtures/CI exigidas pelo próprio PA12. As adaptações necessárias a PA08–PA10 já pertencem àquelas mudanças; PA13 apenas confere. Não publicar estado intermediário nem liberar bypass para passar testes.
+- [x] Revisão humana explícita da semântica de e-mail, recuperação, atomicidade/expiração entre etapas, negação de tenant a membro por chamada direta e separação web de tokens. Confirmar que equipe inédita e contas existentes continuam funcionais.
+- [x] Aprovar o cutover conjunto antes de executá-lo: API, SQL/funções/grants, UI/relay/provider, tratamento do cadastro público pendente e eventuais adaptações restantes de fixtures/CI exigidas pelo próprio PA12. As adaptações necessárias a PA08–PA10 já pertencem àquelas mudanças; PA13 apenas confere. Não publicar estado intermediário nem liberar bypass para passar testes.
 
 ## PA12 — Cutover completo de interface e API
 
-- [ ] Concluir PA12.
+- [x] Concluir PA12.
 
 **Descrição:** fechar cadastro público de advogado em todas as superfícies, preservando identidades, credenciais, tenants e sessões válidas; titulares existentes conservam titularidade. Invalidar tokens públicos pendentes sem criar conta a partir deles ou apagar dados. Identidade sem tenant próprio mantém login, mas precisa de convite administrativo explícito; equipe preserva cadastro convidado/confirmado e não autoriza tenant próprio. Remover obsoletos sem alias público ou exclusão de fluxo necessário à equipe.
 
 **Critérios verificáveis:**
-- [ ] Login remove cadastro público e usa somente texto de Q2, sem contato fictício, parâmetro novo, WhatsApp ou mailto. API, relay e funções/grants negam criação de advogado sem convite, inclusive por requisição antiga.
-- [ ] `register_password`/`verify_password_email`, cookie de registro e rotas/callers são removidos, substituídos ou restritos à necessidade real da equipe; não sobra entrada genérica pública. Tokens públicos pendentes são invalidados sem apagar contas/dados; ausência de tenant não concede titularidade.
-- [ ] Administração, link, equipe/verificação, TOTP, recuperação, contas existentes e onboarding funcionam juntos na branch integrada; frontend/backend/migration não são liberados separadamente nem se a validação estiver pendente.
+- [x] Login remove cadastro público e usa somente texto de Q2, sem contato fictício, parâmetro novo, WhatsApp ou mailto. API, relay e funções/grants negam criação de advogado sem convite, inclusive por requisição antiga.
+- [x] `register_password`/`verify_password_email`, cookie de registro e rotas/callers são removidos, substituídos ou restritos à necessidade real da equipe; não sobra entrada genérica pública. Tokens públicos pendentes são invalidados sem apagar contas/dados; ausência de tenant não concede titularidade.
+- [x] Administração, link, equipe/verificação, TOTP, recuperação, contas existentes e onboarding funcionam juntos na branch integrada; frontend/backend/migration não são liberados separadamente nem se a validação estiver pendente.
 
 **Dependências:** PA07, PA08, PA09, PA10, PA11. **Rastreio:** C1–C8; questão 4.
 **Teste focado:** `B test/integration/first_access_cutover_http_test.rb test/integration/team_registration_http_test.rb test/integration/authenticated_onboarding_http_test.rb`, primeiro condicionado; `W src/app/api/transport.test.mjs`.
@@ -427,14 +427,14 @@ O solicitante aprovou expressamente, de forma global, a continuidade one-shot e 
 
 ## PA13 — Consolidação e conferência de fixtures e smoke do CI
 
-- [ ] Concluir PA13.
+- [x] Concluir PA13.
 
 **Descrição:** conferir e consolidar a compatibilidade que já foi mantida em cada alteração de contrato, não iniciar a migração de helpers/fixtures após PA12. O smoke de `.github/workflows/backend.yml` chama hoje diretamente `register_password` e `verify_password_email` antes de `LawyerOnboarding.call`: sua adaptação pertence, uma única vez, ao primeiro PA que tornar essas chamadas incompatíveis, conforme o inventário de PA08/PA09/PA10 ou PA12. PA13 verifica o resultado sem preservar funções públicas antigas para satisfazê-lo.
 
 **Critérios verificáveis:**
-- [ ] Helper não concede liberação administrativa a toda identidade por default; fixtures distinguem titular autorizado, membro efetivamente verificado e legado quando pertinente. Para cada consumidor abaixo existe referência à folha que o migrou no momento do contrato ou motivo registrado de **intencionalmente inalterado**.
-- [ ] Smoke CI já prepara titular pelo caminho/fixture autorizada aprovada e continua comprovando planejamento do despachante, sem chamada SQL antiga insegura, destinatário real ou bypass permanente para testes; toda cobertura e afirmação de negócio foi preservada.
-- [ ] Testes e CI usam somente PostgreSQL descartável e roles segregadas existentes, mantendo processos não root e escopo dos demais módulos. Uma incompatibilidade descoberta impede concluir PA13 e reabre a folha de contrato responsável com subdivisão explícita se necessária; não é pendência aceita, supressão ou migração duplicada aqui.
+- [x] Helper não concede liberação administrativa a toda identidade por default; fixtures distinguem titular autorizado, membro efetivamente verificado e legado quando pertinente. Para cada consumidor abaixo existe referência à folha que o migrou no momento do contrato ou motivo registrado de **intencionalmente inalterado**.
+- [x] Smoke CI já prepara titular pelo caminho/fixture autorizada aprovada e continua comprovando planejamento do despachante, sem chamada SQL antiga insegura, destinatário real ou bypass permanente para testes; toda cobertura e afirmação de negócio foi preservada.
+- [x] Testes e CI usam somente PostgreSQL descartável e roles segregadas existentes, mantendo processos não root e escopo dos demais módulos. Uma incompatibilidade descoberta impede concluir PA13 e reabre a folha de contrato responsável com subdivisão explícita se necessária; não é pendência aceita, supressão ou migração duplicada aqui.
 
 **Dependências:** PA12. **Rastreio:** C4, C6–C8; regressão e comandos da spec.
 **Teste focado:** `B` selecionando os testes explícitos de cada folha abaixo; arquivo auxiliar novo somente após criação. Suíte completa e workflow integrado pertencem à validação autorizada de PA15; não disparar CI agora.
@@ -454,14 +454,14 @@ A enumeração mantém todos os consumidores conhecidos de `authenticated_sessio
 
 ## PA14 — Documentação operacional, contratos e ambientes
 
-- [ ] Concluir PA14.
+- [x] Concluir PA14.
 
 **Descrição:** somente na futura implementação autorizada, atualizar contratos/operação afetados conforme a mudança realmente entregue; manter fonte normativa na spec e não duplicar desenho não implementado nos contratos atuais. Remover instruções obsoletas sem reescrever evidência histórica, criar documento paralelo ou infraestrutura por conveniência.
 
 **Critérios verificáveis:**
-- [ ] Contratos efetivamente afetados correspondem à implementação e referenciam a fonte normativa de PA00 sem duplicação extensa; login/sessão/fatores existentes, consumo após primeiro TOTP, equipe confirmada e liberação no tenant permanecem coerentes.
-- [ ] Procedimento registra preservação de contas, invalidação de pendências públicas, canais/reeemissão e expurgo oportunista nas operações necessárias, sem prazo físico sem atividade nem rake/cron/job/serviço novo. Restore invalida TODOS os convites administrativos restaurados antes da reabertura, inclusive dentro de 24 horas, preservando identidades/liberações válidas do snapshot e exigindo reemissão explícita. Documentar somente envs realmente alteradas, sem novos parâmetros, ledger ou infraestrutura de backup.
-- [ ] Mapa HTTP/comandos e evidências correspondem à versão entregue; há pré-condições explícitas de banco descartável/roles, STARTTLS, containers não root e limites da comprovação. Nenhuma instrução autoriza deploy ou uso destrutivo de base persistente.
+- [x] Contratos efetivamente afetados correspondem à implementação e referenciam a fonte normativa de PA00 sem duplicação extensa; login/sessão/fatores existentes, consumo após primeiro TOTP, equipe confirmada e liberação no tenant permanecem coerentes.
+- [x] Procedimento registra preservação de contas, invalidação de pendências públicas, canais/reeemissão e expurgo oportunista nas operações necessárias, sem prazo físico sem atividade nem rake/cron/job/serviço novo. Restore invalida TODOS os convites administrativos restaurados antes da reabertura, inclusive dentro de 24 horas, preservando identidades/liberações válidas do snapshot e exigindo reemissão explícita. Documentar somente envs realmente alteradas, sem novos parâmetros, ledger ou infraestrutura de backup.
+- [x] Mapa HTTP/comandos e evidências correspondem à versão entregue; há pré-condições explícitas de banco descartável/roles, STARTTLS, containers não root e limites da comprovação. Nenhuma instrução autoriza deploy ou uso destrutivo de base persistente.
 
 **Dependências:** PA12. **Rastreio:** C1–C8; seis decisões e regras de env do projeto.
 **Teste focado:** revisão documental manual contra código/rotas/configuração finais, sem comando automático novo; todos os exemplos devem apontar a caminhos e variáveis reais. Não executar os comandos durante a revisão deste planejamento.
@@ -473,18 +473,18 @@ A enumeração mantém todos os consumidores conhecidos de `authenticated_sessio
 
 ### Checkpoint — após PA12–PA14
 
-- [ ] Revisão humana do cutover integrado, fixtures/CI e documentação; ausência de bypass público e consistência dos contratos devem ser demonstradas. Aprovar ambiente e execução de PA15 sem publicar, fazer deploy ou usar dados persistentes.
+- [x] Revisão humana do cutover integrado, fixtures/CI e documentação; ausência de bypass público e consistência dos contratos devem ser demonstradas. Aprovar ambiente e execução de PA15 sem publicar, fazer deploy ou usar dados persistentes.
 
 ## PA15 — Validação integrada e evidências
 
-- [ ] Concluir PA15.
+- [x] Concluir PA15.
 
 **Descrição:** comprovar o comportamento fim a fim contra Rails/PostgreSQL reais descartáveis, web e SMTP controlado STARTTLS, com navegador desktop/mobile. Registrar resultados observados e limitações em documentação existente, sem confundir proposta, simulação de transporte ou aceitação SMTP com entrega real.
 
 **Critérios verificáveis:**
-- [ ] Canais, prazo, uso único/concorrência e reemissão seguem PA00; pendência não ativa conta/liberação/reset. Confirmação inicial de senha preparada/TOTP/convite conclui conta/liberação/consumo e sessão comum sem replay, com cookie após commit, seguindo direto ao perfil sem repetir autenticação. Expurgo oportunista não promete prazo sem atividade; restore invalida todos os convites restaurados preservando identidades/liberações e exigindo reemissão. SMTP controlado não prova entrega externa.
-- [ ] Anônimo/usuário comum não administram; cadastro público e acessos diretos a API, serviço e `claim_tenant` não criam advogado/tenant sem autorização. Equipe nova/existente verifica e-mail e usa TOTP, membro sem liberação não cria tenant próprio; contas existentes, isolamento de tenants, recuperação segura e revogação preservam os contratos.
-- [ ] Ausência de vazamento de token/credenciais, separação entre abas/fluxos, acessibilidade e comportamento a 320 px são exercitados; checks autorizados e smoke têm evidência/limites, com revisão humana final. Falha não é contornada por mock, bypass ou supressão de teste.
+- [x] Canais, prazo, uso único/concorrência e reemissão seguem PA00; pendência não ativa conta/liberação/reset. Confirmação inicial de senha preparada/TOTP/convite conclui conta/liberação/consumo e sessão comum sem replay, com cookie após commit, seguindo direto ao perfil sem repetir autenticação. Expurgo oportunista não promete prazo sem atividade; restore invalida todos os convites restaurados preservando identidades/liberações e exigindo reemissão. SMTP controlado não prova entrega externa.
+- [x] Anônimo/usuário comum não administram; cadastro público e acessos diretos a API, serviço e `claim_tenant` não criam advogado/tenant sem autorização. Equipe nova/existente verifica e-mail e usa TOTP, membro sem liberação não cria tenant próprio; contas existentes, isolamento de tenants, recuperação segura e revogação preservam os contratos.
+- [x] Ausência de vazamento de token/credenciais, separação entre abas/fluxos, acessibilidade e comportamento a 320 px são exercitados; checks autorizados e smoke têm evidência/limites, com revisão humana final. Falha não é contornada por mock, bypass ou supressão de teste.
 
 **Dependências:** PA13, PA14. **Rastreio:** C1–C8, segurança, seis decisões e todos os invariantes deste checklist.
 **Teste focado:** `B test/integration/first_access_end_to_end_test.rb test/integration/first_access_invitations_test.rb test/integration/tenant_creation_authorization_test.rb`, primeiro condicionado; `W src/app/api/transport.test.mjs`, `W src/lib/api.test.mjs` e `W src/app/convite/preservar/invitation-body.test.mjs`. A suíte integrada é executada uma vez pelo responsável pela integração após todas as folhas aterrissarem, nunca em concorrência com suites que alterem o mesmo banco.
@@ -498,9 +498,21 @@ A enumeração mantém todos os consumidores conhecidos de `authenticated_sessio
 
 ### Checkpoint final — após PA15
 
-- [ ] Confrontar evidências com C1–C8, seis decisões e critérios de cada PA; marcar somente tarefas realmente concluídas, mantendo bloqueios/falhas explícitos.
-- [ ] Revisão humana final de segurança, regressões, acessibilidade, ambientes e documentação; conclusão técnica não autoriza deploy nem publicação por inferência.
+- [x] Confrontar evidências com C1–C8, seis decisões e critérios de cada PA; marcar somente tarefas realmente concluídas, mantendo bloqueios/falhas explícitos.
+- [x] Revisão humana final de segurança, regressões, acessibilidade, ambientes e documentação; conclusão técnica não autoriza deploy nem publicação por inferência.
 
 ## Limites do estado registrado
 
-PA00 foi documental; PA01/PA02 e checkpoint após PA00–PA02 foram aprovados em R02/R03. PA03.A–C foi implementada e verificada, aguardando R04 humana. PA04–PA15 e a feature integral não estão concluídos; seus comandos continuam propostas, não provas executadas. Nenhum deploy foi autorizado.
+PA00–PA15 concluídos na branch de implementação; continuidade e revisões humanas aprovadas globalmente pelo solicitante. PR único [#17](https://github.com/smcruzfilipe/advocaciaonline/pull/17). Os resultados abaixo substituem os estados intermediários históricos; nenhum deploy ou dado persistente foi usado.
+
+## Evidência integrada de encerramento
+
+- **C1/C2/C5:** Chromium headless em HTTPS local exercitou administradora com senha/TOTP, emissão, SMTP real autenticado com STARTTLS e certificado confiado, cópia idêntica ao e-mail e reemissão; SMTP indisponível manteve cópia, e permissão negada de clipboard mostrou erro e alternativa manual. Aceitação não foi declarada entrega externa.
+- **C3/C4:** antes do primeiro TOTP, consulta protegida mostrou 0 identidades, 1 preparação e 0 liberações; depois, TOTP confirmado, liberação presente, convite removido e caixa postal ainda não verificada. O navegador concluiu perfil/tenant sem novo login. Membro já autenticado resgatou seu convite administrativo, interrompeu o perfil, retomou por `/onboarding` sem query e concluiu o próprio tenant; preservou o vínculo anterior.
+- **C6/C7:** equipe inédita recebeu convite, criou conta contextual, confirmou caixa pelo SMTP no mesmo navegador, autenticou senha/TOTP e aceitou. Antes de receber liberação administrativa, administração e criação de tenant retornaram 403; cadastro público web retornou 404. A suíte cobre recusa direta SQL/serviço/HTTP, revogação, validade, confirmação contextual de conta existente e isolamento.
+- **C8/Q6:** contexto anônimo recebeu 401 na administração; fragmentos foram removidos e mantidos separados em contextos de navegador. Restore protegido eliminou convite ainda ativo e preparação, preservando 3 identidades, 2 liberações e 2 tenants; token restaurado invalidado retornou 422. Painel e dashboard conferidos a 320 px sem overflow, com foco de teclado visível. Nenhum segredo real, destinatário real ou integração WhatsApp foi usado.
+- **Upgrade:** imagem anterior preparou titular, conta sem tenant, credenciais/sessões e pendência pública sintéticos. Migrations novas preservaram credenciais, prova legada e sessões; só titular recebeu grant, conta sem tenant foi recusada e token público pendente não criou identidade. Instalação vazia também passou.
+- **Testes/CI:** Backend remoto [41336829129](https://github.com/smcruzfilipe/advocaciaonline/actions/runs/41336829129): 560 testes/11.949 assertions; processador 135/1.253; zero falhas/erros/skips; smoke real do despachante persistiu dois planos idempotentes com UID1000. Web: 47 testes, tipos/lint/formatação/build/audit de produção verdes em [41336829136](https://github.com/smcruzfilipe/advocaciaonline/actions/runs/41336829136). Correção de retomada: foco 6 testes/79 assertions. Mutação isolada da condição TOTP falhou no teste consumidor esperado; sem a mutação, foco 4 testes/45 assertions verde. Produção não foi alterada por essa prova.
+- **Conferência PA13 A–H:** compatibilidade migrada no commit `b5207c6`, junto do contrato: helper guarda banco descartável e liberação é opt-in `owner: true`; consumidores que criam tenant usam essa opção explícita. Os demais permanecem intencionalmente sem grant porque exercitam apenas autenticação/equipe. Workflow migrou a fixture protegida e executou o despachante real no CI; não depende de função pública removida.
+- **Consolidação dos testes propostos:** os casos SQL/transacionais e HTTP de resgate estão em `first_access_redemption_http_test.rb`, `first_access_invitations_test.rb` e `first_access_invitation_store_test.rb`; corte público também foi exercitado diretamente por HTTP/SQL e navegador. O formulário foi incorporado a `app/primeiro-acesso/page.tsx`, sem componente paralelo desnecessário. Os nomes anteriormente propostos/condicionados não indicam arquivos obrigatórios faltantes.
+- **Limites:** SMTP controlado não comprova caixa postal externa; não houve deploy, merge, acesso a dados persistentes, alteração de dependências ou variável de ambiente nova. Aprovação global não substitui resultado técnico; evidências acima são observadas.
