@@ -1,9 +1,13 @@
 # Checklist de integração dos endpoints — web
 
-Fonte: `apps/backend/config/routes.rb`. `[x]` indica integração e comportamento exercitados pela interface ou pelo relay contra Rails e PostgreSQL descartável; não implica autorização de deploy. Os convites foram enviados a um SMTP local descartável com STARTTLS, não a um serviço externo. O callback inválido foi verificado (303 para login), mas o retorno válido do Google permanece pendente; o catálogo real retornou 503 após a fonte responder 403 neste ambiente.
+Fonte: `apps/backend/config/routes.rb`. `[x]` indica integração e comportamento exercitados pela interface ou pelo relay contra Rails e PostgreSQL locais; não implica autorização de deploy. Os convites foram enviados a um SMTP descartável com STARTTLS. A recuperação foi exercitada na URL HTTPS com conta sintética; o pedido para o endereço autorizado pelo Resend foi aceito pelo SMTP real. Cadastro e confirmação de e-mail ainda exigem comprovação visual integrada; o catálogo real retornou 503 após a fonte responder 403 neste ambiente.
 
-- [x] `GET /auth/google` — `google_sessions#new`; início com ingresso autenticado
-- [ ] `GET /auth/google/callback` — `google_sessions#create`; retorno válido do Google ainda não exercitado
+- [ ] `POST /api/auth/register` — cadastro com e-mail e senha
+- [ ] `POST /api/auth/verify-email` — confirmação do e-mail
+- [x] `POST /api/auth/login` — senha nova aceita e senha antiga recusada após redefinição, com conta sintética
+- [x] `POST /api/auth/totp` — segundo fator preservado e sessão criada após senha redefinida
+- [x] `POST /api/auth/password-reset` — solicitação pela interface e aceitação SMTP Resend
+- [x] `POST /api/auth/password-reset/confirm` — nova senha e confirmação pela interface, sem autenticação automática
 - [x] `GET /api/session` — `sessions#show`
 - [x] `PATCH /api/session/membership` — `sessions#update`
 - [x] `DELETE /api/session` — `sessions#destroy`

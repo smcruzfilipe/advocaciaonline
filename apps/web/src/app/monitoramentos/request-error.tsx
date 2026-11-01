@@ -32,7 +32,7 @@ export function RequestError({
     <div className="error stack" role="alert">
       <strong>{heading}</strong>
       <p>{error.message}</p>
-      {status === 401 && <Link href="/login">Entrar com Google</Link>}
+      {status === 401 && <Link href="/login">Entrar na conta</Link>}
       {onboarding && (
         <Link href="/onboarding">Cadastrar perfil profissional</Link>
       )}

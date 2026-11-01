@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Local Tailscale validation only; does not modify the deployment database.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+umask 077
+mkdir -p .local/tls
+
+if [[ ! -f .local/compose.env ]]; then
+  host=${1:?Uso: bash bin/local-up nome-da-maquina.tailnet.ts.net [porta HTTPS]}
+  port=${2:-3001}
+  cat > .local/compose.env <<EOF
+LOCAL_APP_HOST=$host
+LOCAL_HTTPS_PORT=$port
+APP_ORIGIN=https://$host:$port
+LOCAL_POSTGRES_PASSWORD=$(openssl rand -hex 32)
+LOCAL_RUNTIME_PASSWORD=$(openssl rand -hex 32)
+LOCAL_MIGRATOR_PASSWORD=$(openssl rand -hex 32)
+SECRET_KEY_BASE=$(openssl rand -hex 64)
+AUTH_INGRESS_SECRET=$(openssl rand -hex 32)
+EOF
+else
+  # This is a private, locally generated shell-compatible environment file.
+  source .local/compose.env
+  host=$LOCAL_APP_HOST
+fi
+
+# tailscaled caches certificates; rerunning also renews a certificate when due.
+if ! tailscale cert --cert-file "$PWD/.local/tls/server.crt" --key-file "$PWD/.local/tls/server.key" "$host"; then
+  sudo tailscale cert --cert-file "$PWD/.local/tls/server.crt" --key-file "$PWD/.local/tls/server.key" "$host"
+  sudo chown "$(id -u):$(id -g)" .local/tls/server.crt .local/tls/server.key
+fi
+chmod 600 .local/compose.env .local/tls/server.key
+chmod 644 .local/tls/server.crt
+if [[ ! -f .local/integrations.env ]]; then
+  printf '# Forneça aqui as variáveis SMTP documentadas no README.\n' > .local/integrations.env
+fi
+
+compose=(docker compose --env-file .local/compose.env)
+"${compose[@]}" config --quiet
+"${compose[@]}" up --build --detach --wait --wait-timeout 180
+"${compose[@]}" ps
+printf '\nAplicação: '
+"${compose[@]}" exec -T api ruby -e 'puts ENV.fetch("APP_ORIGIN") + "/login"; puts "SMTP: #{%w[SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD SMTP_FROM].all? { |k| !ENV.fetch(k, "").empty? } ? "configurado (não validado)" : "credenciais ausentes"}"'

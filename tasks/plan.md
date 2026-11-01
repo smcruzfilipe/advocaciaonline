@@ -89,10 +89,16 @@ O escopo desta branch é o backend: as interfaces e a aprovação dos checkpoint
 
 **Escopo:** implementar em `apps/web/` as telas de identidade, monitoramentos, consulta, dashboard, equipe, grupos e histórico operacional de [SPEC-web.md](../apps/web/SPEC-web.md), integradas à API existente. A exportação Banani é referência visual; regras aprovadas e o design system prevalecem sobre dados ou controles ilustrativos.
 
-1. **Base e identidade:** Next.js App Router, TypeScript e npm com dependências fixadas; manter sessão, cookies seguros, Origin e CSRF da API Rails. O callback Google atualmente retorna JSON: o frontend deve encaminhá-lo ao Rails, preservar os cookies e concluir a navegação. Aceite de convite deve preservar o fragmento sem expor segredo.
+1. **Base e identidade:** Next.js App Router, TypeScript e npm com dependências fixadas; manter sessão, cookies seguros, Origin e CSRF da API Rails. O acesso atual usa senha e TOTP obrigatórios, com verificação prévia do e-mail. Aceite de convite deve preservar o fragmento sem expor segredo.
 2. **Fatias independentes:** monitoramentos de advogado, partes e processos; consulta/dashboard e histórico; equipe e grupos. Todas usam o mesmo cliente HTTP, respostas reais e estados de erro, sem dados fictícios, cache compartilhado, editais ou funcionalidades de agenda.
-3. **Integração:** verificar autorização, dados de dois tenants, texto da fonte como texto inerte, falha/zero/máscara e formulários no navegador headless, com API Rails e PostgreSQL descartável. Login Google real depende de credenciais externas; cenários preparados não comprovam OAuth real.
+3. **Integração:** verificar autorização, dados de dois tenants, texto da fonte como texto inerte, falha/zero/máscara e formulários no navegador headless, com API Rails e PostgreSQL descartável. Entrega de confirmação de e-mail depende de SMTP externo configurado.
 4. **Entrega:** executar build, verificações focadas e CI; documentar comandos, configurações e limitações. Nenhuma aprovação humana de checkpoint ou deploy é presumida. Imagens devem respeitar as regras de usuário não root e gates de containerização.
+
+#### Execução local conteinerizada pela Tailscale
+
+O solicitante autorizou concluir a containerização e publicar o frontend em `0.0.0.0` para validação por outra máquina da tailnet. `compose.yaml` e `bin/local-up` iniciam imagens separadas de frontend, API, PostgreSQL exclusivamente local e ingresso HTTPS; migrations executam em processo separado, com credencial própria. Não alteram a instância PostgreSQL de deploy nem iniciam coletas automáticas.
+
+O ingresso publica `0.0.0.0:3001`, com certificado Tailscale para `apps-contabo.tail519952.ts.net`; API e banco não publicam portas. Builds, HTTP/HTTPS, conexão pela role runtime, usuários reais dos processos e persistência após reinício foram verificados na execução anterior; resultados, tamanhos, variáveis e comandos estão no README. A entrega SMTP depende de configuração externa; esta execução não encerra checkpoints funcionais nem presume aprovação humana dos resultados.
 
 **Checkpoint após 13–15:** rever o estado de falhas por tribunal, a aplicação da autorização nas respostas e os critérios de volumetria acordados.
 

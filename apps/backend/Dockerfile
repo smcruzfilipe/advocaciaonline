@@ -35,7 +35,7 @@ COPY --link --chown=1000:1000 config ./config
 COPY --link --chown=1000:1000 db ./db
 COPY --link --chown=1000:1000 --chmod=0555 bin ./bin
 LABEL org.opencontainers.image.title="Advocacia Online Rails API" \
-      org.opencontainers.image.description="API-only Rails with server-side OIDC sessions and PostgreSQL tenant RLS"
+      org.opencontainers.image.description="API-only Rails with server-side sessions and PostgreSQL tenant RLS"
 EXPOSE 3000
 USER 1000:1000
 CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]

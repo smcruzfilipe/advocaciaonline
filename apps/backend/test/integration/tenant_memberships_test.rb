@@ -13,8 +13,7 @@ class TenantMembershipsTest < ActiveSupport::TestCase
     invitation = nil
     TeamInvitationMailer.stub(:deliver!, ->(**arguments) { invitation = arguments.fetch(:token) }) do
       credential = IdentityStore.create_credential(token: owner, email: email, validity_days: nil, smtp: {})
-      token = SecureRandom.urlsafe_base64(32)
-      IdentityStore.authenticate(subject: subject, email: email, token: token, csrf: SecureRandom.urlsafe_base64(32))
+      token, = authenticated_session(subject: subject, email: email)
       IdentityStore.accept_invitation(token: token, invitation_token: invitation)
       return [token, credential, subject]
     end
@@ -39,8 +38,7 @@ class TenantMembershipsTest < ActiveSupport::TestCase
     DatabaseContext.with_session(member) do
       assert_equal [membership_b.fetch("tenant_id")], Lawyer.pluck(:tenant_id)
     end
-    fresh = SecureRandom.urlsafe_base64(32)
-    IdentityStore.authenticate(subject: subject, email: "member@example.test", token: fresh, csrf: SecureRandom.urlsafe_base64(32))
+    fresh, = authenticated_session(subject: subject, email: "member@example.test")
     assert_nil IdentityStore.context(fresh).fetch("tenant_id")
     DatabaseContext.with_session(fresh) { assert_empty Lawyer.pluck(:id) }
   end

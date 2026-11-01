@@ -1,6 +1,10 @@
 Rails.application.routes.draw do
-  get "/auth/google", to: "google_sessions#new"
-  get "/auth/google/callback", to: "google_sessions#create"
+  post "/api/auth/register", to: "password_auth#register", defaults: { format: :json }
+  post "/api/auth/verify-email", to: "password_auth#verify_email", defaults: { format: :json }
+  post "/api/auth/login", to: "password_auth#login", defaults: { format: :json }
+  post "/api/auth/totp", to: "password_auth#totp", defaults: { format: :json }
+  post "/api/auth/password-reset", to: "password_auth#password_reset", defaults: { format: :json }
+  post "/api/auth/password-reset/confirm", to: "password_auth#confirm_password_reset", defaults: { format: :json }
   get "/api/session", to: "sessions#show", defaults: { format: :json }
   patch "/api/session/membership", to: "sessions#update", defaults: { format: :json }
   delete "/api/session", to: "sessions#destroy", defaults: { format: :json }

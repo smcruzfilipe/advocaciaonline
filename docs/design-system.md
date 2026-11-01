@@ -112,7 +112,7 @@ Controles nativos, incluindo radios, select e calendário, podem manter formas i
 
 A organização abaixo orienta composição, não fixa URLs nem adiciona funcionalidades às especificações.
 
-- **Acesso e onboarding:** coluna única, sem navegação privada antes de autenticação. Usar a identidade Google prevista em [identidade](../SPEC-identidade.md), sem inventar formulário de senha local. Nome, OABs e escritório opcional organizados em grupos legíveis.
+- **Acesso e onboarding:** coluna única, sem navegação privada antes de autenticação. Usar senha e aplicativo autenticador conforme [identidade](../SPEC-identidade.md); nome, OABs e escritório opcional organizados em grupos legíveis.
 - **Monitoramentos:** separar contexto do advogado, partes e processos conforme [monitoramentos](../SPEC-monitoramentos.md). Exibir nome ou número, tribunais aplicáveis e situação com texto; deixar ações previstas junto ao registro.
 - **Consulta:** cada comunicação permanece independente, agrupada por tribunal; nunca fundir resultados por número de processo. O detalhe prioriza tribunal, número e conteúdo efetivamente fornecido pela fonte, escapado na renderização, nunca inserido como HTML bruto. Somente o texto da API é sanitizado na coleta; o caderno não é sanitizado, e a primeira versão deduplicada pode conservar seu HTML. A referência funcional é [consulta](../SPEC-consulta.md).
 - **Dashboard:** apenas as duas métricas aprovadas — comunicações novas persistidas e processos distintos associados — nas janelas definidas em consulta. Compor números, rótulos e períodos sem inventar gráficos, tendências ou métricas. Avisos de coleta aparecem junto ao escopo afetado.

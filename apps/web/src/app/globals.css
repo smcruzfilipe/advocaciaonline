@@ -369,9 +369,6 @@ dd {
   font-size: 1rem;
   margin-bottom: 0.5rem;
 }
-.google-login {
-  width: 100%;
-}
 .registration-row {
   border-top: 1px solid var(--color-divider);
   padding-top: 1rem;

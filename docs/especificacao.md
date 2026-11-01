@@ -51,11 +51,11 @@ A restrição a tribunais e dashboard aplica-se a respostas e agregações; dash
 
 ### Documentação da API
 
-A API usará Swagger UI para expor sua documentação interativa, protegida por login e senha, conforme requisito do solicitante. O mecanismo de autenticação dessa documentação deve ser definido no contrato técnico; não está decidido se compartilha identidade com o login Google da aplicação. Usuários e senhas padrão não devem ser embutidos no código nem versionados. A aplicação e a documentação ainda não estão implementadas.
+A API usará Swagger UI para expor sua documentação interativa, protegida por login e senha independentes da autenticação da aplicação. Usuários e senhas padrão não devem ser embutidos no código nem versionados. Swagger UI ainda não está implementado.
 
 ## Decisões pendentes e evidências
 
-- Identidade: login Google; validade apenas para equipe, explicitamente sem expiração ou por número inteiro positivo de dias desde a criação em UTC; contagem por 24 horas, recusa no instante de vencimento, renovação, alteração e revogação estão decididas. Permanecem detalhes técnicos de convite, sessões e implementação.
+- Identidade: senha e segundo fator TOTP obrigatórios; validade apenas para equipe, explicitamente sem expiração ou por número inteiro positivo de dias desde a criação em UTC; contagem por 24 horas, recusa no instante de vencimento, renovação, alteração e revogação estão decididas.
 - Autorização: composição por união de concessões e negação explícita prevalecente; catálogo de leitura/escrita e escopos definidos; usuário sem grupos tem leitura de monitoramentos/comunicações e dashboard, sem escrita por grupo. A administração do tenant é exclusiva do advogado titular.
 - Consulta: métricas são comunicações novas persistidas e processos distintos associados; primeira persistência local define o período; combinação válida `id` + `hash` impede recontagem e chaves incompletas ficam fora das métricas. Janelas em `America/Sao_Paulo`, máscara `*` e estados zero/falha/parcial/indisponível estão definidos nas especificações.
 - Coleta: duas execuções somente de Diário Eletrônico (`D`), sem editais (`E`), com horários configuráveis sem padrão, fuso Brasília, retomada do dia corrente e três tentativas por caminho com intervalos iniciais de um e cinco minutos. Primeiro slot: caderno com fallback API; segundo: API diretamente. Resultados parciais identificam tribunais concluídos e falhos. Evidências antigas com `E` são históricas e não ampliam o escopo vigente.

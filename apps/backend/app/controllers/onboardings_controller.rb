@@ -24,7 +24,7 @@ class OnboardingsController < ApplicationController
   rescue LawyerOnboarding::AlreadyOnboarded
     api_error("already_onboarded", "Seu perfil profissional já foi cadastrado.", :conflict)
   rescue LawyerOnboarding::Unauthenticated
-    api_error("authentication_required", "Entre com sua conta Google para continuar.", :unauthorized)
+    api_error("authentication_required", "Entre na sua conta para continuar.", :unauthorized)
   end
 
   private

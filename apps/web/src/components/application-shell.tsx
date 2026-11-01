@@ -9,6 +9,8 @@ import { destination, useSession } from "./session-provider";
 const accessPaths: Record<string, true> = {
   "/": true,
   "/login": true,
+  "/verify-email": true,
+  "/reset-password": true,
   "/onboarding": true,
   "/vinculos": true,
   "/convite": true,
@@ -59,7 +61,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
 
   const identity = session?.authenticated ? (
     <div className="session-summary">
-      <span>Conta Google autenticada</span>
+      <span>Conta autenticada</span>
       {session.role && (
         <strong>
           {session.role === "owner" ? "Titular" : "Membro da equipe"}
@@ -91,7 +93,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
               {logoutError}
             </p>
           )}
-          {error ? (
+          {error && pathname !== "/reset-password" ? (
             <section className="page access-page stack">
               <h1>Não foi possível abrir sua sessão</h1>
               <p className="error" role="alert">
@@ -110,7 +112,15 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
               </p>
             </section>
           ) : accessPage ? (
-            <div key={session?.csrf_token ?? "anonymous"}>{children}</div>
+            <div
+              key={
+                pathname === "/reset-password"
+                  ? "password-reset"
+                  : (session?.csrf_token ?? "anonymous")
+              }
+            >
+              {children}
+            </div>
           ) : (
             <div className="page" role="status" aria-busy="true">
               {loading

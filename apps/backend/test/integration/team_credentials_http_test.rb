@@ -33,10 +33,7 @@ class TeamCredentialsHttpTest < ActionDispatch::IntegrationTest
   end
 
   def member_session
-    token = SecureRandom.urlsafe_base64(32)
-    csrf = SecureRandom.urlsafe_base64(32)
-    IdentityStore.authenticate(subject: SecureRandom.uuid, email: @email, token: token, csrf: csrf)
-    [token, csrf]
+    authenticated_session(email: @email)
   end
 
   test "creation requires explicit validity and supports lifecycle without exposing invitation secrets" do
@@ -98,7 +95,7 @@ class TeamCredentialsHttpTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
-  test "acceptance uses Google email and JSON body token rather than URL claims" do
+  test "acceptance uses verified email and JSON body token rather than URL claims" do
     credential = create_credential
     member, csrf = member_session
     cookies[ApplicationController::SESSION_COOKIE] = member

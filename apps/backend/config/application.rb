@@ -18,8 +18,7 @@ module AdvocaciaOnline
     config.middleware.use ActionDispatch::Cookies
     config.action_controller.wrap_parameters_by_default = false
     config.filter_parameters += %i[code state nonce code_verifier id_token access_token refresh_token
-      token csrf_token csrf secret cookie authorization email full_name office_name number]
-    config.filter_redirect = ["accounts.google.com"]
+      token csrf_token csrf secret password cookie authorization email full_name office_name number]
     config.action_dispatch.default_headers.merge!(
       "Content-Security-Policy" => "default-src 'none'; frame-ancestors 'none'",
       "Referrer-Policy" => "no-referrer",
@@ -27,7 +26,7 @@ module AdvocaciaOnline
       "X-Frame-Options" => "DENY",
       "Strict-Transport-Security" => "max-age=31536000"
     )
-    # Request/SQL debug logs can expose OIDC payloads and bearer digests.
+    # Request/SQL debug logs can expose credentials and bearer digests.
     config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
     config.active_record.logger = nil
     config.logger = ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new($stdout))

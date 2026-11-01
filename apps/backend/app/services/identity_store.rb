@@ -9,7 +9,9 @@ class IdentityStore
   class NotFound < StandardError; end
   class Conflict < StandardError; end
   UUID = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
-  FUNCTIONS = %w[start_login consume_login authenticate_google session_identity session_context
+  FUNCTIONS = %w[auth_limit register_password verify_password_email password_lookup
+    request_password_reset cancel_password_reset confirm_password_reset
+    create_password_challenge password_challenge finish_password_challenge session_identity session_context
     claim_tenant revoke_session require_owner available_memberships select_membership
     list_team_credentials create_team_credential change_credential_validity renew_team_credential
     revoke_team_credential reissue_team_invitation accept_team_invitation].freeze
@@ -43,9 +45,6 @@ class IdentityStore
     end
   end
 
-  def self.authenticate(subject:, email:, token:, csrf:)
-    call("authenticate_google", subject, email, digest(token), csrf)
-  end
 
   def self.context(token)
     return if token.blank?

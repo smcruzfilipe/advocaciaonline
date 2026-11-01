@@ -10,7 +10,7 @@ Estabelecer como um advogado independente e os usuários de seu ambiente se aute
 
 Este módulo é dono do contrato de identidade autenticada, do tenant associado a essa identidade, do perfil profissional do advogado e da validade da credencial. Ele não decide o que a identidade pode fazer: [autorização](SPEC-autorizacao.md) consome o contexto autenticado e é dona das decisões de acesso. [Monitoramentos](SPEC-monitoramentos.md) consome o perfil profissional para representar o advogado monitorado.
 
-Usuários de equipe pertencem ao tenant do advogado que os convidou; autorização administra vínculo e grupos, enquanto identidade valida login Google, aceitação do convite, validade e revogação do acesso local. A conta Google não substitui a autorização no tenant.
+Usuários de equipe pertencem ao tenant do advogado que os convidou; autorização administra vínculo e grupos, enquanto identidade valida o acesso, a aceitação do convite, validade e revogação. A autenticação não substitui a autorização no tenant.
 
 ## Contratos lógicos
 
@@ -21,11 +21,12 @@ Usuários de equipe pertencem ao tenant do advogado que os convidou; autorizaç�
 - **Alteração e renovação:** alterar a validade escolhida não modifica retroativamente uma credencial existente; a nova escolha só passa a valer mediante renovação explícita. Renovar uma credencial não revogada, inclusive expirada, inicia um novo período no instante da renovação, usando a escolha de validade vigente; não se soma ao prazo anterior.
 - **Revogação:** interrompe imediatamente novas operações protegidas, inclusive em sessões abertas. Renovação não reativa credencial revogada; para restabelecer acesso, é necessária uma nova credencial.
 - **Fronteira com autorização:** este módulo fornece o contexto autenticado e seu estado de validade; não fornece permissões, associação a grupos ou escopo de tribunais/dashboard.
-- **Login:** advogado e equipe entram exclusivamente pelo Google na primeira entrega; não há senha local nem convite para definir senha.
-- **Convite de equipe:** o advogado informa e-mail e grupos; a pessoa recebe convite e aceita entrando pelo Google com o e-mail convidado. Login Google, isoladamente, não concede participação em um tenant. Identidade implementa a aceitação; autorização administra vínculo e grupos. Detalhes de entrega, validade e uso do convite permanecem no contrato técnico.
+- **Login:** advogado e equipe usam senha local e código temporário de aplicativo autenticador (TOTP), ambos obrigatórios. A sessão só é criada após validação dos dois fatores.
+- **Recuperação de senha:** link enviado ao e-mail confirmado, válido por 30 minutos e de uso único. Novo pedido invalida o anterior. A confirmação altera somente a senha e revoga sessões e desafios existentes; preserva o autenticador, seu estado de inscrição e a proteção contra reutilização de códigos. Não autentica automaticamente nem oferece recuperação de TOTP.
+- **Convite de equipe:** o advogado informa e-mail e grupos; a pessoa aceita o convite após verificar o mesmo e-mail e autenticar-se com os dois fatores. Autenticação isoladamente não concede participação em um tenant. Identidade implementa a aceitação; autorização administra vínculo e grupos.
 - **E-mail de acesso:** o convite faz parte da primeira entrega e é distinto dos relatórios e avisos diários de coleta, que continuam futuros.
 
-O contrato técnico de login, sessão, convite e documentação está registrado em [arquitetura](docs/arquitetura.md#identidade-convites-e-documentação). O login Google não substitui a autorização nem a checagem de validade da credencial.
+O contrato técnico de login, sessão, convite e documentação está registrado em [arquitetura](docs/arquitetura.md#identidade-convites-e-documentação). Autenticação não substitui a autorização nem a checagem de validade da credencial.
 
 ## Requisitos
 
@@ -81,7 +82,7 @@ As políticas de RLS não substituem RBAC nem as verificações de identidade e 
 
 ## Questões abertas
 
-1. **Técnica, fora da decisão 2a:** configuração do Google e contrato seguro de emissão, envio, validade e aceite do convite; nenhum desses mecanismos pode reiniciar a validade já iniciada na criação da credencial.
+1. **Técnica, fora da decisão 2a:** emissão, envio, validade e aceite do convite não podem reiniciar a validade já iniciada na criação da credencial.
 2. **Validação de perfil:** nome e OAB seguem [monitoramentos](SPEC-monitoramentos.md#contratos-lógicos); no perfil, inscrição principal é obrigatória e pares número/UF duplicados são recusados. Não há verificação externa de inscrição.
 3. **Implementação:** representação e persistência dos instantes UTC, validação do número positivo de dias, sessões e fluxos técnicos; os comportamentos de política já estão definidos acima.
 4. **Ambiente:** caminhos físicos/layout, comandos, estilo real, ferramentas e locais de teste do repositório de implementação; a stack base está em [stack](docs/stack.md).

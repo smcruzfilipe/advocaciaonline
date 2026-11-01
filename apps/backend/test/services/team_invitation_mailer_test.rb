@@ -69,7 +69,7 @@ class TeamInvitationMailerTest < ActiveSupport::TestCase
     assert_equal "UTF-8", message.charset
     body = message.body.decoded.encode(Encoding::UTF_8, message.charset)
     assert body.valid_encoding?
-    assert_includes body, "entre com a conta Google de equipe@example.test"
+    assert_includes body, "entre com a conta de equipe@example.test"
     assert_includes body, "uso único"
     assert_includes body, "24 horas"
     assert_includes body, "https://app.example.test/invite/accept#token=#{@token}"

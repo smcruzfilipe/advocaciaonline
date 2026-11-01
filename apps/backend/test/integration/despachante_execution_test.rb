@@ -381,7 +381,7 @@ class DespachanteExecutionTest < ActiveSupport::TestCase
       "DESPACHANTE_DATABASE_URL" => @despachante_url,
       "COLETA_HORARIO_1" => "04:00", "COLETA_HORARIO_2" => "16:00",
       "DATABASE_URL" => nil, "MIGRATION_DATABASE_URL" => nil, "RAILS_ENV" => nil,
-      "APP_ORIGIN" => nil, "GOOGLE_CLIENT_ID" => nil, "GOOGLE_CLIENT_SECRET" => nil,
+      "APP_ORIGIN" => nil, "AUTH_INGRESS_SECRET" => nil,
       "SECRET_KEY_BASE" => nil
     }
     script = <<~'RUBY'
@@ -411,7 +411,7 @@ class DespachanteExecutionTest < ActiveSupport::TestCase
       "DESPACHANTE_DATABASE_URL" => @despachante_url,
       "COLETA_HORARIO_1" => first, "COLETA_HORARIO_2" => second,
       "DATABASE_URL" => nil, "MIGRATION_DATABASE_URL" => nil, "RAILS_ENV" => nil,
-      "APP_ORIGIN" => nil, "GOOGLE_CLIENT_ID" => nil, "GOOGLE_CLIENT_SECRET" => nil,
+      "APP_ORIGIN" => nil, "AUTH_INGRESS_SECRET" => nil,
       "SECRET_KEY_BASE" => nil
     }
     script = <<~'RUBY'

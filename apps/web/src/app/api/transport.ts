@@ -38,7 +38,7 @@ export function publicOrigin(): URL {
 }
 
 export function isApiPath(path: string): boolean {
-  return /^\/api\/(?:session(?:\/membership)?|onboarding|courts|dashboard|communications(?:\/[A-Za-z0-9_-]+)?|monitorings\/(?:lawyer|(?:parties|processes)(?:\/[A-Za-z0-9_-]+)?)|team\/(?:invitations\/accept|credentials(?:\/[A-Za-z0-9_-]+(?:\/(?:renewal|invitation))?)?)|authorization\/(?:catalog|groups(?:\/[A-Za-z0-9_-]+(?:\/rules(?:\/[A-Za-z0-9_-]+)?|\/memberships\/[A-Za-z0-9_-]+)?)?)|collection-runs(?:\/[A-Za-z0-9_-]+\/(?:jobs|events|execution))?)$/.test(
+  return /^\/api\/(?:auth\/(?:register|verify-email|login|totp|password-reset(?:\/confirm)?)|session(?:\/membership)?|onboarding|courts|dashboard|communications(?:\/[A-Za-z0-9_-]+)?|monitorings\/(?:lawyer|(?:parties|processes)(?:\/[A-Za-z0-9_-]+)?)|team\/(?:invitations\/accept|credentials(?:\/[A-Za-z0-9_-]+(?:\/(?:renewal|invitation))?)?)|authorization\/(?:catalog|groups(?:\/[A-Za-z0-9_-]+(?:\/rules(?:\/[A-Za-z0-9_-]+)?|\/memberships\/[A-Za-z0-9_-]+)?)?)|collection-runs(?:\/[A-Za-z0-9_-]+\/(?:jobs|events|execution))?)$/.test(
     path,
   );
 }
@@ -93,7 +93,9 @@ export function forwardedHeaders(request: Request): Headers {
   const cookies = (request.headers.get("cookie") ?? "")
     .split(";")
     .map((part) => part.trim())
-    .filter((part) => /^__Host-advocacia_(?:session|oidc)=/.test(part));
+    .filter((part) =>
+      /^__Host-advocacia_(?:session|auth|registration)=/.test(part),
+    );
   if (cookies.length) headers.set("cookie", cookies.join("; "));
   return headers;
 }
@@ -122,20 +124,17 @@ export async function railsFetch(
 ): Promise<Response> {
   const upstream = configuredOrigin("RAILS_API_ORIGIN", ["http:", "https:"]);
   const target = new URL(path, upstream);
-  if (
-    target.origin !== upstream.origin ||
-    (!isApiPath(target.pathname) &&
-      !["/auth/google", "/auth/google/callback"].includes(target.pathname))
-  ) {
+  if (target.origin !== upstream.origin || !isApiPath(target.pathname)) {
     throw new Error("Invalid backend resource");
   }
   const method = options?.method ?? request.method;
   const send = target.protocol === "https:" ? httpsRequest : httpRequest;
   const headers = forwardedHeaders(request);
   if (options?.clientIp) {
-    if (target.pathname !== "/auth/google" || !isIP(options.clientIp))
+    if (!target.pathname.startsWith("/api/auth/") || !isIP(options.clientIp))
       throw new Error("Invalid client address");
-    headers.set("X-Forwarded-For", options.clientIp);
+    headers.set("X-Advocacia-Ingress-Secret", process.env.AUTH_INGRESS_SECRET!);
+    headers.set("X-Advocacia-Client-IP", options.clientIp);
   }
   const { promise, resolve, reject } = Promise.withResolvers<Response>();
   let bodyStream: Readable | undefined;
@@ -209,7 +208,7 @@ export function responseHeaders(upstream: Response): Headers {
     const value = upstream.headers.get(name);
     if (value) headers.set(name, value);
   }
-  // A comma split would corrupt Expires and silently lose one of the OAuth cookies.
+  // A comma split would corrupt Expires and silently lose cookies.
   for (const cookie of upstream.headers.getSetCookie())
     headers.append("Set-Cookie", cookie);
   return headers;
@@ -252,39 +251,4 @@ export function matchesInvitation(
 
 export function invitationCookie(value: string | null): string {
   return `${INVITATION_COOKIE}=${value ?? ""}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${value ? INVITATION_LIFETIME : 0}`;
-}
-
-export function safeGoogleRedirect(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (
-      url.origin === "https://accounts.google.com" &&
-      !url.username &&
-      !url.password &&
-      url.pathname === "/o/oauth2/v2/auth"
-    );
-  } catch {
-    return false;
-  }
-}
-
-export function sessionDestination(
-  session: {
-    authenticated?: boolean;
-    selection_required?: boolean;
-    onboarded?: boolean;
-  },
-  pendingInvitation = false,
-): string {
-  if (!session.authenticated) return "/login";
-  if (pendingInvitation) return "/convite";
-  if (session.selection_required) return "/vinculos";
-  return session.onboarded ? "/dashboard" : "/onboarding";
-}
-
-export function uiRedirect(path: string, upstream?: Response): Response {
-  const headers = upstream ? responseHeaders(upstream) : privateHeaders();
-  headers.delete("content-type");
-  headers.set("Location", new URL(path, publicOrigin()).href);
-  return new Response(null, { status: 303, headers });
 }

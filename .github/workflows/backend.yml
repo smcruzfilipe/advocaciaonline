@@ -20,8 +20,7 @@ jobs:
       PROCESSADOR_DATABASE_URL: postgresql://advocacia_processador@advocacia-ci-db/advocacia_test
       PROCESSADOR_TEST_ADMIN_DATABASE_URL: postgresql://postgres@advocacia-ci-db/advocacia_test
       APP_ORIGIN: https://example.test
-      GOOGLE_CLIENT_ID: test-client
-      GOOGLE_CLIENT_SECRET: test-secret
+      AUTH_INGRESS_SECRET: test-only-ingress-secret-01234567890123456789
       SECRET_KEY_BASE: test-only-secret-key-base-0123456789012345678901234567890123456789
       RAILS_LOG_LEVEL: fatal
     steps:
@@ -56,7 +55,7 @@ jobs:
         run: |
           docker run --rm --network advocacia-ci \
             -e RAILS_ENV -e DATABASE_URL -e MIGRATION_DATABASE_URL -e DESPACHANTE_DATABASE_URL \
-            -e PROCESSADOR_DATABASE_URL -e APP_ORIGIN -e GOOGLE_CLIENT_ID -e GOOGLE_CLIENT_SECRET \
+            -e PROCESSADOR_DATABASE_URL -e APP_ORIGIN -e AUTH_INGRESS_SECRET \
             -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL advocacia-ci:test ruby bin/rails test
       - name: Run processador suite
         run: |
@@ -68,9 +67,19 @@ jobs:
             -e RAILS_ENV -e DATABASE_URL -e APP_ORIGIN -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL \
             advocacia-ci:test ruby bin/rails runner '
               require "securerandom"
+              verification = SecureRandom.urlsafe_base64(32)
+              hash = IdentityStore.digest(verification)
+              secret = PasswordAuthentication.new_secret
+              IdentityStore.call("register_password", hash, hash, "ci@example.test",
+                PasswordAuthentication.password_hash("ci-test-password"), PasswordAuthentication.encrypt(secret))
+              raise "verification failed" unless IdentityStore.call("verify_password_email", hash, hash).fetch("verified")
+              credential = IdentityStore.call("password_lookup", "ci@example.test")
+              challenge = IdentityStore.digest(SecureRandom.urlsafe_base64(32))
+              IdentityStore.call("create_password_challenge", credential.fetch("identity_id"), challenge,
+                credential.fetch("password_hash"))
               token = SecureRandom.urlsafe_base64(32)
-              IdentityStore.authenticate(subject: SecureRandom.uuid, email: "ci@example.test",
-                token: token, csrf: SecureRandom.urlsafe_base64(32))
+              raise "authentication failed" unless IdentityStore.call("finish_password_challenge", challenge,
+                (Time.now.to_i / 30).to_s, IdentityStore.digest(token), SecureRandom.urlsafe_base64(32), "").fetch("created")
               LawyerOnboarding.call(token: token, input: {
                 "full_name" => "CI Despachante Runtime",
                 "primary_oab" => { "number" => "12345", "uf" => "SP" }, "secondary_oabs" => []
