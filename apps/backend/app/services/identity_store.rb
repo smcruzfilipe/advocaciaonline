@@ -15,7 +15,9 @@ class IdentityStore
     create_password_challenge password_challenge finish_password_challenge session_identity session_context
     claim_tenant revoke_session require_owner available_memberships select_membership
     list_team_credentials create_team_credential change_credential_validity renew_team_credential
-    revoke_team_credential reissue_team_invitation accept_team_invitation].freeze
+    revoke_team_credential reissue_team_invitation accept_team_invitation
+    first_access_admin_list first_access_admin_issue first_access_admin_link first_access_admin_reissue
+    first_access_inspect first_access_prepare first_access_prepared first_access_consume].freeze
 
   def self.digest(token)
     Digest::SHA256.hexdigest(token.to_s)

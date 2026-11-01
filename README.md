@@ -103,7 +103,7 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | Variável | Default | Obrigatória? | Finalidade |
 |---|---|---|---|
 | `DATABASE_URL` | Nenhum | Sim, para API e testes | Conexão PostgreSQL com a role `advocacia_runtime`, sem propriedade das tabelas nem bypass de RLS. |
-| `MIGRATION_DATABASE_URL` | Nenhum | Sim, para migration e teste administrativo de sessão; não fornecer à API web | Conexão com `advocacia_migrator`, separada da role de execução. |
+| `MIGRATION_DATABASE_URL` | Nenhum | Sim, para migrations e testes PostgreSQL protegidos; não fornecer à API web | Conexão com `advocacia_migrator`, separada da role de execução. |
 | `DESPACHANTE_DATABASE_URL` | Nenhum | Sim, no despachante e nos testes do despachante; não fornecer à API web | Conexão PostgreSQL isolada com a role `advocacia_despachante`, exclusiva do processo confiável de planejamento; fornecer externamente por ambiente protegido ou gerenciador de segredos. |
 | `PROCESSADOR_DATABASE_URL` | Nenhum | Sim, no processador e nos testes de fronteira do Escrevente; não fornecer à API nem ao despachante | Conexão PostgreSQL exclusiva com a role `advocacia_processador`, provisionada administrativamente por `apps/backend/db/provision_processador.sql` antes da migration do Escrevente. Fornecer credencial e URL externamente por ambiente protegido ou gerenciador de segredos, sem registrar segredo no repositório. |
 | `POSTGRES_DB` | `POSTGRES_USER` da imagem PostgreSQL; `postgres` quando este não é definido; `advocacia_local` no Compose local | Não na imagem; Compose e CI fornecem um nome | Banco criado na primeira inicialização do PostgreSQL local/descartável; o CI usa `advocacia_test`. Não configura o banco de deploy. |
@@ -128,7 +128,7 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | `SMTP_USERNAME` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Usuário de autenticação SMTP; fornecer pela configuração protegida do ambiente. |
 | `SMTP_PASSWORD` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Senha de autenticação SMTP; fornecer por gerenciador de segredos, sem versioná-la. |
 | `SMTP_FROM` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Endereço remetente autorizado no servidor SMTP; fornecer pela configuração protegida do ambiente. |
-| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails usado para proteção de tentativas e segredos de autenticação; gerar e fornecer externamente. Preservar entre reinícios. |
+| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails para proteção de tentativas, fatores de autenticação e cópia cifrada dos convites de primeiro acesso com derivação/propósito próprios; gerar e fornecer externamente. Preservar entre reinícios. |
 | `RAILS_ENV` | `production` na imagem runtime; `test` na imagem de testes | Não | Seleciona o ambiente Rails. |
 | `RAILS_LOG_LEVEL` | `info` | Não | Nível de logging. |
 | `PORT` | `3000` nas imagens API e web | Não | Porta interna do servidor Puma ou Next.js; a publicação HTTPS local é controlada por `LOCAL_HTTPS_PORT`. |
@@ -273,7 +273,7 @@ end
 
 A transação é materializada antes das chamadas PostgreSQL parametrizadas: erro ou segunda administradora fazem rollback integral, sem substituir a conta existente. Não imprimir exceções ou seus parâmetros; consultar somente o estado sanitizado. Os códigos só são exibidos após commit e persistidos como hashes. Guarde-os fora da plataforma e preserve `SECRET_KEY_BASE`.
 
-Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha por e-mail mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. `/admin` é o destino administrativo autorizado; a interface e os endpoints de convites ainda não estão implementados.
+Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha por e-mail mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. `/admin` é o destino administrativo autorizado; o backend de convites está disponível conforme abaixo, mas sua interface, relay web e envio por SMTP ainda pertencem às próximas folhas.
 
 ### Recuperação administrativa e sessão comum
 
@@ -293,6 +293,25 @@ No login comum, **Perdi meu autenticador administrativo** pede e-mail, senha e u
 A administradora entra por `/login` e segue a `/admin`, sem precisar de tenant. A própria página consulta a sessão real no servidor antes de renderizar; o relay não concede capacidade. Não depender de layout como fronteira de autorização: [layouts Next não revalidam em toda navegação nem impedem a execução/RSC dos filhos](https://nextjs.org/docs/app/guides/authentication#layouts-and-auth-checks). A leitura server-side usa [`cookies()` assíncrono](https://nextjs.org/docs/app/api-reference/functions/cookies), sem outro cookie/provider. Controles de troca de tenant ficam fora do ambiente administrativo; quem também tem vínculo profissional pode acessar seu ambiente existente, sem perder a capacidade administrativa. O provider não trata fragmentos em `/admin` como convites de equipe.
 
 **Verificação PA03:** 44 testes Node aprovados; tipos, lint sem warnings, formatação e build Next de produção aprovados. `npm audit --omit=dev` retornou zero vulnerabilidades; a instalação completa apontou 15 moderadas já presentes na árvore de desenvolvimento, sem atualização forçada. HTTP real verificou origem/ingresso/método, negação a owner/member, CSRF e ausência de CSRF no RSC. Chromium 149 **headless**, em container descartável não root e HTTPS local, verificou login/recuperação, fatores inválidos, expiração, cookie revogado, preservação dos códigos entre contas/erro de rede e navegação de conta com papel duplo. Menu, teclado e foco conferidos a 320 px; ausência de overflow conferida a 320, 768, 1024 e 1440 px. Eventos de foco foram controlados no headless, sem janela gráfica. Não houve SMTP, conta real, deploy ou alteração de dependências/env. Web standalone: 303.629.026 bytes; ingresso existente: 72.190.907 bytes; ambos observados como UID/GID 1000:1000.
+
+### Convites administrativos de primeiro acesso
+
+| Método e caminho | Entrada | Resposta de sucesso |
+|---|---|---|
+| `GET /api/admin/invitations` | Sessão comum autorizada | `200 { invitations: [{ id, email, created_at, expires_at }] }`, somente ativos e sem segredo. |
+| `POST /api/admin/invitations` | JSON com `email` | `201 { id, email, created_at, expires_at }`; normaliza o e-mail, não cria tenant nem substitui convite ativo. |
+| `GET /api/admin/invitations/:id/link` | Identificador do convite ativo | `200 { link, expires_at }`; link opaco em `/primeiro-acesso#token=...`, sem renovar o prazo. |
+| `POST /api/admin/invitations/:id/reissue` | JSON `{}` | `201` com novos metadados; substitui convite/preparação anteriores atomicamente e reinicia as 24 horas. |
+
+Todas revalidam sessão e capacidade administrativa no PostgreSQL; owner/member comuns não são administradores. Mutações exigem JSON, `Origin` igual a `APP_ORIGIN` e CSRF da sessão atual. Leituras aceitam essa origem ou, sem `Origin`, `Sec-Fetch-Site: same-origin`; origem explícita indevida sempre é recusada. Não há cookie, dependência ou variável nova. Respostas usam `no-store`; não registrar seus corpos sensíveis. Sessão ausente/revogada retorna `401`; falta de capacidade, origem ou CSRF retorna `403`; duplicidade ou identidade desativada/titular com tenant retorna `409`; e-mail inválido retorna `422`; identificador sem convite ativo retorna `404`.
+
+Há no máximo um convite ativo por e-mail, com prazo absoluto de 24 horas. Cópia retorna sempre o mesmo token e prazo; somente reemissão explícita substitui ambos. O banco guarda digest e cópia cifrada autenticada, nunca o token em claro. Consumo, substituição e expurgo removem convite e preparação; a liberação consumida permanece vinculada à identidade. Listar/emitir/copiar/resgatar executam expurgo oportunista, sem tarefa agendada: sem atividade, não há promessa de prazo físico de remoção.
+
+O store também mantém preparação pendente sem criar identidade, sessão, reset ou liberação. Consumo exige sessão MFA válida da mesma identidade e pode participar da transação de ativação de PA09. Este grupo não publica endpoints de cadastro/resgate, não altera a verificação de caixa de e-mail e não implementa envio SMTP; esses caminhos permanecem nas folhas previstas.
+
+**Restore:** antes de reabrir o tráfego, a operação protegida deve executar `DELETE FROM app_private.first_access_invitations` na instância restaurada com a role de migration. Isso invalida todos os convites restaurados e elimina suas preparações por FK; não apagar identidades nem `app_private.first_access_grants`. A role da API não pode executar esse DELETE; não existe endpoint ou função runtime de manutenção. Preserve `SECRET_KEY_BASE`; não tentar recuperar links antigos com outra chave.
+
+**Verificação PA04/PA05:** foco com 27 testes e 288 assertions e suíte Rails completa com 536 testes e 11.710 assertions, sem falhas, erros ou skips, em PostgreSQL Docker descartável com roles segregadas. `zeitwerk:check` aprovado. HTTP real em Puma de produção não root comprovou senha/TOTP comuns, emissão/cópia/duplicidade/reemissão e negações; o instante de 24 horas devolveu `404` e removeu o segredo. Consumo via store exigiu a sessão MFA da mesma identidade; restore protegido eliminou os convites/preparações e preservou a liberação consumida. Isso não antecipa a prova do cadastro público de conta nova, prevista em PA09, nem SMTP/UI de convites.
 
 ### API de onboarding
 

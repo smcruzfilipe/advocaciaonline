@@ -7,6 +7,10 @@ Rails.application.routes.draw do
   post "/api/auth/password-reset/confirm", to: "password_auth#confirm_password_reset", defaults: { format: :json }
   post "/api/admin/auth/recovery", to: "password_auth#admin_recovery", defaults: { format: :json }
   post "/api/admin/auth/recovery/confirm", to: "password_auth#confirm_admin_recovery", defaults: { format: :json }
+  get "/api/admin/invitations", to: "platform_admin_invitations#index", defaults: { format: :json }
+  post "/api/admin/invitations", to: "platform_admin_invitations#create", defaults: { format: :json }
+  get "/api/admin/invitations/:id/link", to: "platform_admin_invitations#link", defaults: { format: :json }
+  post "/api/admin/invitations/:id/reissue", to: "platform_admin_invitations#reissue", defaults: { format: :json }
   get "/api/session", to: "sessions#show", defaults: { format: :json }
   patch "/api/session/membership", to: "sessions#update", defaults: { format: :json }
   delete "/api/session", to: "sessions#destroy", defaults: { format: :json }

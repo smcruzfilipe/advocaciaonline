@@ -87,7 +87,7 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 - [x] R01: PA00.A–B — integração e revisão documental concluídas por delegação; sem liberação de execução da aplicação.
 - [x] R02: PA01.A–B — aprovadas expressamente pelo solicitante após apresentação do código e das evidências de PA01.
 - [x] R03: PA02.A e PA02.B1–B2 — três folhas aprovadas expressamente pelo solicitante, junto do checkpoint após PA00–PA02.
-- [ ] R04: PA03.A–C — três folhas.
+- [x] R04: PA03.A–C — aprovadas expressamente pelo solicitante; liberado o próximo grupo PA04/PA05, sem ampliar escopo.
 - [ ] R05: PA04 e PA05.A–B — três folhas.
 - [ ] R06: PA06.A–B e PA07 — três folhas.
 - [ ] R07: PA08.P e PA08.A — duas folhas; conferir preparação e troca efetiva de registro, incluindo consumidores inventariados.
@@ -225,13 +225,13 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 ## PA04 — Persistência e ciclo do convite do advogado
 
-- [ ] Concluir PA04.
+- [x] Concluir PA04.
 
 **Descrição:** manter somente convite administrativo ativo por e-mail normalizado, separado de `team_invitations`, conforme Q3/Q6 e ambiguidades decididas. Reusar criptografia Rails: token opaco aleatório de 256 bits, hash para lookup/consumo e cópia cifrada autenticada recuperável apenas enquanto ativo, com finalidade/chave derivada distinta de TOTP e `SECRET_KEY_BASE` existente.
 
 **Critérios verificáveis:**
-- [ ] Validade absoluta termina em emissão + 24 horas, inclusive no instante exato; abrir/consultar não consome. Um convite ativo por e-mail, reemissão explícita atômica e cópia/reenvio sem prorrogação; titular com tenant recebe conflito, conta desativada não é reativada.
-- [ ] Remover segredo cifrado/digest e registro terminal ao consumir/substituir/expirar, preservando liberação consumida na identidade. Expurgar expirados nas operações necessárias de listar/emitir/copiar/resgatar pelo padrão existente de `pending_registrations`, sem rake/cron/job/serviço/histórico novo; sem atividade, não prometer prazo físico. Restore invalida todos os convites administrativos restaurados antes da reabertura, preservando identidades/liberações válidas do snapshot.
+- [x] Validade absoluta termina em emissão + 24 horas, inclusive no instante exato; abrir/consultar não consome. Um convite ativo por e-mail, reemissão explícita atômica e cópia/reenvio sem prorrogação; titular com tenant recebe conflito, conta desativada não é reativada.
+- [x] Remover segredo cifrado/digest e registro terminal ao consumir/substituir/expirar, preservando liberação consumida na identidade. Expurgar expirados nas operações necessárias de listar/emitir/copiar/resgatar pelo padrão existente de `pending_registrations`, sem rake/cron/job/serviço/histórico novo; sem atividade, não prometer prazo físico. Restore invalida todos os convites administrativos restaurados antes da reabertura, preservando identidades/liberações válidas do snapshot.
 - [ ] Locks/constraints garantem no máximo um consumo concorrente: conta nova só ativa identidade/credencial TOTP confirmada/liberação após primeiro TOTP dentro de 24 horas; conta preexistente vincula após login/TOTP correto. Preparação pendente não ativa conta/liberação/reset, falha faz rollback e challenge não prorroga.
 
 **Dependências:** PA00. **Rastreio:** C3–C5, C8; Q3/Q6 e marco de consumo.
@@ -242,22 +242,28 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 ## PA05 — Emissão e acesso ao link no servidor
 
-- [ ] Concluir PA05.
+- [x] Concluir PA05.
 
 **Descrição:** disponibilizar emissão, consulta ativa, recuperação do mesmo link e reemissão explícita somente à sessão comum com capacidade administrativa no servidor. A cópia cifrada ativa de PA04 permite recuperar o segredo original; hash sozinho não o reconstrói. Endpoints futuros seguem as Decisões de PA00, sem manter histórico terminal.
 
 **Critérios verificáveis:**
-- [ ] Somente administradora autenticada emite/acessa link; validar e-mail, origem, CSRF e autorização em toda chamada, inclusive direta à API/função.
-- [ ] E-mail associado, prazo e direitos não variam por canal; duplicidade, e-mail existente e reemissão obedecem PA00, sem conceder tenant no ato da emissão.
-- [ ] Respostas e acesso ao segredo não são cacheados/logados nem expostos a identidade comum; erro não declara emissão que não ocorreu nem invalida silenciosamente convite fora da política.
+- [x] Somente administradora autenticada emite/acessa link; validar e-mail, origem, CSRF e autorização em toda chamada, inclusive direta à API/função.
+- [x] E-mail associado, prazo e direitos não variam por canal; duplicidade, e-mail existente e reemissão obedecem PA00, sem conceder tenant no ato da emissão.
+- [x] Respostas e acesso ao segredo não são cacheados/logados nem expostos a identidade comum; erro não declara emissão que não ocorreu nem invalida silenciosamente convite fora da política.
 
 **Dependências:** PA02, PA04. **Rastreio:** C1, C2, C5, C8.
-**Teste focado:** `B test/integration/platform_admin_invitations_http_test.rb`, condicionado.
+**Teste focado:** `B test/integration/platform_admin_invitations_test.rb`.
 **Smoke comportamental:** emitir e obter link como administradora, repetir via chamada direta sem sessão e com membro, e observar estado real após erro/duplicidade.
 
 **Folhas; B depende de A:**
-- **A — Serviço de emissão/acesso:** `apps/backend/app/services/first_access_invitation_store.rb` (**proposto em PA04**); `apps/backend/test/integration/first_access_invitations_test.rb` (**proposto em PA04**); `apps/backend/app/services/identity_store.rb`. Aceite: capacidade administrativa server-side, acesso ao mesmo segredo ativo e reemissão explícita, sem bearer em claro persistido; teste `B test/integration/first_access_invitations_test.rb`; smoke de emissão/recusa no serviço real. **Tamanho M: 3 + rastreio = 4.**
-- **B — Endpoints administrativos:** `apps/backend/app/controllers/platform_admin_invitations_controller.rb` (**novo proposto**); `apps/backend/config/routes.rb`; `apps/backend/test/integration/platform_admin_invitations_http_test.rb` (**novo proposto**). Aceite/teste/smoke: critérios HTTP acima nos endpoints normativos de convites, link ativo, envio e reemissão, usando a guarda/sessão comuns. **Tamanho M: 3 + rastreio = 4.**
+- **A — Serviço de emissão/acesso:** `apps/backend/app/services/first_access_invitation_store.rb`; `apps/backend/test/services/first_access_invitation_store_test.rb`; `apps/backend/app/services/identity_store.rb`. Aceite: capacidade administrativa server-side, acesso ao mesmo segredo ativo e reemissão explícita, sem bearer em claro persistido; teste `B test/services/first_access_invitation_store_test.rb`; smoke de emissão/recusa no serviço real. A integração SQL de PA04 continua no gate agregado. **Tamanho M: 3 + rastreio = 4.**
+- **B — Endpoints administrativos:** `apps/backend/app/controllers/platform_admin_invitations_controller.rb`; `apps/backend/config/routes.rb`; `apps/backend/test/integration/platform_admin_invitations_test.rb`; contrato público no `README.md`. Aceite/teste/smoke: listar, emitir, copiar link ativo e reemitir nos endpoints normativos, usando guarda/sessão comuns; envio SMTP permanece em PA06, conforme ratificação abaixo. **Tamanho M: 4 funcionais + rastreio.**
+
+**Ratificação antes de PA04/PA05:** usar a migration `20261102000001_create_first_access_invitations.rb`, store existente no plano e funções fixas da allowlist IdentityStore. Persistir somente convite ativo (id, e-mail normalizado único, digest, cópia cifrada, emissão/expiração), preparação pendente vinculada e liberação por identidade; nenhum histórico, job, configuração ou infraestrutura nova. O store oferece listar/emitir/link/reemitir/inspecionar/preparar/consultar preparação/consumir. Preparação não cria conta ou sessão; consumo exige sessão comum com TOTP confirmado do mesmo e-mail e grava liberação/elimina convite em uma transação, podendo integrar a transação de conta nova de PA09. PA09 compõe criação de identidade/credencial/sessão e a distinção de e-mail que já lhe pertence; não antecipar o cutover ou afirmar verificação de caixa. Restore usa DELETE protegido das linhas de convite, sem função runtime de manutenção. PA05.A acrescenta teste real do serviço em `test/services/first_access_invitation_store_test.rb`, mantendo no máximo quatro arquivos funcionais; integração SQL pertence a PA04. PA05.B inclui README como quarto funcional, além de controller/routes/teste HTTP. DTOs: listagem `{ invitations: [{ id, email, created_at, expires_at }] }`; emissão/reemissão `201` e metadados, sem segredo; link `200 { link, expires_at }`, com `/primeiro-acesso#token=...`. Somente listar/emitir/link/reemitir são rotas deste grupo; envio SMTP pertence a PA06. Sessão/capacidade são revalidadas no SQL; mutações exigem CSRF/origem/JSON. Leituras recusam origem explicitamente indevida e aceitam origem esperada ou fetch same-origin. Erros seguem 401/403/409/422/404 existentes, sem payload secreto.
+
+**Entrega PA04/PA05 para R05:** persistência e quatro endpoints concluídos. Gate focado `B test/integration/first_access_invitations_test.rb test/services/first_access_invitation_store_test.rb test/integration/platform_admin_invitations_test.rb test/services/verification_mailer_test.rb`: **27 testes, 288 assertions, 0 falhas/erros/skips**. `B` completo em banco vazio: **536 testes, 11.710 assertions, 0 falhas/erros/skips**. HTTP real em runtime de produção não root comprovou senha/TOTP comuns, ausência de tenant administrativo, emissão/cópia/duplicidade/reemissão, negação de acesso, prazo exato e remoção física do segredo expirado; store consumiu convite com sessão MFA da identidade correta e restore protegido preservou essa liberação. `zeitwerk:check` aprovado. O critério compartilhado acima sobre ativação integral de **conta nova** permanece aberto para PA09/C3: não confundir primitivas transacionais comprovadas com o fluxo público ainda previsto. R05 e checkpoint continuam pendentes; nenhuma folha posterior foi liberada.
+
+**Correções do próprio gate:** a indisponibilidade retorna ausência no SQL e vira erro no Ruby após commit, evitando rollback do expurgo. O teste legado `verification_mailer_test.rb` tinha stub global de `Mail::SMTP.new` dependente de ordem, reproduzido com `KeyError(:enable_starttls)`; foi isolado no transporte `Net::SMTP`, preservando TLS, link utilizável e sigilo. Essa correção de um arquivo é independente das folhas funcionais e não altera produção, dependências ou configuração SMTP.
 
 ### Checkpoint — após PA03–PA05
 
