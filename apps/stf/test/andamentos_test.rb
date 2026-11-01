@@ -71,6 +71,14 @@ class AndamentosTest < Minitest::Test
     assert_equal ["https://portal.stf.jus.br/processos/downloadPeca.asp?id=42"], items[1].dig("stf", "links").map { |link| link.fetch("url") }
   end
 
+  def test_textual_urls_preserve_balanced_parentheses_and_original_punctuation
+    results, = fetch(item(date: "05/05/2026", title: "Peça", observation: "Peça https://example.test/documento_(1). Outro (https://example.test/outro)."))
+    assert_equal [
+      { "url" => "https://example.test/documento_(1)", "rotulo" => nil, "referencia_original" => "https://example.test/documento_(1)." },
+      { "url" => "https://example.test/outro", "rotulo" => nil, "referencia_original" => "https://example.test/outro)." }
+    ], results.first.dig("stf", "links")
+  end
+
   def test_optional_fields_and_empty_day
     results, = fetch(item(date: "05/05/2026", title: "Protocolo"))
     assert_nil results.first.dig("stf", "julgador")

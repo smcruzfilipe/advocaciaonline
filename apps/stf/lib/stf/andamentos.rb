@@ -110,12 +110,33 @@ module STF
       item.xpath(".//text()[not(ancestor::a)]").each do |text|
         next if hint?(text) || text.ancestors.any? { |node| %w[script style svg].include?(node.name) }
         text.text.scan(%r{https?://[^\s<>"']+}i).each do |reference|
-          reference = reference.sub(/[.,;:!?\)\]]+\z/, "")
-          url = absolute_url(base, reference)
+          url = absolute_url(base, text_url(reference))
           result << { "url" => url, "rotulo" => nil, "referencia_original" => reference } if url
         end
       end
       result
+    end
+
+    def text_url(reference)
+      finish = reference.bytesize
+      parentheses = reference.count(")") - reference.count("(")
+      brackets = reference.count("]") - reference.count("[")
+      while finish.positive?
+        case reference.getbyte(finish - 1)
+        when 46, 44, 59, 58, 33, 63
+          # Sentence punctuation is not part of the resolved destination.
+        when 41
+          break unless parentheses.positive?
+          parentheses -= 1
+        when 93
+          break unless brackets.positive?
+          brackets -= 1
+        else
+          break
+        end
+        finish -= 1
+      end
+      reference.byteslice(0, finish)
     end
 
     def hint?(node)

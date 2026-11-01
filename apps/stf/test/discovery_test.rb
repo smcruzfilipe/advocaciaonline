@@ -176,11 +176,16 @@ class DiscoveryTest < Minitest::Test
     end
   end
 
-  def test_status_restricted_masked_and_optional_cnj
+  def test_status_restricted_masked
     http = FakeHTTP.new({ ["sim", 1] => page([row(publicity: "Privado", cnj: "***", identification: nil)]) })
     assert_equal :restricted, STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: nil)
-    http = FakeHTTP.new({ ["sim", 1] => page([row(cnj: nil)]) })
-    assert_equal :active, STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: "01882631920261000000")
+  end
+
+  def test_known_cnj_is_not_confirmed_by_missing_or_different_source_cnj
+    [nil, "0000001-00.2026.1.00.0000"].each do |cnj|
+      http = FakeHTTP.new({ ["sim", 1] => page([row(cnj: cnj)]), ["nao", 1] => page([]) })
+      assert_nil STF::Discovery.new(http: http).find_status(name: "Roberto Ferreira da Silva", incidente: 7728350, cnj: "01882631920261000000")
+    end
   end
   def test_status_accepts_public_without_detail_cnj_but_rejects_malformed_present_cnj
     http = FakeHTTP.new({ ["sim", 1] => page([row(publicity: "PUBLICO")]) })
