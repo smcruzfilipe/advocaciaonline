@@ -123,7 +123,7 @@ module Processador
             medium: job.fetch("medium"), before_request: before_request) do |publication|
             lease.check!
             if Matcher.match?(entity_type: job.fetch("entity_type"), criteria: job.fetch("criteria"), publication: publication)
-              matches << (source_path == "fallback" ? Sanitizer.publication(publication) : publication)
+              matches << (source_path == "fallback" ? Sanitizer.publication(publication) : Sanitizer.presentation(publication))
             end
           end
           lease.check!
