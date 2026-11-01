@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { navigateAfterIdentityChange } from "@/lib/identity-navigation";
 import { destination, useSession } from "@/components/session-provider";
+import { AlertBanner } from "@/components/ui";
 
 export default function InvitationPage() {
   const {
@@ -89,32 +90,25 @@ export default function InvitationPage() {
 
   return (
     <section
-      className="page access-wide stack"
+      className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-16 text-sm sm:px-0"
       aria-busy={loading || Boolean(working)}
     >
-      <header className="stack">
-        <span className="eyebrow">Acesso de equipe</span>
-        <h1>Convite para a equipe</h1>
-        <p className="muted">
+      <header>
+        <h1 className="mb-2 font-headings text-2xl font-semibold text-foreground">
+          Você foi convidado
+        </h1>
+        <p className="text-sm text-muted-foreground">
           O acesso só será concedido após o aceite com a conta do e-mail
           convidado.
         </p>
       </header>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p className="notice" role="status">
-          {message}
-        </p>
-      )}
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
+      {message && <AlertBanner variant="success">{message}</AlertBanner>}
       {loading ? (
         <p role="status">Consultando o convite e sua sessão…</p>
       ) : !pendingInvitation ? (
-        <div className="panel stack">
-          <h2>Nenhum convite aberto</h2>
+        <div className="flex flex-col gap-4 border border-border p-5">
+          <h2 className="font-medium">Nenhum convite aberto</h2>
           <p>
             Abra o link recebido por e-mail. Se você já o abriu há mais de dez
             minutos, abra-o novamente: a cópia temporária deste navegador é
@@ -125,7 +119,7 @@ export default function InvitationPage() {
             solicite um novo convite ao titular.
           </p>
           <Link
-            className="button-secondary"
+            className="border border-border bg-background px-4 py-2 text-center text-sm font-medium"
             href={session ? destination(session) : "/login"}
           >
             {session?.authenticated
@@ -134,14 +128,17 @@ export default function InvitationPage() {
           </Link>
         </div>
       ) : invitationMismatch ? (
-        <div className="panel stack" role="alert">
-          <h2>O convite aberto nesta aba mudou</h2>
+        <div
+          className="flex flex-col gap-4 border border-error bg-error-bg p-5"
+          role="alert"
+        >
+          <h2 className="font-medium">O convite aberto nesta aba mudou</h2>
           <p>
             Outro convite foi aberto em outra aba. Para não aceitar o ambiente
             errado, abra novamente o link original nesta aba.
           </p>
           <button
-            className="button-secondary"
+            className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
             type="button"
             disabled={Boolean(working)}
             onClick={() => void discard()}
@@ -150,8 +147,8 @@ export default function InvitationPage() {
           </button>
         </div>
       ) : (
-        <div className="panel stack">
-          <h2>
+        <div className="flex flex-col gap-4 border border-border p-5">
+          <h2 className="font-medium">
             {session?.authenticated
               ? "Confirme o aceite"
               : "Entre para aceitar o convite"}
@@ -167,9 +164,9 @@ export default function InvitationPage() {
                 servidor verificará a conta, o prazo e a disponibilidade da
                 credencial.
               </p>
-              <div className="row">
+              <div className="flex flex-col gap-3 border-t border-border pt-4">
                 <button
-                  className="button"
+                  className="w-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
                   type="button"
                   disabled={Boolean(working)}
                   onClick={() => void accept()}
@@ -179,7 +176,7 @@ export default function InvitationPage() {
                     : "Aceitar convite e entrar na equipe"}
                 </button>
                 <button
-                  className="button-secondary"
+                  className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
                   type="button"
                   disabled={Boolean(working)}
                   onClick={() => void changeAccount()}
@@ -191,12 +188,15 @@ export default function InvitationPage() {
               </div>
             </>
           ) : (
-            <Link className="button" href="/login">
+            <Link
+              className="w-full bg-primary px-4 py-3 text-center text-sm font-medium text-primary-foreground"
+              href="/login"
+            >
               Entrar ou criar conta
             </Link>
           )}
           <button
-            className="button-secondary"
+            className="text-xs text-muted-foreground underline disabled:opacity-50"
             type="button"
             disabled={Boolean(working)}
             onClick={() => void discard()}
@@ -207,7 +207,7 @@ export default function InvitationPage() {
           </button>
         </div>
       )}
-      <p className="muted small">
+      <p className="text-xs text-muted-foreground">
         Aceitar o convite não reinicia a validade da credencial de equipe.
         Vencimento e revogação são aplicados pelo servidor em cada operação.
       </p>

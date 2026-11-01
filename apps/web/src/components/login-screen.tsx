@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { destination, useSession } from "@/components/session-provider";
 import { authRequest } from "@/lib/api";
+import { AlertBanner } from "@/components/ui";
 
 type Challenge =
   | { next: "totp" }
@@ -103,47 +104,49 @@ export function LoginScreen() {
   }
 
   return (
-    <section className="page access-page stack" aria-busy={loading || working}>
-      <header className="stack">
-        <span className="eyebrow">Acesso seguro</span>
-        <h1>
+    <section
+      className="mx-auto flex w-full max-w-sm flex-col gap-6 px-4 py-20 sm:px-0"
+      aria-busy={loading || working}
+    >
+      <header>
+        <h1 className="mb-2 font-headings text-2xl font-semibold text-foreground">
           {challenge
             ? "Confirme seu acesso"
             : mode === "register"
               ? "Crie sua conta"
-              : "Entre na sua conta"}
+              : "Entrar"}
         </h1>
-        <p className="muted">
-          Acesse seus monitoramentos, comunicações e equipe com e-mail, senha e
-          autenticador.
+        <p className="text-sm text-muted-foreground">
+          Acesse sua conta com e-mail, senha e autenticador para continuar.
         </p>
       </header>
       {pendingInvitation && (
-        <div className="notice stack">
+        <div className="flex flex-col gap-2 border border-info bg-info-bg p-4 text-sm text-info">
           <strong>Você tem um convite de equipe.</strong>
           <p>Entre ou crie uma conta com o e-mail convidado para continuar.</p>
-          <Link href="/convite">Ver convite</Link>
+          <Link className="underline" href="/convite">
+            Ver convite
+          </Link>
         </div>
       )}
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
       {loading || session?.authenticated ? (
         <p role="status">
           {loading ? "Consultando sua sessão…" : "Abrindo seu ambiente…"}
         </p>
       ) : registered ? (
-        <div className="panel stack" role="status">
-          <h2>Confira seu e-mail</h2>
+        <div
+          className="flex flex-col gap-4 border border-border p-6 text-sm"
+          role="status"
+        >
+          <h2 className="font-semibold">Confira seu e-mail</h2>
           <p>
             Se o endereço puder ser cadastrado, você receberá um link de
             confirmação. Abra o link neste mesmo navegador e confirme seu e-mail
             antes de entrar.
           </p>
           <button
-            className="button"
+            className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
             type="button"
             onClick={() => switchMode("login")}
           >
@@ -151,10 +154,13 @@ export function LoginScreen() {
           </button>
         </div>
       ) : challenge ? (
-        <form className="stack" onSubmit={submitCode}>
+        <form
+          className="flex flex-col gap-4 border border-border p-6 text-sm [&_input]:w-full [&_input]:border [&_input]:border-border [&_input]:bg-input [&_input]:px-3 [&_input]:py-2"
+          onSubmit={submitCode}
+        >
           {challenge.next === "totp_setup" ? (
-            <div className="notice stack">
-              <h2>Configure seu autenticador</h2>
+            <div className="flex flex-col gap-3 border border-info bg-info-bg p-4 text-info">
+              <h2 className="font-semibold">Configure seu autenticador</h2>
               <p>
                 Adicione uma conta no aplicativo autenticador usando a chave
                 abaixo. Em seguida, informe o código de seis dígitos gerado pelo
@@ -162,14 +168,17 @@ export function LoginScreen() {
               </p>
               <p>
                 <strong>Chave de configuração:</strong>{" "}
-                <span className="identifier">{challenge.secret}</span>
+                <span className="break-all font-mono">{challenge.secret}</span>
               </p>
               <p>Guarde esta chave em local seguro e não a compartilhe.</p>
             </div>
           ) : (
             <p>Informe o código atual do seu aplicativo autenticador.</p>
           )}
-          <label className="field" htmlFor="totp-code">
+          <label
+            className="flex flex-col gap-1.5 text-sm font-medium"
+            htmlFor="totp-code"
+          >
             Código do autenticador
             <input
               id="totp-code"
@@ -185,25 +194,35 @@ export function LoginScreen() {
               onChange={(event) => setCode(event.target.value)}
             />
           </label>
-          <button className="button" type="submit" disabled={working}>
+          <button
+            className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            type="submit"
+            disabled={working}
+          >
             {working ? "Validando…" : "Validar e entrar"}
           </button>
           <button
-            className="button-secondary"
+            className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
             type="button"
             disabled={working}
             onClick={() => switchMode("login")}
           >
             Voltar ao login
           </button>
-          <p className="muted small">
+          <p className="text-xs text-muted-foreground">
             Se o desafio expirar ou você atualizar a página, entre novamente com
             seu e-mail e senha.
           </p>
         </form>
       ) : (
-        <form className="stack" onSubmit={submitCredentials}>
-          <label className="field" htmlFor="access-email">
+        <form
+          className="flex flex-col gap-4 border border-border p-6 [&_input]:w-full [&_input]:border [&_input]:border-border [&_input]:bg-input [&_input]:px-3 [&_input]:py-2 [&_input]:text-sm"
+          onSubmit={submitCredentials}
+        >
+          <label
+            className="flex flex-col gap-1.5 text-sm font-medium"
+            htmlFor="access-email"
+          >
             E-mail
             <input
               id="access-email"
@@ -216,7 +235,10 @@ export function LoginScreen() {
               onChange={(event) => setEmail(event.target.value)}
             />
           </label>
-          <label className="field" htmlFor="access-password">
+          <label
+            className="flex flex-col gap-1.5 text-sm font-medium"
+            htmlFor="access-password"
+          >
             Senha
             <input
               id="access-password"
@@ -237,10 +259,13 @@ export function LoginScreen() {
           </label>
           {mode === "register" && (
             <>
-              <p id="password-help" className="muted small">
+              <p id="password-help" className="text-xs text-muted-foreground">
                 A senha deve ter de 12 a 128 caracteres.
               </p>
-              <label className="field" htmlFor="confirm-password">
+              <label
+                className="flex flex-col gap-1.5 text-sm font-medium"
+                htmlFor="confirm-password"
+              >
                 Confirme a senha
                 <input
                   id="confirm-password"
@@ -256,7 +281,11 @@ export function LoginScreen() {
               </label>
             </>
           )}
-          <button className="button" type="submit" disabled={working}>
+          <button
+            className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            type="submit"
+            disabled={working}
+          >
             {working
               ? "Enviando…"
               : mode === "register"
@@ -264,10 +293,15 @@ export function LoginScreen() {
                 : "Continuar"}
           </button>
           {mode === "login" && (
-            <Link href="/reset-password">Esqueci minha senha</Link>
+            <Link
+              className="text-center text-xs text-accent underline"
+              href="/reset-password"
+            >
+              Esqueci minha senha
+            </Link>
           )}
           <button
-            className="button-secondary"
+            className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
             type="button"
             disabled={working}
             onClick={() => switchMode(mode === "login" ? "register" : "login")}
@@ -276,8 +310,8 @@ export function LoginScreen() {
           </button>
         </form>
       )}
-      <div className="access-note">
-        <h2>Primeiro acesso?</h2>
+      <div className="flex flex-col gap-1 text-center text-xs text-muted-foreground">
+        <h2 className="font-medium">Primeiro acesso?</h2>
         <p>
           Confirme seu e-mail e configure o autenticador. Depois você poderá
           cadastrar seu perfil profissional ou aceitar um convite válido.

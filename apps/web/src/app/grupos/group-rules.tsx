@@ -11,7 +11,7 @@ import {
   type Court,
   type GroupRule,
 } from "./types";
-import styles from "../equipe/admin.module.css";
+import { Badge } from "@/components/ui";
 
 export default function GroupRules({
   group,
@@ -79,14 +79,19 @@ export default function GroupRules({
 
   return (
     <section
-      className="panel stack"
+      className="border border-border mb-6 p-5 flex flex-col gap-4 text-sm"
       aria-labelledby="rules-heading"
       aria-busy={removing !== null}
     >
-      <div className={styles.header}>
-        <h2 id="rules-heading">Regras de autorização</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2
+          id="rules-heading"
+          className="text-base font-semibold font-headings"
+        >
+          Regras de autorização
+        </h2>
         <button
-          className="button-secondary"
+          className="border border-border px-3 py-1.5 text-sm disabled:opacity-50"
           type="button"
           disabled={disabled}
           onClick={onReloadCatalogs}
@@ -95,7 +100,10 @@ export default function GroupRules({
         </button>
       </div>
       {message && (
-        <p className="notice" role="status">
+        <p
+          className="border border-success bg-success-bg p-3 text-sm"
+          role="status"
+        >
           {message}
         </p>
       )}
@@ -104,7 +112,7 @@ export default function GroupRules({
         <ErrorNotice error={operationsError} onRetry={onReloadCatalogs} />
       )}
       {courtsError != null && (
-        <div className="notice stack">
+        <div className="border border-border bg-input p-3 flex flex-col gap-3">
           <p>
             Regras de escopo geral continuam disponíveis. Para escolher um
             tribunal específico, é necessário carregar o catálogo real.
@@ -119,17 +127,22 @@ export default function GroupRules({
           se soma.
         </p>
       ) : (
-        <ul className={styles.list}>
-          {group.rules.map((rule) => (
-            <li className={`${styles.item} stack`} key={rule.id}>
-              <div className={styles.header}>
-                <div className="stack">
-                  <h3>{operationLabel(rule.operation)}</h3>
-                  <p>
-                    <strong>
-                      {rule.effect === "allow" ? "Permitir" : "Negar"}
-                    </strong>{" "}
-                    ·{" "}
+        <ul className="border border-border flex flex-col">
+          {group.rules.map((rule, index) => (
+            <li
+              className={`border-b border-border last:border-b-0 px-5 py-3 flex flex-col gap-3 ${index % 2 ? "bg-table-row-alt" : "bg-background"}`}
+              key={rule.id}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-medium">
+                    {operationLabel(rule.operation)}
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <Badge
+                      label={rule.effect === "allow" ? "Permitida" : "Negada"}
+                      variant={rule.effect === "allow" ? "active" : "error"}
+                    />
                     {rule.court ??
                       (operations?.find(
                         (entry) => entry.operation === rule.operation,
@@ -137,12 +150,14 @@ export default function GroupRules({
                       rule.operation === "consultar_comunicacoes"
                         ? "Todos os tribunais"
                         : "Ambiente do advogado")}
-                  </p>
-                  <code className={styles.code}>{rule.operation}</code>
+                  </div>
+                  <code className="text-xs text-muted-foreground break-all">
+                    {rule.operation}
+                  </code>
                 </div>
-                <div className="row">
+                <div className="flex flex-wrap gap-2">
                   <button
-                    className="button-secondary"
+                    className="border border-border px-3 py-1.5 text-sm disabled:opacity-50"
                     type="button"
                     disabled={disabled || operations === null}
                     onClick={() => {
@@ -153,7 +168,7 @@ export default function GroupRules({
                     Editar regra
                   </button>
                   <button
-                    className="button-secondary"
+                    className="border border-border px-3 py-1.5 text-sm disabled:opacity-50"
                     type="button"
                     disabled={disabled}
                     onClick={() => {
@@ -165,7 +180,7 @@ export default function GroupRules({
                 </div>
               </div>
               {editing === rule.id && operations && (
-                <div className={styles.confirm}>
+                <div className="border border-border bg-input p-4">
                   <RuleForm
                     key={rule.id}
                     groupId={group.id}
@@ -184,9 +199,9 @@ export default function GroupRules({
           ))}
         </ul>
       )}
-      <h3>Adicionar regra</h3>
+      <h3 className="text-sm font-medium">Adicionar regra</h3>
       {operations === null ? (
-        <p className="muted">
+        <p className="text-xs text-muted-foreground">
           O catálogo de operações precisa estar disponível para criar ou editar
           regras.
         </p>
@@ -200,27 +215,6 @@ export default function GroupRules({
           onSaved={saved}
           onBusyChange={onBusyChange}
         />
-      )}
-      {operations && (
-        <details>
-          <summary>Operações do catálogo ({operations.length})</summary>
-          <ul>
-            {operations.map((entry) => (
-              <li key={entry.operation}>
-                <strong>{operationLabel(entry.operation)}</strong> ·{" "}
-                {entry.scope === "court"
-                  ? "escopo de tribunal"
-                  : "escopo do ambiente"}
-                <br />
-                <code className={styles.code}>{entry.operation}</code>
-              </li>
-            ))}
-          </ul>
-          <p className="muted">
-            Somente as operações retornadas pelo servidor estão disponíveis para
-            regras. A administração de equipe e grupos não é delegável.
-          </p>
-        </details>
       )}
     </section>
   );

@@ -12,9 +12,16 @@ export default function HomePage() {
       router.replace(destination(session, pendingInvitation));
   }, [loading, pendingInvitation, router, session]);
   return (
-    <section className="page access-page stack" aria-busy="true">
-      <h1>Seu ambiente jurídico</h1>
-      <p role="status">Preparando seu acesso…</p>
+    <section
+      className="mx-auto max-w-sm px-4 py-20 flex flex-col gap-6"
+      aria-busy="true"
+    >
+      <h1 className="text-2xl font-semibold font-headings">
+        Central de Processos
+      </h1>
+      <p className="text-sm text-muted-foreground" role="status">
+        Preparando seu acesso…
+      </p>
     </section>
   );
 }

@@ -87,7 +87,7 @@ O escopo desta branch é o backend: as interfaces e a aprovação dos checkpoint
 
 #### Branch frontend-web — implementação da interface
 
-**Escopo:** implementar em `apps/web/` as telas de identidade, monitoramentos, consulta, dashboard, equipe, grupos e histórico operacional de [SPEC-web.md](../apps/web/SPEC-web.md), integradas à API existente. A exportação Banani é referência visual; regras aprovadas e o design system prevalecem sobre dados ou controles ilustrativos.
+**Escopo:** implementar em `apps/web/` as telas de identidade, monitoramentos, consulta, dashboard, equipe, grupos e histórico operacional de [SPEC-web.md](../apps/web/SPEC-web.md), integradas à API existente. Na refatoração `refactor/frontend`, a exportação `docs/banani/byZqYk7YE568/` é o contrato visual vigente; o solicitante aprovou sua integração com dados/estados reais e a preservação de senha/TOTP, sem alterar o backend. O [design system](../docs/design-system.md) registra as adaptações funcionais.
 
 1. **Base e identidade:** Next.js App Router, TypeScript e npm com dependências fixadas; manter sessão, cookies seguros, Origin e CSRF da API Rails. O acesso atual usa senha e TOTP obrigatórios, com verificação prévia do e-mail. Aceite de convite deve preservar o fragmento sem expor segredo.
 2. **Fatias independentes:** monitoramentos de advogado, partes e processos; consulta/dashboard e histórico; equipe e grupos. Todas usam o mesmo cliente HTTP, respostas reais e estados de erro, sem dados fictícios, cache compartilhado, editais ou funcionalidades de agenda.

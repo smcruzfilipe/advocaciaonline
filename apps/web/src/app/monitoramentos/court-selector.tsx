@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import type { CourtCatalog } from "./monitoring";
 import { RequestError } from "./request-error";
-import styles from "./monitoramentos.module.css";
+import { AlertBanner, Btn } from "@/components/ui";
 
 export type CourtMode = "keep" | "all" | "selected";
 
@@ -50,19 +50,22 @@ export function CourtSelector({
 
   return (
     <fieldset
-      className={styles.fieldset}
+      className="min-w-0 flex flex-col gap-2"
       disabled={disabled}
       aria-describedby={`${id}-help${error ? ` ${id}-error` : ""}`}
       aria-invalid={Boolean(error)}
     >
-      <legend>Tribunais</legend>
-      <p id={`${id}-help`} className={styles.help}>
+      <legend className="mb-1 text-sm font-medium text-foreground">
+        Tribunais
+      </legend>
+      <p id={`${id}-help`} className="mb-2 text-xs text-muted-foreground">
         Todos abrange os tribunais disponibilizados pela fonte. Uma seleção
         específica exige ao menos um tribunal do catálogo real.
       </p>
       {editing && (
-        <label className={styles.choice}>
+        <label className="flex items-start gap-3 text-sm cursor-pointer">
           <input
+            className="mt-0.5 size-4 shrink-0 accent-foreground"
             type="radio"
             name={`${id}-mode`}
             value="keep"
@@ -79,8 +82,9 @@ export function CourtSelector({
           </span>
         </label>
       )}
-      <label className={styles.choice}>
+      <label className="flex items-start gap-3 text-sm cursor-pointer">
         <input
+          className="mt-0.5 size-4 shrink-0 accent-foreground"
           type="radio"
           name={`${id}-mode`}
           value="all"
@@ -89,8 +93,9 @@ export function CourtSelector({
         />
         <span>Todos os tribunais disponíveis</span>
       </label>
-      <label className={styles.choice}>
+      <label className="flex items-start gap-3 text-sm cursor-pointer">
         <input
+          className="mt-0.5 size-4 shrink-0 accent-foreground"
           type="radio"
           name={`${id}-mode`}
           value="selected"
@@ -100,7 +105,7 @@ export function CourtSelector({
         <span>Selecionar tribunais específicos</span>
       </label>
       {mode === "selected" && (
-        <div className="stack" aria-busy={loading}>
+        <div className="mt-2 flex flex-col gap-2 text-sm" aria-busy={loading}>
           {loading && <p role="status">Carregando catálogo de tribunais…</p>}
           {catalogError && (
             <RequestError
@@ -111,18 +116,19 @@ export function CourtSelector({
           )}
           {catalog && (
             <>
-              <div className="field">
-                <label htmlFor={`${id}-search`}>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium" htmlFor={`${id}-search`}>
                   Buscar tribunal no catálogo
                 </label>
                 <input
+                  className="w-full border border-border bg-input px-3 py-2 text-sm text-foreground"
                   id={`${id}-search`}
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
               </div>
-              <p className={styles.help}>
+              <p className="text-xs text-muted-foreground">
                 {selected.length} tribunal(is) na nova seleção.
               </p>
               {catalog.courts.length === 0 ? (
@@ -133,10 +139,14 @@ export function CourtSelector({
               ) : courts?.length === 0 ? (
                 <p>Nenhum tribunal corresponde à busca.</p>
               ) : (
-                <div className={styles.catalog}>
+                <div className="max-h-80 overflow-y-auto flex flex-col gap-2">
                   {courts?.map((court) => (
-                    <label className={styles.choice} key={court.code}>
+                    <label
+                      className={`flex items-center gap-3 px-3 py-2.5 border cursor-pointer ${selected.includes(court.code) ? "border-foreground bg-secondary" : "border-border bg-background"}`}
+                      key={court.code}
+                    >
                       <input
+                        className="size-4 shrink-0 accent-foreground"
                         type="checkbox"
                         checked={selected.includes(court.code)}
                         onChange={(event) =>
@@ -155,7 +165,7 @@ export function CourtSelector({
                 </div>
               )}
               {unavailable.length > 0 && (
-                <div className="notice stack">
+                <AlertBanner variant="warning">
                   <p>
                     Os códigos abaixo estavam salvos, mas não constam no
                     catálogo atual. Eles não serão substituídos por todos os
@@ -163,10 +173,14 @@ export function CourtSelector({
                     seleção.
                   </p>
                   {unavailable.map((code) => (
-                    <div className={styles.actions} key={code}>
+                    <div
+                      className="mt-2 flex flex-wrap items-center gap-3"
+                      key={code}
+                    >
                       <span>{code} — indisponível no catálogo atual</span>
-                      <button
-                        className="button-secondary"
+                      <Btn
+                        variant="secondary"
+                        size="sm"
                         type="button"
                         onClick={() =>
                           onSelectionChange(
@@ -177,17 +191,17 @@ export function CourtSelector({
                         }
                       >
                         Remover {code} da nova seleção
-                      </button>
+                      </Btn>
                     </div>
                   ))}
-                </div>
+                </AlertBanner>
               )}
             </>
           )}
         </div>
       )}
       {mode !== "selected" && catalogError && (
-        <p className={styles.help}>
+        <p className="text-xs text-muted-foreground">
           O catálogo não pôde ser consultado.{" "}
           {mode === "keep"
             ? "O filtro salvo será preservado."
@@ -196,7 +210,7 @@ export function CourtSelector({
         </p>
       )}
       {error && (
-        <span id={`${id}-error`} className={styles.fieldError}>
+        <span id={`${id}-error`} className="text-xs text-error" role="alert">
           {error}
         </span>
       )}

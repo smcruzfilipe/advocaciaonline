@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertBanner } from "@/components/ui";
 import {
   EntityReference,
   entityLabel,
@@ -18,12 +19,14 @@ export function RunEvents({ runId }: { runId: string }) {
 
   return (
     <section className={styles.section} aria-labelledby="run-events">
-      <h2 id="run-events">Marcos do Escrevente</h2>
-      <p className="notice">
+      <h2 id="run-events" className="text-sm font-medium">
+        Marcos do Escrevente
+      </h2>
+      <AlertBanner variant="info">
         Os marcos de início e término são imutáveis e não podem ser editados ou
         excluídos. Ausência de término não permite inferir falha. O Escrevente
         não apresenta erros técnicos nem conteúdo de comunicações.
-      </p>
+      </AlertBanner>
       {state.status !== "ready" ? (
         <ReadFeedback
           state={state}
@@ -32,7 +35,7 @@ export function RunEvents({ runId }: { runId: string }) {
           ownerOnly
         />
       ) : state.data.events.length === 0 ? (
-        <p className="panel" role="status">
+        <p className="border border-border bg-input p-5 text-sm" role="status">
           Nenhum marco registrado para esta execução. Não há início, término ou
           sucesso a presumir.
         </p>
@@ -41,14 +44,17 @@ export function RunEvents({ runId }: { runId: string }) {
           {state.data.events.map((event) => (
             <li className={styles.item} key={event.id}>
               <div className={styles.header}>
-                <h3>
+                <h3 className="text-sm font-medium">
                   {event.event_type === "started"
                     ? "Início do processamento"
                     : event.event_type === "completed"
                       ? "Término bem-sucedido confirmado"
                       : event.event_type}
                 </h3>
-                <time dateTime={event.recorded_at}>
+                <time
+                  className="text-xs text-muted-foreground"
+                  dateTime={event.recorded_at}
+                >
                   {formatInstant(event.recorded_at)} (Brasília)
                 </time>
               </div>

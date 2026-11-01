@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { ApiError, authRequest } from "@/lib/api";
+import { AlertBanner } from "@/components/ui";
 
 type Props = {
   token: string;
@@ -67,16 +68,20 @@ export function PasswordResetConfirmation({
   }
 
   return (
-    <form className="stack" onSubmit={submit} aria-busy={working}>
+    <form
+      className="flex flex-col gap-4 border border-border p-6 text-sm"
+      onSubmit={submit}
+      aria-busy={working}
+    >
       <p>Escolha uma nova senha para sua conta.</p>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      <label className="field" htmlFor="reset-password">
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
+      <label
+        className="flex flex-col gap-1.5 text-sm font-medium"
+        htmlFor="reset-password"
+      >
         Nova senha
         <input
+          className="w-full border border-border bg-input px-3 py-2 text-sm"
           id="reset-password"
           name="password"
           type="password"
@@ -90,12 +95,16 @@ export function PasswordResetConfirmation({
           aria-describedby="reset-password-help"
         />
       </label>
-      <p id="reset-password-help" className="muted small">
+      <p id="reset-password-help" className="text-xs text-muted-foreground">
         A senha deve ter de 12 a 128 caracteres.
       </p>
-      <label className="field" htmlFor="reset-password-confirmation">
+      <label
+        className="flex flex-col gap-1.5 text-sm font-medium"
+        htmlFor="reset-password-confirmation"
+      >
         Confirme a nova senha
         <input
+          className="w-full border border-border bg-input px-3 py-2 text-sm"
           id="reset-password-confirmation"
           name="confirmation"
           type="password"
@@ -108,7 +117,11 @@ export function PasswordResetConfirmation({
           onChange={(event) => setConfirmation(event.target.value)}
         />
       </label>
-      <button className="button" type="submit" disabled={working}>
+      <button
+        className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        type="submit"
+        disabled={working}
+      >
         {working ? "Alterando senha…" : "Salvar nova senha"}
       </button>
     </form>

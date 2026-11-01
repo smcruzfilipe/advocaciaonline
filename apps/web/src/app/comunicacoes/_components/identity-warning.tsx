@@ -1,3 +1,4 @@
+import { AlertBanner } from "@/components/ui";
 import type { Communication } from "../types";
 
 export function IdentityWarning({
@@ -12,10 +13,10 @@ export function IdentityWarning({
     return null;
 
   return (
-    <div className="notice">
+    <AlertBanner variant="warning">
       <strong>Identidade pendente — possível duplicidade.</strong> A fonte não
       forneceu uma combinação válida de identificador e hash. Esta comunicação
-      permanece separada e não compõe as métricas da dashboard.
-    </div>
+      permanece separada e não compõe as métricas do painel.
+    </AlertBanner>
   );
 }

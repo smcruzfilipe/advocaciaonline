@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useSession } from "@/components/session-provider";
 import {
+  Badge,
+  EmptyState,
+  Icon,
+  PageShell,
+  SectionHeader,
+} from "@/components/ui";
+import {
   courtDescription,
   monitoringConfig,
   monitoringName,
@@ -16,7 +23,6 @@ import type {
 } from "./monitoring";
 import { RequestError } from "./request-error";
 import { useRemote } from "./use-remote";
-import styles from "./monitoramentos.module.css";
 
 function OwnerOffice() {
   const profile = useRemote<{ profile: { office_name: string | null } }>(
@@ -27,9 +33,8 @@ function OwnerOffice() {
   if (profile.error)
     return <RequestError error={profile.error} onRetry={profile.reload} />;
   return (
-    <p>
-      <span className="muted">Escritório: </span>
-      {profile.data?.profile.office_name || "Não informado"}
+    <p className="text-xs text-muted-foreground">
+      Escritório: {profile.data?.profile.office_name || "Não informado"}
     </p>
   );
 }
@@ -39,21 +44,19 @@ function LawyerProfile() {
   const { session } = useSession();
   return (
     <section
-      className={styles.section}
-      aria-labelledby="lawyer-monitoring-title"
+      className="mb-8"
+      aria-label="Dados do advogado"
       aria-busy={profile.loading}
     >
-      <div className={styles.header}>
-        <div>
-          <h2 id="lawyer-monitoring-title">Advogado monitorado</h2>
-          <p className="muted">
-            Dados do perfil profissional do vínculo atual, sem um cadastro de
-            monitoramento separado.
-          </p>
-        </div>
-      </div>
+      <SectionHeader
+        title="Dados do advogado"
+        subtitle="Informações do seu perfil usadas no monitoramento automático."
+      />
       {profile.loading && (
-        <p className="panel" role="status">
+        <p
+          className="border border-border p-5 text-sm text-muted-foreground"
+          role="status"
+        >
           Carregando perfil do advogado…
         </p>
       )}
@@ -61,23 +64,27 @@ function LawyerProfile() {
         <RequestError error={profile.error} onRetry={profile.reload} />
       )}
       {profile.data && (
-        <div className="panel stack">
-          <strong>{profile.data.full_name}</strong>
-          {session?.role === "owner" && <OwnerOffice />}
+        <div className="border border-border p-5 flex flex-col gap-3">
           <div>
-            <span className="muted">Inscrições OAB do perfil</span>
-            <ul className={styles.oabs}>
+            <p className="text-sm font-medium text-foreground">
+              {profile.data.full_name}
+            </p>
+            <ul
+              aria-label="Inscrições OAB do perfil"
+              className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground"
+            >
               {profile.data.oabs.map((oab) => (
                 <li
                   key={`${oab.uf}:${oab.number}`}
-                  className={styles.identifier}
+                  className="break-all tabular-nums"
                 >
                   OAB/{oab.uf} {oab.number}
                 </li>
               ))}
             </ul>
           </div>
-          <p className={styles.help}>
+          {session?.role === "owner" && <OwnerOffice />}
+          <p className="text-xs text-muted-foreground border-t border-border pt-3">
             O acompanhamento usa o nome completo ou uma das inscrições OAB do
             perfil. Número e sufixos da inscrição são mantidos como texto.
           </p>
@@ -101,73 +108,91 @@ function MonitoringList({
   reload: () => void;
 }) {
   const config = monitoringConfig[kind];
-  const headingId = `${kind}-monitoring-title`;
   return (
     <section
-      className={styles.section}
-      aria-labelledby={headingId}
+      className="mb-8"
+      aria-label={
+        kind === "party" ? "Partes monitoradas" : "Processos monitorados"
+      }
       aria-busy={loading}
     >
-      <div className={styles.header}>
-        <div>
-          <h2 id={headingId}>
-            {kind === "party" ? "Partes monitoradas" : "Processos monitorados"}
-          </h2>
-          <p className="muted">
-            {kind === "party"
-              ? "Nomes completos de pessoas e empresas a acompanhar."
-              : "Processos identificados pelo número CNJ, incluindo os zeros iniciais."}
-          </p>
-        </div>
-        <Link className="button" href={config.newPath}>
-          {kind === "party" ? "Nova parte" : "Novo processo"}
-        </Link>
-      </div>
+      <SectionHeader
+        title={
+          kind === "party" ? "Partes monitoradas" : "Processos monitorados"
+        }
+        subtitle={
+          kind === "party"
+            ? "Nomes de pessoas ou empresas a acompanhar nas publicações."
+            : "Números CNJ de processos a acompanhar."
+        }
+        action={
+          <Link
+            className="inline-flex items-center justify-center gap-2 border border-primary bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            href={config.newPath}
+          >
+            <Icon i="plus" size={13} />
+            {kind === "party" ? "Nova parte" : "Novo processo"}
+          </Link>
+        }
+      />
       {loading && (
-        <p className="panel" role="status">
+        <p
+          className="border border-border p-5 text-sm text-muted-foreground"
+          role="status"
+        >
           Carregando {kind === "party" ? "partes" : "processos"}…
         </p>
       )}
       {error && <RequestError error={error} onRetry={reload} />}
       {error && (
-        <p className={styles.help}>
+        <p className="mt-2 text-xs text-muted-foreground">
           Permissões de leitura e cadastro são independentes. O cadastro
           continua disponível e o servidor autoriza cada operação.
         </p>
       )}
-      {records && records.length === 0 && (
-        <div className="panel stack">
-          <strong>
-            {kind === "party"
+      {records?.length === 0 && (
+        <EmptyState
+          icon={kind === "party" ? "users" : "folder"}
+          title={
+            kind === "party"
               ? "Nenhuma parte cadastrada"
-              : "Nenhum processo cadastrado"}
-          </strong>
-          <p>
-            {kind === "party"
+              : "Nenhum processo cadastrado"
+          }
+          description={
+            kind === "party"
               ? "Cadastre uma parte pelo nome completo para acompanhar publicações correspondentes."
-              : "Cadastre um processo pelo número CNJ para acompanhar suas publicações."}
-          </p>
-        </div>
+              : "Cadastre um processo pelo número CNJ para acompanhar suas publicações."
+          }
+        />
       )}
       {records && records.length > 0 && (
-        <ul className={styles.list}>
+        <ul className="border border-border flex flex-col">
           {records.map((record) => (
-            <li className={styles.item} key={record.id}>
-              <div>
-                <strong className={styles.identifier}>
+            <li
+              className="border-b last:border-b-0 border-border px-5 py-3.5 flex items-center justify-between gap-4"
+              key={record.id}
+            >
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <span className="text-sm text-foreground font-medium break-words tabular-nums">
                   {monitoringName(record)}
-                </strong>
-                <p className="muted">{courtDescription(record.courts)}</p>
+                </span>
+                <span className="text-xs text-muted-foreground break-words">
+                  {courtDescription(record.courts)}
+                </span>
               </div>
-              <span className={styles.status}>
-                {record.active ? "Ativo" : "Desativado"}
-              </span>
-              <Link
-                href={`${config.path}/${encodeURIComponent(record.id)}`}
-                aria-label={`Ver detalhes de ${monitoringName(record)}`}
-              >
-                Ver detalhes e editar
-              </Link>
+              <div className="flex flex-wrap items-center justify-end gap-3 shrink-0">
+                <Badge
+                  label={record.active ? "Ativo" : "Inativo"}
+                  variant={record.active ? "active" : "inactive"}
+                />
+                <Link
+                  className="text-xs text-accent underline"
+                  href={`${config.path}/${encodeURIComponent(record.id)}`}
+                  aria-label={`Ver detalhes de ${monitoringName(record)}`}
+                >
+                  detalhe
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
@@ -184,20 +209,16 @@ export default function MonitoramentosPage() {
     "/api/monitorings/processes",
   );
   return (
-    <div className={`page ${styles.page}`}>
-      <header className={styles.header}>
-        <div>
-          <h1>Monitoramentos</h1>
-          <p className="muted">
-            Gerencie o advogado, as partes e os processos usados no
-            acompanhamento de publicações.
-          </p>
-        </div>
-        <nav className={styles.actions} aria-label="Consulta de publicações">
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/comunicacoes">Comunicações</Link>
-        </nav>
-      </header>
+    <PageShell maxWidth="max-w-4xl">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold font-headings text-foreground">
+          Monitoramentos
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Gerencie os dados usados para rastrear publicações: dados do advogado,
+          partes e processos.
+        </p>
+      </div>
       <LawyerProfile />
       <MonitoringList
         kind="party"
@@ -213,6 +234,6 @@ export default function MonitoramentosPage() {
         error={processes.error}
         reload={processes.reload}
       />
-    </div>
+    </PageShell>
   );
 }

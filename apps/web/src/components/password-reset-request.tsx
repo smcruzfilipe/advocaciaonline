@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { ApiError, authRequest } from "@/lib/api";
+import { AlertBanner } from "@/components/ui";
 
 export function PasswordResetRequest() {
   const [email, setEmail] = useState("");
@@ -37,9 +38,9 @@ export function PasswordResetRequest() {
 
   if (sent) {
     return (
-      <div className="panel stack">
-        <div className="stack" role="status">
-          <h2>Confira seu e-mail</h2>
+      <div className="flex flex-col gap-4 border border-border p-6 text-sm">
+        <div className="flex flex-col gap-3" role="status">
+          <h2 className="font-semibold">Confira seu e-mail</h2>
           <p>
             Se houver uma conta confirmada para este endereço, você receberá um
             link para redefinir sua senha. Confira também a pasta de spam.
@@ -50,7 +51,7 @@ export function PasswordResetRequest() {
           </p>
         </div>
         <button
-          className="button-secondary"
+          className="border border-border bg-background px-4 py-2 text-sm font-medium"
           type="button"
           onClick={() => setSent(false)}
         >
@@ -61,18 +62,22 @@ export function PasswordResetRequest() {
   }
 
   return (
-    <form className="stack" onSubmit={submit} aria-busy={working}>
+    <form
+      className="flex flex-col gap-4 border border-border p-6 text-sm"
+      onSubmit={submit}
+      aria-busy={working}
+    >
       <p>
         Informe o e-mail da sua conta para solicitar um link de redefinição.
       </p>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      <label className="field" htmlFor="reset-email">
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
+      <label
+        className="flex flex-col gap-1.5 text-sm font-medium"
+        htmlFor="reset-email"
+      >
         E-mail
         <input
+          className="w-full border border-border bg-input px-3 py-2 text-sm"
           id="reset-email"
           name="email"
           type="email"
@@ -84,7 +89,11 @@ export function PasswordResetRequest() {
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
-      <button className="button" type="submit" disabled={working}>
+      <button
+        className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        type="submit"
+        disabled={working}
+      >
         {working ? "Solicitando…" : "Enviar link de redefinição"}
       </button>
     </form>

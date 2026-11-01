@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AlertBanner, Btn, EmptyState, PageShell } from "@/components/ui";
 import {
   formatCalendarDate,
   ReadFeedback,
@@ -14,22 +14,23 @@ export default function CollectionRunsPage() {
   const { state, reload } = useRead<RunList>("/api/collection-runs");
 
   return (
-    <div className="page stack">
-      <header className={styles.header}>
+    <PageShell maxWidth="max-w-5xl">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1>Histórico de coleta</h1>
-          <p className="muted">
-            Execuções, trabalhos e marcos do Escrevente. Consulta exclusiva do
-            advogado titular.
+          <h1 className="text-xl font-semibold font-headings text-foreground">
+            Histórico de coleta
+          </h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Execuções e trabalhos. Consulta exclusiva do advogado titular.
           </p>
         </div>
-        <button
-          className="button-secondary"
+        <Btn
+          variant="secondary"
           onClick={reload}
           disabled={state.status === "loading"}
         >
           {state.status === "loading" ? "Atualizando…" : "Atualizar histórico"}
-        </button>
+        </Btn>
       </header>
 
       {state.status !== "ready" ? (
@@ -41,38 +42,34 @@ export default function CollectionRunsPage() {
         />
       ) : (
         <>
-          <p className="notice">
+          <AlertBanner variant="info">
             O planejamento e o processamento são estados separados. Um plano
             concluído não confirma sucesso da coleta; um trabalho concluído não
             informa a quantidade de publicações. Os registros são somente
             leitura.
-          </p>
+          </AlertBanner>
           {state.data.runs.length === 0 ? (
-            <section className="panel stack" role="status">
-              <h2>Nenhuma execução disponível</h2>
-              <p>
-                O servidor não retornou execuções para este vínculo. Não há
-                conclusão de coleta nem resultado vazio a inferir.
-              </p>
-            </section>
+            <div className="mt-6 border border-border">
+              <EmptyState
+                icon="history"
+                title="Nenhuma execução disponível"
+                description="O servidor não retornou execuções para este vínculo. Não há conclusão de coleta nem resultado vazio a inferir."
+              />
+            </div>
           ) : (
             <div
-              className={styles.tableRegion}
+              className={`${styles.tableRegion} mt-6`}
               role="region"
               aria-label="Execuções de coleta"
               tabIndex={0}
             >
               <table>
-                <caption>
-                  Execuções visíveis no contexto atual. Datas no fuso
-                  America/Sao_Paulo.
-                </caption>
+                <caption>Execuções visíveis no contexto atual.</caption>
                 <thead>
                   <tr>
                     <th scope="col">Data</th>
                     <th scope="col">Slot</th>
                     <th scope="col">Planejamento</th>
-                    <th scope="col">Consulta</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -88,20 +85,9 @@ export default function CollectionRunsPage() {
                         <td>{run.slot}ª execução</td>
                         <td>
                           <strong>{status.label}</strong>
-                          <p className="muted">{status.description}</p>
-                        </td>
-                        <td>
-                          <Link
-                            href={`/coletas/${encodeURIComponent(run.id)}`}
-                            prefetch={false}
-                          >
-                            Ver trabalhos e marcos
-                            <span className={styles.visuallyHidden}>
-                              {" "}
-                              de {formatCalendarDate(run.collection_date)}, slot{" "}
-                              {run.slot}
-                            </span>
-                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            {status.description}
+                          </p>
                         </td>
                       </tr>
                     );
@@ -112,6 +98,6 @@ export default function CollectionRunsPage() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

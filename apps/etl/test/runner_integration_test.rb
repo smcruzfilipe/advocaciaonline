@@ -53,7 +53,8 @@ class RunnerIntegrationTest < Minitest::Test
       job("party", @party, { "name" => "Parte Exemplo" }),
       job("process", @process, { "number" => "00000010020268260001" })
     ]
-    pub = publication(101).merge("texto" => "<p>Guilherme&nbsp;Curcelli Guimarães &amp; partes<br>Intimação</p><script>não executar</script>",
+    pub = publication(101).merge("texto" => "<p>Guilherme&nbsp;Curcelli Guimarães &amp; partes<br>Intimação " \
+      "<a href='https://example.test/manual.pdf'>manual</a></p><script>não executar</script>",
       "destinatarios" => [{ "nome" => "Parte Exemplo" }], "numero_processo" => "00000010020268260001")
     zip = zip_with([pub])
     responses = []
@@ -68,6 +69,10 @@ class RunnerIntegrationTest < Minitest::Test
     rows = @admin.exec_params("SELECT payload FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
     assert_equal 1, rows.ntuples
     assert_equal pub.fetch("texto"), JSON.parse(rows.first.fetch("payload")).fetch("texto")
+    stored = JSON.parse(rows.first.fetch("payload"))
+    assert_equal ["https://example.test/manual.pdf"], stored.fetch("texto_parts").filter_map { |part| part["href"] }
+    assert_equal stored.fetch("texto_plain"), stored.fetch("texto_parts").map { |part| part.fetch("text") }.join
+    refute_includes stored.fetch("texto_plain"), "não executar"
     assert_equal "3", scalar("SELECT count(*)::text FROM public.collection_communication_links WHERE tenant_id = $1", [@tenant])
   end
 
@@ -232,13 +237,17 @@ class RunnerIntegrationTest < Minitest::Test
   def test_second_slot_uses_paginated_api_directly_and_sanitizes_its_text
     run = run_for(@date, slot: 2)
     id = job("lawyer", @lawyer, { "name" => LAWYER_NAME, "oabs" => [] }, run: run)
-    item = publication(501).merge("texto" => "<p>Texto&nbsp;da API &amp; parte</p><script>remover</script>")
+    item = publication(501).merge("texto" => "<p>Texto&nbsp;da API &amp; parte" \
+      "<a href='https://example.test/manual.pdf'> PDF</a></p><script>remover</script>")
     with_server([page([item]), page([])]) do |origin, requests|
       assert_equal "succeeded", runner(origin).call(id).fetch("state")
       assert_equal 2, requests.length
       assert requests.all? { |request| request.fetch(:target).start_with?("/api/v1/comunicacao?") }
     end
-    assert_equal "Texto da API & parte", JSON.parse(scalar("SELECT payload::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])).fetch("texto")
+    stored = JSON.parse(scalar("SELECT payload::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant]))
+    assert_equal "Texto da API & parte PDF", stored.fetch("texto")
+    assert_equal ["https://example.test/manual.pdf"], stored.fetch("texto_parts").filter_map { |part| part["href"] }
+    assert_equal stored.fetch("texto"), stored.fetch("texto_parts").map { |part| part.fetch("text") }.join
   end
 
   def test_claimed_runner_uses_the_selected_lease_without_claiming_again

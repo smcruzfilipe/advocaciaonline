@@ -11,7 +11,6 @@ import {
   type Court,
   type GroupRule,
 } from "./types";
-import styles from "../equipe/admin.module.css";
 
 export default function RuleForm({
   groupId,
@@ -84,19 +83,20 @@ export default function RuleForm({
 
   return (
     <form
-      className="stack"
+      className="flex flex-col gap-4 text-sm"
       onSubmit={submit}
       aria-busy={busy}
       aria-describedby={error != null ? `${prefix}-error` : undefined}
     >
       {error != null && <ErrorNotice error={error} id={`${prefix}-error`} />}
-      <fieldset className="stack" disabled={busy || disabled}>
-        <div className={styles.ruleFields}>
-          <div className="field">
+      <fieldset className="flex flex-col gap-4" disabled={busy || disabled}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
             <label htmlFor={`${prefix}-operation`}>
               Operação (obrigatória)
             </label>
             <select
+              className="border border-border bg-input px-3 py-2 text-sm w-full"
               id={`${prefix}-operation`}
               required
               value={operation}
@@ -114,9 +114,10 @@ export default function RuleForm({
               ))}
             </select>
           </div>
-          <div className="field">
+          <div className="flex flex-col gap-1.5">
             <label htmlFor={`${prefix}-effect`}>Efeito (obrigatório)</label>
             <select
+              className="border border-border bg-input px-3 py-2 text-sm w-full"
               id={`${prefix}-effect`}
               required
               value={effect}
@@ -129,9 +130,12 @@ export default function RuleForm({
           </div>
         </div>
         {courtOperation ? (
-          <fieldset className="stack" aria-describedby={`${prefix}-scope-help`}>
-            <legend>Escopo de tribunal</legend>
-            <label className={styles.choice}>
+          <fieldset
+            className="flex flex-col gap-2"
+            aria-describedby={`${prefix}-scope-help`}
+          >
+            <legend className="font-medium mb-2">Escopo de tribunal</legend>
+            <label className="flex items-center gap-3 border border-border px-3 py-2.5">
               <input
                 type="radio"
                 name={`${prefix}-scope`}
@@ -140,7 +144,7 @@ export default function RuleForm({
               />
               Todos os tribunais (escopo geral)
             </label>
-            <label className={styles.choice}>
+            <label className="flex items-center gap-3 border border-border px-3 py-2.5">
               <input
                 type="radio"
                 name={`${prefix}-scope`}
@@ -149,18 +153,21 @@ export default function RuleForm({
               />
               Um tribunal específico
             </label>
-            <p id={`${prefix}-scope-help`} className="muted">
+            <p
+              id={`${prefix}-scope-help`}
+              className="text-xs text-muted-foreground"
+            >
               A regra de comunicações pode abranger todos os tribunais ou apenas
               o tribunal escolhido.
             </p>
             {courtScope === "specific" && (
-              <div className="field">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor={`${prefix}-court`}>
                   Tribunal (obrigatório neste escopo)
                 </label>
                 {courtsError != null && <ErrorNotice error={courtsError} />}
                 {courts === null ? (
-                  <p className="muted">
+                  <p className="text-xs text-muted-foreground">
                     O catálogo de tribunais ainda não está disponível. Você pode
                     manter o tribunal já salvo ou atualizar o catálogo para
                     escolher outro.
@@ -168,6 +175,7 @@ export default function RuleForm({
                 ) : (
                   <>
                     <select
+                      className="border border-border bg-input px-3 py-2 text-sm w-full"
                       id={`${prefix}-court`}
                       required
                       value={court}
@@ -197,7 +205,7 @@ export default function RuleForm({
                       ))}
                     </select>
                     {courts.length === 0 && (
-                      <p className="muted">
+                      <p className="text-xs text-muted-foreground">
                         O catálogo foi consultado e não contém tribunais.
                       </p>
                     )}
@@ -208,20 +216,20 @@ export default function RuleForm({
           </fieldset>
         ) : (
           selectedOperation && (
-            <p className="muted">
+            <p className="text-xs text-muted-foreground">
               Escopo do ambiente do advogado. Esta operação não aceita restrição
               de tribunal.
             </p>
           )
         )}
-        <p className="muted">
+        <p className="text-xs text-muted-foreground">
           A regra passa a valer para os membros associados assim que for salva.
           Uma negação explícita prevalece sobre concessões aplicáveis ao mesmo
           escopo.
         </p>
-        <div className="row">
+        <div className="flex flex-wrap gap-2">
           <button
-            className="button"
+            className="bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
             type="submit"
             disabled={
               operations.length === 0 ||
@@ -236,7 +244,7 @@ export default function RuleForm({
           </button>
           {onCancel && (
             <button
-              className="button-secondary"
+              className="border border-border px-3 py-2 text-sm disabled:opacity-50"
               type="button"
               onClick={onCancel}
             >

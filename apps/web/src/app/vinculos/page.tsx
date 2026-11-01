@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { navigateAfterIdentityChange } from "@/lib/identity-navigation";
 import { useSession } from "@/components/session-provider";
+import { AlertBanner, Badge, Btn, Icon } from "@/components/ui";
 
 function expiration(value: string | null): string {
   return value === null
@@ -51,30 +52,28 @@ export default function MembershipsPage() {
 
   if (loading || !session?.authenticated || pendingInvitation)
     return (
-      <section className="page access-page" aria-busy="true">
-        <h1>Seus vínculos</h1>
-        <p role="status">Consultando os vínculos disponíveis…</p>
+      <section className="mx-auto max-w-lg px-4 py-12 sm:px-0" aria-busy="true">
+        <h1 className="mb-1 text-2xl font-semibold">Selecionar vínculo</h1>
+        <p className="text-sm text-muted-foreground" role="status">
+          Consultando os vínculos disponíveis…
+        </p>
       </section>
     );
   const memberships = session.memberships ?? [];
   return (
-    <section className="page access-wide stack">
-      <header className="stack">
-        <span className="eyebrow">Contexto de trabalho</span>
-        <h1>Selecione seu vínculo</h1>
-        <p className="muted">
-          Escolha em qual ambiente deseja trabalhar. Somente os vínculos
-          disponíveis para sua conta são apresentados.
+    <section className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-12 sm:px-0">
+      <header>
+        <h1 className="mb-1 font-headings text-2xl font-semibold text-foreground">
+          Selecionar vínculo
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Escolha em qual contexto profissional você quer trabalhar agora.
         </p>
       </header>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
       {memberships.length === 0 ? (
-        <div className="panel stack">
-          <h2>Nenhum vínculo disponível</h2>
+        <div className="flex flex-col gap-4 border border-border p-5 text-sm">
+          <h2 className="font-semibold">Nenhum vínculo disponível</h2>
           <p>
             Seu acesso de equipe pode ter vencido ou sido revogado. Peça ao
             titular uma renovação ou um novo convite. O login não restabelece a
@@ -84,23 +83,33 @@ export default function MembershipsPage() {
             Se você é advogado e quer criar seu próprio ambiente, cadastre seu
             perfil profissional.
           </p>
-          <div className="row">
-            <Link className="button" href="/onboarding">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              href="/onboarding"
+            >
               Cadastrar perfil profissional
             </Link>
-            <Link href="/convite">Abrir convite recebido</Link>
+            <Link className="text-xs text-accent underline" href="/convite">
+              Abrir convite recebido
+            </Link>
           </div>
         </div>
       ) : (
         <form
-          className="stack"
+          className="flex flex-col gap-6"
           onSubmit={(event) => void selectMembership(event)}
           aria-busy={saving}
         >
-          <fieldset className="stack" disabled={saving}>
-            <legend>Vínculos disponíveis (obrigatório)</legend>
+          <fieldset className="min-w-0 border border-border" disabled={saving}>
+            <legend className="sr-only">
+              Vínculos disponíveis (obrigatório)
+            </legend>
             {memberships.map((membership) => (
-              <label className="membership-option" key={membership.id}>
+              <label
+                className={`flex cursor-pointer items-center gap-3 border-b border-border px-5 py-4 last:border-b-0 ${selectedId === membership.id ? "bg-secondary" : "bg-background"}`}
+                key={membership.id}
+              >
                 <input
                   type="radio"
                   name="membership"
@@ -109,40 +118,42 @@ export default function MembershipsPage() {
                   onChange={() => setSelected(membership.id)}
                   required
                 />
-                <span className="stack">
-                  <strong>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+                    <Icon
+                      i={membership.role === "owner" ? "user" : "building-2"}
+                      size={15}
+                    />
                     {membership.role === "owner"
                       ? "Titular — ambiente próprio"
                       : "Membro da equipe"}
-                  </strong>
-                  <span className="identifier">
+                    {session.membership_id === membership.id && (
+                      <Badge label="Atual" variant="active" />
+                    )}
+                  </span>
+                  <span className="ml-5 break-all text-xs text-muted-foreground">
                     Ambiente: {membership.tenant_id}
                   </span>
-                  <span className="muted small">
+                  <span className="ml-5 text-xs text-muted-foreground">
                     {expiration(membership.expires_at)}
                   </span>
-                  {session.membership_id === membership.id && (
-                    <span className="badge">Vínculo atual</span>
-                  )}
                 </span>
               </label>
             ))}
           </fieldset>
-          <div className="row">
-            <button
-              type="submit"
-              className="button"
-              disabled={!selectedId || saving}
-            >
+          <div className="flex flex-wrap items-center gap-3">
+            <Btn type="submit" disabled={!selectedId || saving}>
               {saving ? "Selecionando…" : "Continuar neste vínculo"}
-            </button>
+            </Btn>
             {session.onboarded && (
-              <Link href="/dashboard">Voltar ao ambiente atual</Link>
+              <Link className="text-xs text-accent underline" href="/dashboard">
+                Voltar ao ambiente atual
+              </Link>
             )}
           </div>
         </form>
       )}
-      <p className="muted small">
+      <p className="text-xs text-muted-foreground">
         Cada vínculo mantém seus próprios dados e permissões. Ao trocar de
         vínculo, o servidor valida novamente seu acesso.
       </p>

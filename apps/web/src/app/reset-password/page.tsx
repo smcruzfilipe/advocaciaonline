@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PasswordResetConfirmation } from "@/components/password-reset-confirmation";
 import { PasswordResetRequest } from "@/components/password-reset-request";
+import { AlertBanner } from "@/components/ui";
 
 type ResetState =
   | {
@@ -58,17 +59,16 @@ export default function ResetPasswordPage() {
 
   return (
     <section
-      className="page access-page stack"
+      className="mx-auto flex w-full max-w-sm flex-col gap-6 px-4 py-20 text-sm"
       aria-busy={state.view === "loading"}
     >
-      <header className="stack">
-        <span className="eyebrow">Acesso seguro</span>
-        <h1>
+      <header>
+        <h1 className="mb-2 font-headings text-2xl font-semibold text-foreground">
           {state.view === "confirm"
             ? "Escolha sua nova senha"
             : "Redefinir senha"}
         </h1>
-        <p className="muted">
+        <p className="text-sm text-muted-foreground">
           A redefinição altera apenas sua senha. O autenticador continua
           obrigatório para entrar na conta.
         </p>
@@ -85,24 +85,25 @@ export default function ResetPasswordPage() {
           onInvalid={() => finish("invalid", state.generation)}
         />
       ) : state.view === "success" ? (
-        <div className="panel stack" role="status">
-          <h2>Senha alterada</h2>
+        <div
+          className="flex flex-col gap-4 border border-border p-6"
+          role="status"
+        >
+          <h2 className="font-semibold">Senha alterada</h2>
           <p>
             Entre com sua nova senha e o código do seu autenticador. As sessões
             anteriores foram encerradas; seu autenticador não foi alterado.
           </p>
         </div>
       ) : (
-        <div className="stack">
-          <p className="error" role="alert">
-            Este link é inválido, expirou ou já foi utilizado. Solicite um novo
-            link para redefinir sua senha.
-          </p>
-        </div>
+        <AlertBanner variant="error">
+          Este link é inválido, expirou ou já foi utilizado. Solicite um novo
+          link para redefinir sua senha.
+        </AlertBanner>
       )}
       {(state.view === "invalid" || state.view === "confirm") && (
         <button
-          className="button-secondary"
+          className="border border-border bg-background px-4 py-2 text-sm font-medium"
           type="button"
           onClick={() =>
             setState((current) => ({
@@ -115,7 +116,7 @@ export default function ResetPasswordPage() {
         </button>
       )}
       {/* Reload the session after a reset instead of reusing a revoked identity. */}
-      <a className="button-secondary" href="/login">
+      <a className="text-center text-xs text-accent underline" href="/login">
         Ir para o login
       </a>
     </section>

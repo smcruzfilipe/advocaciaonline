@@ -5,7 +5,7 @@ RUN chown node:node /app
 USER node
 COPY --link --chown=1000:1000 package.json package-lock.json .npmrc ./
 RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 npm ci --ignore-scripts
-COPY --link --chown=1000:1000 next.config.ts next-env.d.ts tsconfig.json ./
+COPY --link --chown=1000:1000 next.config.ts postcss.config.mjs next-env.d.ts tsconfig.json ./
 COPY --link --chown=1000:1000 src ./src
 RUN npm run build
 

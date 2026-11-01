@@ -68,7 +68,11 @@ class CommunicationQuery
       )
       SELECT communication.id, communication.source, communication.identity_status, communication.warning,
         origin.court, communication.payload->>'numero_processo' AS process_number,
-        jsonb_typeof(communication.payload->'numero_processo') = 'string' AS process_number_supplied
+        jsonb_typeof(communication.payload->'numero_processo') = 'string' AS process_number_supplied,
+        CASE WHEN jsonb_typeof(communication.payload->'nomeOrgao') = 'string'
+          THEN communication.payload->>'nomeOrgao' END AS organ_name,
+        CASE WHEN jsonb_typeof(communication.payload->'numeroprocessocommascara') = 'string'
+          THEN communication.payload->>'numeroprocessocommascara' END AS process_number_masked
         #{id ? ', communication.payload::text AS payload' : ''}
       FROM public.collection_communications AS communication
       JOIN origins AS origin ON origin.tenant_id = communication.tenant_id AND origin.communication_id = communication.id
@@ -98,6 +102,8 @@ class CommunicationQuery
   def serialize(record)
     result = record.slice("id", "court", "source", "identity_status", "warning")
     result["process_number"] = record.fetch("process_number") if record.fetch("process_number_supplied") == true
+    result["organ_name"] = record.fetch("organ_name") if record.fetch("organ_name").is_a?(String)
+    result["process_number_masked"] = record.fetch("process_number_masked") if record.fetch("process_number_masked").is_a?(String)
     result
   end
 

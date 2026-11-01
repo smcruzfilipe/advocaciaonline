@@ -20,7 +20,7 @@ import type {
 } from "./monitoring";
 import { RequestError } from "./request-error";
 import { useRemote } from "./use-remote";
-import styles from "./monitoramentos.module.css";
+import { AlertBanner, Btn, FormField } from "@/components/ui";
 
 export function MonitoringForm({
   kind,
@@ -121,76 +121,73 @@ export function MonitoringForm({
 
   return (
     <form
-      className={styles.form}
+      className="flex flex-col gap-5"
       onSubmit={submit}
       noValidate
       aria-busy={pending}
     >
-      <div className="field">
-        <label htmlFor={`${id}-value`}>
-          {config.label}{" "}
-          {!editing || record
-            ? "(obrigatório)"
-            : "(opcional, apenas para substituir)"}
-        </label>
-        <input
-          ref={input}
-          id={`${id}-value`}
-          name={config.field}
-          type="text"
-          inputMode={kind === "process" ? "numeric" : "text"}
-          value={value}
-          onChange={(event) => {
-            setValue(event.target.value);
-            setValueError(undefined);
-          }}
+      <div className="border border-border p-5 flex flex-col gap-5">
+        <FormField
+          label={config.label}
+          htmlFor={`${id}-value`}
           required={!editing || Boolean(record)}
+        >
+          <input
+            ref={input}
+            id={`${id}-value`}
+            name={config.field}
+            type="text"
+            className={`w-full border px-3 py-2 text-sm font-body bg-input text-foreground disabled:opacity-50 ${valueError ? "border-error" : "border-border"}`}
+            inputMode={kind === "process" ? "numeric" : "text"}
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setValueError(undefined);
+            }}
+            required={!editing || Boolean(record)}
+            disabled={disabled}
+            autoComplete="off"
+            spellCheck={kind === "party"}
+            aria-invalid={Boolean(valueError)}
+            aria-describedby={`${id}-help${valueError ? ` ${id}-value-error` : ""}`}
+          />
+          <p id={`${id}-help`} className="mt-1 text-xs text-muted-foreground">
+            {kind === "party"
+              ? "Use o nome completo da pessoa ou empresa. Homônimos podem corresponder ao mesmo alvo; não há busca aproximada nem desambiguação automática."
+              : "Digite 20 dígitos ou use NNNNNNN-DD.AAAA.J.TR.OOOO. Os zeros iniciais são preservados; o número não é convertido em valor numérico."}
+          </p>
+          {valueError && (
+            <span
+              id={`${id}-value-error`}
+              className="mt-1 block text-xs text-error"
+              role="alert"
+            >
+              {valueError}
+            </span>
+          )}
+        </FormField>
+        <CourtSelector
+          editing={editing}
+          mode={mode}
+          selected={selected}
+          savedCourts={record?.courts}
+          catalog={catalog.data}
+          loading={catalog.loading}
+          catalogError={catalog.error}
+          error={courtError}
           disabled={disabled}
-          autoComplete="off"
-          spellCheck={kind === "party"}
-          aria-invalid={Boolean(valueError)}
-          aria-describedby={`${id}-help${valueError ? ` ${id}-value-error` : ""}`}
+          onModeChange={(next) => {
+            setMode(next);
+            setCourtError(undefined);
+          }}
+          onSelectionChange={(codes) => {
+            setSelected(codes);
+            setCourtError(undefined);
+          }}
+          onRetry={catalog.reload}
         />
-        <p id={`${id}-help`} className={styles.help}>
-          {kind === "party"
-            ? "Use o nome completo da pessoa ou empresa. Homônimos podem corresponder ao mesmo alvo; não há busca aproximada nem desambiguação automática."
-            : "Digite 20 dígitos ou use NNNNNNN-DD.AAAA.J.TR.OOOO. Os zeros iniciais são preservados; o número não é convertido em valor numérico."}
-        </p>
-        {valueError && (
-          <span
-            id={`${id}-value-error`}
-            className={styles.fieldError}
-            role="alert"
-          >
-            {valueError}
-          </span>
-        )}
       </div>
-      <CourtSelector
-        editing={editing}
-        mode={mode}
-        selected={selected}
-        savedCourts={record?.courts}
-        catalog={catalog.data}
-        loading={catalog.loading}
-        catalogError={catalog.error}
-        error={courtError}
-        disabled={disabled}
-        onModeChange={(next) => {
-          setMode(next);
-          setCourtError(undefined);
-        }}
-        onSelectionChange={(codes) => {
-          setSelected(codes);
-          setCourtError(undefined);
-        }}
-        onRetry={catalog.reload}
-      />
-      {formError && (
-        <p className="error" role="alert">
-          {formError}
-        </p>
-      )}
+      {formError && <AlertBanner variant="error">{formError}</AlertBanner>}
       {error && (
         <RequestError
           error={error}
@@ -198,22 +195,27 @@ export function MonitoringForm({
         />
       )}
       {error && (
-        <p className={styles.help}>
+        <p className="text-xs text-muted-foreground">
           Os dados preenchidos foram mantidos. Corrija o que for necessário e
           tente salvar novamente.
         </p>
       )}
-      <div className={styles.actions}>
-        <button className="button" type="submit" disabled={disabled}>
+      <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-5">
+        <Link
+          href="/monitoramentos"
+          className="inline-flex items-center justify-center border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary"
+        >
+          Cancelar
+        </Link>
+        <Btn type="submit" disabled={disabled}>
           {pending
             ? "Salvando…"
             : editing
               ? "Salvar alterações"
-              : "Cadastrar monitoramento"}
-        </button>
-        <Link href="/monitoramentos" className="button-secondary">
-          Voltar aos monitoramentos
-        </Link>
+              : kind === "party"
+                ? "Salvar parte"
+                : "Salvar processo"}
+        </Btn>
       </div>
     </form>
   );

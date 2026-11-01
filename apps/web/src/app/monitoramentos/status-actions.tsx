@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { asError, monitoringConfig } from "./monitoring";
 import type { MonitoringKind, MonitoringWriteResult } from "./monitoring";
 import { RequestError } from "./request-error";
-import styles from "./monitoramentos.module.css";
+import { Btn } from "@/components/ui";
 
 export function StatusActions({
   kind,
@@ -52,27 +52,32 @@ export function StatusActions({
 
   return (
     <section
-      className="panel stack"
+      className="mt-5 border-t border-border pt-5 flex flex-col gap-3 text-sm"
       aria-busy={pending !== undefined}
       aria-labelledby="monitoring-status-title"
     >
-      <h2 id="monitoring-status-title">Situação do monitoramento</h2>
+      <h2
+        id="monitoring-status-title"
+        className="text-sm font-semibold text-foreground"
+      >
+        Situação do monitoramento
+      </h2>
       <p>
         Desativar interrompe novas coletas deste alvo. O cadastro, as
         comunicações já coletadas e o histórico são preservados.
       </p>
       {active === undefined && (
-        <p className="muted">
+        <p className="text-xs text-muted-foreground">
           A situação atual não está disponível. Cada ação será autorizada
           separadamente pelo servidor, sem consultar dados protegidos.
         </p>
       )}
       {confirmation === undefined ? (
-        <div className={styles.actions}>
+        <div className="flex flex-wrap items-center gap-3">
           {active !== false && (
             <button
               type="button"
-              className="button-secondary"
+              className="text-sm text-error underline disabled:opacity-40"
               disabled={disabled}
               onClick={() => {
                 setError(undefined);
@@ -83,9 +88,9 @@ export function StatusActions({
             </button>
           )}
           {active !== true && (
-            <button
+            <Btn
               type="button"
-              className="button-secondary"
+              variant="secondary"
               disabled={disabled}
               onClick={() => {
                 setError(undefined);
@@ -93,11 +98,11 @@ export function StatusActions({
               }}
             >
               Reativar monitoramento
-            </button>
+            </Btn>
           )}
         </div>
       ) : (
-        <div className="notice stack">
+        <div className="border border-warning bg-warning-bg p-4 flex flex-col gap-3">
           <strong>
             {confirmation
               ? "Reativar este monitoramento?"
@@ -108,10 +113,10 @@ export function StatusActions({
               ? "O alvo volta a participar de novas coletas conforme o filtro de tribunais salvo. Não será feita uma busca histórica."
               : "Este alvo deixa de participar de novas coletas. As comunicações existentes não serão excluídas."}
           </p>
-          <div className={styles.actions}>
-            <button
+          <div className="flex flex-wrap items-center gap-3">
+            <Btn
               type="button"
-              className="button"
+              variant={confirmation ? "primary" : "danger"}
               disabled={disabled}
               onClick={() => changeStatus(confirmation)}
             >
@@ -120,10 +125,10 @@ export function StatusActions({
                 : confirmation
                   ? "Confirmar reativação"
                   : "Confirmar desativação"}
-            </button>
-            <button
+            </Btn>
+            <Btn
               type="button"
-              className="button-secondary"
+              variant="secondary"
               disabled={disabled}
               onClick={() => {
                 setConfirmation(undefined);
@@ -131,7 +136,7 @@ export function StatusActions({
               }}
             >
               Cancelar
-            </button>
+            </Btn>
           </div>
         </div>
       )}
