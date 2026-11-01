@@ -2,6 +2,8 @@
 
 **Estado:** aprovada pelo solicitante como base funcional; decisões técnicas ainda pendentes continuam bloqueantes antes da implementação. **ID:** `identidade`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [stack](docs/stack.md).
 
+O artefato separado [primeiro acesso controlado](SPEC-primeiro-acesso.md#decisões-de-pa00) registra as decisões de PA00. Sua atualização documental não altera o código atual nem os contratos implementados descritos aqui.
+
 ## Objetivo
 
 Estabelecer como um advogado independente e os usuários de seu ambiente se autenticam, como o servidor reconhece a identidade e o tenant da solicitação e como se aplica a validade opcional da credencial. No onboarding, o advogado informa nome completo, OAB principal e, se houver, OABs secundárias. O tenant pertence ao advogado, não ao escritório; nome comercial do escritório é opcional e não define o tenant.
