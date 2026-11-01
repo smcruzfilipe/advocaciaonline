@@ -14,7 +14,18 @@ export function whatsappInvitationUrl(
   url.searchParams.set("phone", phone);
   url.searchParams.set(
     "text",
-    `Você recebeu um convite para o primeiro acesso.\n\nAcesse: ${link}\nVálido até: ${expiresAt}.`,
+    `*Advocacia Online*
+_Convite para primeiro acesso_
+
+Olá! Você foi convidado(a) para acessar a plataforma.
+
+*Como começar*
+Abra o link abaixo e siga as instruções para concluir seu cadastro:
+${link}
+
+*Válido até:* ${expiresAt}
+
+_Este convite é pessoal e de uso único. Não compartilhe o link._`,
   );
   url.searchParams.set("type", "phone_number");
   url.searchParams.set("app_absent", "0");

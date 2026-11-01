@@ -314,6 +314,8 @@ No painel, **Enviar convite por e-mail** cria o convite e chama o envio; sucesso
 
 **Compartilhar no WhatsApp** exige o telefone com país e DDD, por exemplo `+55 11 99266-9299`. Abre `https://api.whatsapp.com/send/` com número normalizado, mensagem e o mesmo link ativo, `type=phone_number` e `app_absent=0`; o envio final é confirmado no WhatsApp. O telefone não é salvo, não é exigido no envio por e-mail e serve também aos convites ativos. Copiar/compartilhar não renova o prazo; popup bloqueado é informado.
 
+A mensagem usa a [formatação nativa do WhatsApp](https://faq.whatsapp.com/539178204879377): título e seções em negrito, subtítulo e aviso de uso único em itálico, blocos separados por linhas em branco e link intacto em linha própria. Não usa HTML nem links Markdown; destinatário, token e validade permanecem os mesmos.
+
 Inscrição inicial e recuperação do autenticador mostram somente QR code local pelo pacote `qrcode@1.5.4`, sem enviar `otpauth_uri` a terceiros e sem exibir chave manual. Falha na geração informa o erro, sem alternativa textual. Login com TOTP já inscrito continua pedindo seu código, não outro QR.
 
 Em `/primeiro-acesso#token=...`, o formulário captura o segredo apenas em memória e remove o fragmento. Preparar senha/autenticador não cria identidade, sessão, reset ou liberação. A confirmação inicial de TOTP conclui conta, liberação, consumo e sessão comum numa transação, seguindo diretamente ao perfil sem novo login/TOTP. Conta existente usa sua sessão MFA do mesmo e-mail sem alterar credenciais. Perfil/tenant são outra transação; falha nessa etapa não reabre convite consumido. A capacidade server-side `can_create_tenant` permite retomar `/onboarding`, inclusive quando já há vínculo de equipe, e nunca substitui a guarda SQL.

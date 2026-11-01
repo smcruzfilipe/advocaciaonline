@@ -34,6 +34,7 @@ test("codifica mensagem e telefone na URL de compartilhamento", () => {
   assert.ok(
     url.searchParams
       .get("text")
+      .split("\n")
       .includes("https://exemplo.test/primeiro-acesso?token=a&outro=b"),
   );
   assert.equal(url.searchParams.has("outro"), false);
