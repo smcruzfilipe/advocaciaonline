@@ -71,17 +71,20 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
       assert_equal PROCESS_NUMBER, item.fetch("process_number")
       assert_equal "complete", item.fetch("identity_status")
       assert_nil item.fetch("warning")
-      assert_equal %w[court id identity_status process_number source warning], item.keys.sort
+      assert_equal "DJEN", item.fetch("source")
+      refute item.key?("payload")
     end
     response.parsed_body.fetch("courts").each { |group| assert_equal %w[communications court], group.keys.sort }
   end
 
   test "detail preserves the first source payload and every same court monitoring link without executing HTML" do
     payload = publication(1).merge("texto" => '<p>Origem &amp; partes</p><script>alert("fonte")</script>',
+      "nomeOrgao" => "1ª Vara Cível", "numeroprocessocommascara" => "0000001-00.2026.8.26.0001",
       "extra" => { "html" => '<img src=x onerror="alert(1)">' })
     id = persist(@sp_job, payload).sole
     repeated_job = create_party_job("TJSP")
-    assert_equal [id], persist(repeated_job, payload.merge("texto" => "versão posterior", "numero_processo" => "outro processo"))
+    assert_equal [id], persist(repeated_job, payload.merge("texto" => "versão posterior", "numero_processo" => "outro processo",
+      "nomeOrgao" => "Outro órgão", "numeroprocessocommascara" => "outra máscara"))
 
     get "/api/communications/#{id}", headers: { "Accept" => "text/html" }
 
@@ -90,6 +93,8 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
     assert_equal id, body.fetch("id")
     assert_equal "TJSP", body.fetch("court")
     assert_equal PROCESS_NUMBER, body.fetch("process_number")
+    assert_equal "1ª Vara Cível", body.fetch("organ_name")
+    assert_equal "0000001-00.2026.8.26.0001", body.fetch("process_number_masked")
     assert_equal payload, body.fetch("payload")
     assert_equal [@sp_job, repeated_job].sort, body.fetch("links").map { |link| link.fetch("job_id") }.sort
     body.fetch("links").each do |link|
@@ -102,6 +107,16 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "<script>"
     refute_includes response.body, "<img"
     assert_includes response.body, "\\u003cscript\\u003e"
+    get "/api/communications"
+    assert_json_response
+    item = court_communications("TJSP").sole
+    assert_equal "1ª Vara Cível", item.fetch("organ_name")
+    assert_equal "0000001-00.2026.8.26.0001", item.fetch("process_number_masked")
+    assert_equal PROCESS_NUMBER, item.fetch("process_number")
+    assert_equal "DJEN", item.fetch("source")
+    refute item.key?("payload")
+    refute_includes response.body, "extra"
+    refute_includes response.body, "versão posterior"
   end
 
   test "incomplete source keys remain separate pending communications with the original warning" do
@@ -133,10 +148,14 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
     assert_equal "TJSP", response.parsed_body.fetch("court")
     refute response.parsed_body.key?("process_number")
     assert_equal payload, response.parsed_body.fetch("payload")
+    refute response.parsed_body.key?("organ_name")
+    refute response.parsed_body.key?("process_number_masked")
     refute response.parsed_body.fetch("payload").key?("texto")
     get "/api/communications"
     assert_json_response
     refute court_communications("TJSP").sole.key?("process_number")
+    refute court_communications("TJSP").sole.key?("organ_name")
+    refute court_communications("TJSP").sole.key?("process_number_masked")
   end
 
   test "a TJSP group filters both endpoints and cannot be widened by request parameters" do
@@ -209,18 +228,26 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
 
   test "another tenant and a forbidden tribunal are indistinguishable from missing or malformed identifiers" do
     own = persist(@sp_job, publication(1)).sole
-    denied = persist(@rj_job, publication(2, court: "TJRJ")).sole
+    denied = persist(@rj_job, publication(2, court: "TJRJ").merge(
+      "nomeOrgao" => "Órgão restrito", "numeroprocessocommascara" => "máscara restrita")).sole
     other_token, = authenticated_session
     other_lawyer = LawyerOnboarding.call(token: other_token, input: profile_payload)
     other_job = create_job("TJSP", lawyer: other_lawyer)
-    foreign = persist(other_job, publication(1).merge("texto" => "conteúdo de outro tenant")).sole
+    foreign = persist(other_job, publication(1).merge("texto" => "conteúdo de outro tenant",
+      "nomeOrgao" => "Órgão estrangeiro", "numeroprocessocommascara" => "máscara estrangeira")).sole
     assign_group(read_rule("TJSP"))
     get "/api/communications", params: { tenant_id: other_lawyer.tenant_id }
     assert_json_response
     assert_equal [own], court_communications("TJSP").map { |item| item.fetch("id") }
+    ["Órgão restrito", "máscara restrita", "Órgão estrangeiro", "máscara estrangeira"].each do |value|
+      refute_includes response.body, value
+    end
     errors = [foreign, denied, SecureRandom.uuid, "not-a-uuid", "1' OR '1'='1"].map do |id|
       get "/api/communications/#{ERB::Util.url_encode(id)}", params: { tenant_id: other_lawyer.tenant_id }
       assert_communication_not_found
+      ["Órgão restrito", "máscara restrita", "Órgão estrangeiro", "máscara estrangeira"].each do |value|
+        refute_includes response.body, value
+      end
       response.parsed_body
     end
     assert_equal 1, errors.uniq.size
@@ -405,6 +432,41 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
     assert_json_response
     refute response.parsed_body.key?("process_number")
     assert_equal payload, response.parsed_body.fetch("payload")
+  end
+
+  test "optional source display fields expose only actual strings without coercion" do
+    values = [nil, 123, true, false, ["órgão"], { "nome" => "órgão" }, ""]
+    payloads = values.each_with_index.map do |value, index|
+      publication(index + 1).merge("nomeOrgao" => value, "numeroprocessocommascara" => value)
+    end
+    ids = persist(@sp_job, *payloads)
+
+    get "/api/communications"
+    assert_json_response
+    court_communications("TJSP").each do |item|
+      refute item.key?("payload")
+      if item["organ_name"] == ""
+        assert_equal "", item.fetch("process_number_masked")
+      else
+        refute item.key?("organ_name")
+        refute item.key?("process_number_masked")
+      end
+    end
+    assert_equal 1, court_communications("TJSP").count { |item| item.key?("organ_name") }
+
+    ids.each do |id|
+      get "/api/communications/#{id}"
+      assert_json_response
+      body = response.parsed_body
+      value = body.fetch("payload").fetch("nomeOrgao")
+      if value.is_a?(String)
+        assert_equal value, body.fetch("organ_name")
+        assert_equal value, body.fetch("process_number_masked")
+      else
+        refute body.key?("organ_name")
+        refute body.key?("process_number_masked")
+      end
+    end
   end
 
   private
