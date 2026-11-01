@@ -88,7 +88,7 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 - [x] R02: PA01.A–B — aprovadas expressamente pelo solicitante após apresentação do código e das evidências de PA01.
 - [x] R03: PA02.A e PA02.B1–B2 — três folhas aprovadas expressamente pelo solicitante, junto do checkpoint após PA00–PA02.
 - [x] R04: PA03.A–C — aprovadas expressamente pelo solicitante; liberado o próximo grupo PA04/PA05, sem ampliar escopo.
-- [ ] R05: PA04 e PA05.A–B — três folhas.
+- [ ] R05: PA04 e PA05.A–B — três folhas; revisão/checkpoint solicitados no [handoff da issue16](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6561506780).
 - [ ] R06: PA06.A–B e PA07 — três folhas.
 - [ ] R07: PA08.P e PA08.A — duas folhas; conferir preparação e troca efetiva de registro, incluindo consumidores inventariados.
 - [ ] R08: PA08.B–D — três folhas.
