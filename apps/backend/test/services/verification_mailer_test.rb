@@ -1,35 +1,52 @@
 require "test_helper"
+require "mail"
 require "net/smtp"
 
 class VerificationMailerTest < ActiveSupport::TestCase
-  test "sends a single-use fragment link using required STARTTLS" do
+  class CapturingSmtp < Net::SMTP
+    attr_reader :message
+    attr_accessor :delivery_error
+
+    def initialize
+      super("smtp.example.test", 587)
+    end
+
+    def start(*)
+      yield self
+    end
+
+    def sendmail(source, *)
+      raise delivery_error if delivery_error
+      @message = Mail.read_from_string(source)
+    end
+  end
+
+  test "delivers a usable verification fragment without exposing it in headers and requires TLS" do
     smtp = { "host" => "smtp.example.test", "port" => 587, "username" => "user",
       "password" => "secret", "from" => "service@example.test" }
     token = SecureRandom.urlsafe_base64(32)
-    captured = nil
-    transport = Object.new
-    transport.define_singleton_method(:deliver!) { |message| captured = message }
-    factory = lambda do |settings|
-      assert_equal :always, settings.fetch(:enable_starttls)
-      assert_equal "smtp.example.test", settings.fetch(:address)
-      transport
-    end
+    transport = CapturingSmtp.new
     AppSettings.stub(:smtp, smtp) do
-      Mail::SMTP.stub(:new, factory) { VerificationMailer.deliver!(email: "person@example.test", token: token) }
+      Net::SMTP.stub(:new, transport) { VerificationMailer.deliver!(email: "person@example.test", token: token) }
     end
-    assert_equal ["person@example.test"], captured.to
-    assert_includes captured.body.decoded, "#{AppSettings.origin}/verify-email#token=#{token}"
-    refute_includes captured.header.to_s, token
+    assert_equal ["person@example.test"], transport.message.to
+    link = URI(transport.message.body.decoded.lines.map(&:strip).find { |line| line.start_with?("https://") })
+    assert_equal "#{AppSettings.origin}/verify-email", "#{link.scheme}://#{link.host}#{link.port == 443 ? '' : ":#{link.port}"}#{link.path}"
+    assert_nil link.query
+    assert_equal({ "token" => token }, URI.decode_www_form(link.fragment).to_h)
+    refute_includes transport.message.header.to_s, token
+    assert transport.starttls_always?
+    assert transport.tls_verify
   end
 
   test "delivery failures do not expose SMTP response or token" do
     smtp = { "host" => "smtp.example.test", "port" => 587, "username" => "user",
       "password" => "secret", "from" => "service@example.test" }
     token = SecureRandom.urlsafe_base64(32)
-    transport = Object.new
-    transport.define_singleton_method(:deliver!) { |_| raise "SMTP leaked #{token}" }
+    transport = CapturingSmtp.new
+    transport.delivery_error = RuntimeError.new("SMTP leaked #{token}")
     AppSettings.stub(:smtp, smtp) do
-      Mail::SMTP.stub(:new, transport) do
+      Net::SMTP.stub(:new, transport) do
         error = assert_raises(VerificationMailer::DeliveryFailed) do
           VerificationMailer.deliver!(email: "person@example.test", token: token)
         end
