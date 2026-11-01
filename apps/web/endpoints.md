@@ -45,6 +45,6 @@ Fonte: `apps/backend/config/routes.rb`. `[x]` indica integração e comportament
 - [x] `GET /api/collection-runs/:id/jobs` — `collection_runs#jobs`
 - [x] `GET /api/collection-runs/:id/events` — `escrevente#events`
 - [x] `GET /api/collection-runs/:id/execution` — `escrevente#execution`
-- [x] `GET /api/communications` — `communications#index`
-- [x] `GET /api/communications/:id` — `communications#show`
+- [x] `GET /api/communications` — `communications#index`; `organ_name` e `process_number_masked` são strings opcionais, provenientes de `nomeOrgao` e `numeroprocessocommascara` da primeira versão persistida. Campos ausentes/não textuais são omitidos; a lista não expõe o payload integral. `source` continua identificando DJEN; `court` identifica o grupo/accordion com o símbolo do tribunal, sem “Fonte” repetida nos cartões.
+- [x] `GET /api/communications/:id` — `communications#show`; inclui os mesmos metadados opcionais, além do payload e vínculos autorizados. O payload pode conter `texto_parts: {text: string, href?: string}[]` e `texto_plain` derivados pela ingestão: os segmentos devem reproduzir exatamente o texto de apresentação; somente destinos HTTP(S) absolutos, sem credenciais ou controles, viram links. Metadados ausentes/inválidos mantêm o texto original escapado; HTML não é executado.
 - [x] `GET /api/dashboard` — `dashboard#show`

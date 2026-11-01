@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import styles from "../consultation.module.css";
+import { AlertBanner, Btn } from "@/components/ui";
 
 export type ReadState<T> =
   | { status: "loading" }
@@ -52,12 +52,16 @@ export function ReadFeedback({
 }) {
   if (state.status === "loading") {
     return (
-      <div className="panel stack" role="status" aria-busy="true">
-        <p>Carregando {label}…</p>
-        <div className={styles.loadingLines} aria-hidden="true">
-          <span />
-          <span />
-          <span />
+      <div
+        className="flex flex-col gap-4 border border-border p-5"
+        role="status"
+        aria-busy="true"
+      >
+        <p className="text-sm text-muted-foreground">Carregando {label}…</p>
+        <div className="flex animate-pulse flex-col gap-3" aria-hidden="true">
+          <span className="h-4 bg-muted" />
+          <span className="h-4 bg-muted" />
+          <span className="h-4 w-2/3 bg-muted" />
         </div>
       </div>
     );
@@ -82,39 +86,41 @@ export function ReadFeedback({
           : `Não foi possível carregar ${label}`;
 
   return (
-    <div className="panel stack error" role="alert">
-      <p>
-        <strong>{title}</strong>
-      </p>
-      <p>{message}</p>
-      {status === 403 && ownerOnly && (
+    <AlertBanner variant={status === 403 ? "warning" : "error"}>
+      <div className="flex flex-col gap-3">
         <p>
-          O histórico de coleta e os marcos do Escrevente são exclusivos do
-          advogado titular.
+          <strong>{title}</strong>
         </p>
-      )}
-      <div className="row">
-        {onboarding ? (
-          <Link href="/onboarding" prefetch={false}>
-            Cadastrar perfil profissional
-          </Link>
-        ) : status === 401 ? (
-          <Link href="/login" prefetch={false}>
-            Entrar novamente
-          </Link>
-        ) : status === 403 ? (
-          <Link href="/vinculos" prefetch={false}>
-            Consultar vínculos disponíveis
-          </Link>
-        ) : (
-          status !== 404 && (
-            <button className="button-secondary" onClick={retry}>
-              Tentar novamente
-            </button>
-          )
+        <p>{message}</p>
+        {status === 403 && ownerOnly && (
+          <p>
+            O histórico de coleta e os marcos do Escrevente são exclusivos do
+            advogado titular.
+          </p>
         )}
+        <div className="flex flex-wrap gap-3 text-accent underline">
+          {onboarding ? (
+            <Link href="/onboarding" prefetch={false}>
+              Cadastrar perfil profissional
+            </Link>
+          ) : status === 401 ? (
+            <Link href="/login" prefetch={false}>
+              Entrar novamente
+            </Link>
+          ) : status === 403 ? (
+            <Link href="/vinculos" prefetch={false}>
+              Consultar vínculos disponíveis
+            </Link>
+          ) : (
+            status !== 404 && (
+              <Btn variant="secondary" onClick={retry}>
+                Tentar novamente
+              </Btn>
+            )
+          )}
+        </div>
       </div>
-    </div>
+    </AlertBanner>
   );
 }
 
@@ -145,7 +151,15 @@ export function entityLabel(type: string) {
   );
 }
 
-export function EntityReference({ type, id }: { type: string; id: string }) {
+export function EntityReference({
+  type,
+  id,
+  showIdentifier = true,
+}: {
+  type: string;
+  id: string;
+  showIdentifier?: boolean;
+}) {
   const href =
     type === "lawyer"
       ? "/monitoramentos"
@@ -155,15 +169,15 @@ export function EntityReference({ type, id }: { type: string; id: string }) {
           ? `/monitoramentos/processos/${encodeURIComponent(id)}`
           : undefined;
   return (
-    <span className={styles.reference}>
+    <span className="flex min-w-0 flex-col gap-1">
       {href ? (
-        <Link href={href} prefetch={false}>
+        <Link className="text-accent underline" href={href} prefetch={false}>
           {entityLabel(type)} {type === "party" ? "monitorada" : "monitorado"}
         </Link>
       ) : (
         entityLabel(type)
       )}
-      <code className={styles.identifier}>{id}</code>
+      {showIdentifier && <code className="break-all text-xs">{id}</code>}
     </span>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { authRequest } from "@/lib/api";
+import { AlertBanner } from "@/components/ui";
 
 let verification: Promise<void> | undefined;
 
@@ -63,37 +64,45 @@ export default function VerifyEmailPage() {
 
   return (
     <section
-      className="page access-page stack"
+      className="mx-auto flex w-full max-w-sm flex-col gap-6 px-4 py-20 text-sm"
       aria-busy={status === "pending"}
     >
-      <header className="stack">
-        <span className="eyebrow">Acesso seguro</span>
-        <h1>Confirmação de e-mail</h1>
+      <header>
+        <h1 className="font-headings text-2xl font-semibold text-foreground">
+          Confirmação de e-mail
+        </h1>
       </header>
       {status === "pending" ? (
         <p role="status">Confirmando seu e-mail…</p>
       ) : status === "success" ? (
-        <div className="notice stack" role="status">
+        <div
+          className="flex flex-col gap-4 border border-border p-6"
+          role="status"
+        >
           <p>
             E-mail confirmado. Entre com sua senha para configurar o
             autenticador e concluir o acesso. Se recebeu um convite, volte à aba
             em que o abriu ou reabra o link do convite antes de entrar.
           </p>
-          <Link className="button" href="/login">
+          <Link
+            className="bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground"
+            href="/login"
+          >
             Ir para o login
           </Link>
         </div>
       ) : (
-        <div className="stack">
-          <p className="error" role="alert">
-            {error}
-          </p>
+        <div className="flex flex-col gap-4">
+          <AlertBanner variant="error">{error}</AlertBanner>
           <p>
             O link pode ter expirado ou já ter sido usado. Abra-o no mesmo
             navegador usado no cadastro; se necessário, solicite novamente o
             cadastro neste navegador.
           </p>
-          <Link className="button" href="/login">
+          <Link
+            className="bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground"
+            href="/login"
+          >
             Ir para o acesso
           </Link>
         </div>

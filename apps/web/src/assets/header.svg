@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="350" height="90" viewBox="0 0 350 90" role="img" aria-labelledby="title">
+  <title id="title">Vértice Tecnologia</title>
+  <g fill="#111111">
+    <path d="M4 8h13l31 54L79 8h14L48 87Z"/>
+    <path d="M23 8h13l12 21L60 8h13L48 51Z"/>
+    <text x="106" y="53" font-family="Arial, Helvetica, sans-serif" font-size="49" font-weight="700" letter-spacing="-2">Vértice</text>
+    <text x="109" y="77" font-family="Arial, Helvetica, sans-serif" font-size="15" letter-spacing="4">TECNOLOGIA</text>
+  </g>
+</svg>

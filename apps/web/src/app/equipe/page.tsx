@@ -8,7 +8,7 @@ import { ErrorNotice } from "./admin-ui";
 import type { TeamCredential } from "./types";
 import CredentialItem from "./credential-item";
 import InvitationForm from "./invitation-form";
-import styles from "./admin.module.css";
+import { PageShell, SectionHeader } from "@/components/ui";
 
 export default function TeamPage() {
   const [credentials, setCredentials] = useState<TeamCredential[] | null>(null);
@@ -72,21 +72,26 @@ export default function TeamPage() {
   }
 
   return (
-    <div className="page stack">
-      <header className={styles.header}>
-        <div className="stack">
-          <h1>Equipe e credenciais</h1>
-          <p className="muted">
+    <PageShell maxWidth="max-w-4xl">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold font-headings text-foreground">
+            Equipe e credenciais
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Convites, validade e acesso da equipe. Administração exclusiva do
             advogado titular.
           </p>
         </div>
-        <div className="row">
-          <Link className="button-secondary" href="/grupos">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            className="border border-border px-3 py-2 text-sm bg-background text-foreground"
+            href="/grupos"
+          >
             Grupos e permissões
           </Link>
           <button
-            className="button-secondary"
+            className="border border-border px-3 py-2 text-sm bg-background text-foreground disabled:opacity-50"
             type="button"
             disabled={loading || mutating}
             onClick={() => {
@@ -111,7 +116,7 @@ export default function TeamPage() {
         />
       )}
       {error != null && credentials !== null && (
-        <p className="notice">
+        <p className="border border-border bg-input p-4 text-xs text-muted-foreground">
           A atualização da lista falhou. Os dados abaixo são da última consulta
           concluída; as entradas do formulário foram preservadas.
         </p>
@@ -119,18 +124,17 @@ export default function TeamPage() {
       {credentials !== null && (
         <>
           <section
-            className="panel stack"
+            className="mb-10 flex flex-col gap-4"
             id="credentials"
-            aria-labelledby="credentials-heading"
+            aria-label="Membros da equipe"
             aria-busy={loading}
           >
-            <h2 id="credentials-heading">Credenciais da equipe</h2>
-            <p className="muted">
-              Datas em UTC. A escolha de validade e o vencimento vigente são
-              apresentados separadamente.
-            </p>
+            <SectionHeader
+              title="Membros da equipe"
+              subtitle="Credenciais ativas, pendentes, expiradas e revogadas."
+            />
             {groupsError != null && (
-              <div className="notice">
+              <div className="border border-border bg-input p-4 flex flex-col gap-3 text-sm">
                 <p>
                   As credenciais foram carregadas, mas seus grupos não estão
                   disponíveis.
@@ -153,7 +157,7 @@ export default function TeamPage() {
                 abaixo.
               </p>
             ) : (
-              <ul className={styles.list}>
+              <ul className="border border-border flex flex-col">
                 {credentials.map((credential) => (
                   <CredentialItem
                     key={credential.id}
@@ -175,7 +179,10 @@ export default function TeamPage() {
             onChanged={reload}
             onBusyChange={setMutating}
           />
-          <aside className="notice stack" aria-label="Política de validade">
+          <aside
+            className="border border-border bg-input p-4 flex flex-col gap-2 text-xs text-muted-foreground leading-relaxed"
+            aria-label="Política de validade"
+          >
             <p>
               Alterar a escolha de validade não muda o vencimento já efetivo.
               Renovar inicia um novo período a partir da renovação; não soma
@@ -195,6 +202,6 @@ export default function TeamPage() {
           </aside>
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

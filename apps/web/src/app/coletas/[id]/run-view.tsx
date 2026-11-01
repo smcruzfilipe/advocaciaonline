@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AlertBanner, Btn, EmptyState, PageShell } from "@/components/ui";
 import {
   formatCalendarDate,
   ReadFeedback,
@@ -22,26 +23,32 @@ export function CollectionRunView({ id }: { id: string }) {
       : undefined;
 
   return (
-    <div className="page stack">
-      <nav aria-label="Caminho da coleta">
-        <Link href="/coletas" prefetch={false}>
+    <PageShell maxWidth="max-w-5xl">
+      <nav className="mb-6 text-sm" aria-label="Caminho da coleta">
+        <Link
+          className="text-accent underline"
+          href="/coletas"
+          prefetch={false}
+        >
           Voltar para histórico de coleta
         </Link>
       </nav>
-      <header className={styles.header}>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1>Execução de coleta</h1>
-          <p className="muted">
+          <h1 className="text-xl font-semibold font-headings text-foreground">
+            Execução de coleta
+          </h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Plano, estado operacional e registros imutáveis do fluxo.
           </p>
         </div>
-        <button
-          className="button-secondary"
+        <Btn
+          variant="secondary"
           onClick={reload}
           disabled={state.status === "loading"}
         >
           {state.status === "loading" ? "Atualizando…" : "Atualizar execução"}
-        </button>
+        </Btn>
       </header>
 
       {state.status !== "ready" ? (
@@ -52,17 +59,22 @@ export function CollectionRunView({ id }: { id: string }) {
           ownerOnly
         />
       ) : !run ? (
-        <section className="panel stack" role="alert">
-          <h2>Execução não encontrada</h2>
-          <p>
-            Esta execução não está disponível para o vínculo atual. Nenhuma
-            informação adicional pode ser exibida.
-          </p>
-        </section>
+        <div className="border border-border">
+          <EmptyState
+            icon="file-x"
+            title="Execução não encontrada"
+            description="Esta execução não está disponível para o vínculo atual. Nenhuma informação adicional pode ser exibida."
+          />
+        </div>
       ) : (
-        <>
-          <section className="panel stack" aria-labelledby="run-metadata">
-            <h2 id="run-metadata">Planejamento</h2>
+        <div className="flex flex-col gap-6">
+          <section
+            className="flex flex-col gap-4 border border-border p-5"
+            aria-labelledby="run-metadata"
+          >
+            <h2 id="run-metadata" className="text-sm font-medium">
+              Planejamento
+            </h2>
             <dl className={styles.metadata}>
               <div>
                 <dt>Data da execução (America/Sao_Paulo)</dt>
@@ -87,12 +99,14 @@ export function CollectionRunView({ id }: { id: string }) {
                 </dd>
               </div>
             </dl>
-            <p className="notice">{planningState(run.status).description}</p>
+            <AlertBanner variant="info">
+              {planningState(run.status).description}
+            </AlertBanner>
           </section>
           <RunJobs runId={run.id} />
           <RunEvents runId={run.id} />
-        </>
+        </div>
       )}
-    </div>
+    </PageShell>
   );
 }

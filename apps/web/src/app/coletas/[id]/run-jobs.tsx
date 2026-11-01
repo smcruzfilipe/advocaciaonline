@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui";
 import {
   EntityReference,
   entityLabel,
@@ -28,8 +29,10 @@ export function RunJobs({ runId }: { runId: string }) {
 
   return (
     <section className={styles.section} aria-labelledby="run-jobs">
-      <h2 id="run-jobs">Trabalhos da execução</h2>
-      <p className="muted">
+      <h2 id="run-jobs" className="text-sm font-medium">
+        Trabalhos da execução
+      </h2>
+      <p className="text-sm text-muted-foreground">
         O estado operacional vem da coleta, não da presença ou ausência de
         marcos. Ele não informa contagens de publicações nem resultado parcial
         por tribunal.
@@ -46,7 +49,10 @@ export function RunJobs({ runId }: { runId: string }) {
         execution.state.status === "ready" && (
           <>
             {plan.state.data.jobs.length === 0 ? (
-              <p className="panel" role="status">
+              <p
+                className="border border-border bg-input p-5 text-sm"
+                role="status"
+              >
                 Nenhum trabalho retornado para esta execução. Isso não constitui
                 sucesso de coleta com zero publicações.
               </p>
@@ -79,14 +85,17 @@ function JobList({
         return (
           <li className={styles.item} key={job.id}>
             <div className={styles.header}>
-              <h3>
+              <h3 className="text-sm font-medium">
                 {entityLabel(job.entity_type)} · {job.court}
               </h3>
-              <span className={styles.badge}>
-                {operational
-                  ? executionState(operational.state)
-                  : "Estado operacional indisponível"}
-              </span>
+              <Badge
+                label={
+                  operational
+                    ? executionState(operational.state)
+                    : "Estado operacional indisponível"
+                }
+                variant={operational?.state === "failed" ? "error" : "muted"}
+              />
             </div>
             <dl className={styles.metadata}>
               <div>
@@ -124,7 +133,7 @@ function JobList({
             </dl>
             <details className={styles.disclosure}>
               <summary>Critérios fixados no planejamento</summary>
-              <p className="muted">
+              <p className="text-xs text-muted-foreground">
                 Os critérios refletem o momento do planejamento, mesmo se o
                 monitoramento foi alterado depois.
               </p>

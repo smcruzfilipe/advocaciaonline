@@ -1,6 +1,6 @@
 # Especificação: interface web de monitoramento jurídico
 
-**Estado:** implementação autorizada para o frontend em `apps/web/`; não altera o backend nem aprova os checkpoints pendentes. Os módulos e contratos funcionais continuam sendo os de `CAPABILITIES.md` e das respectivas `SPEC-*.md`. As telas exportadas em `banani-selecao.json` são referência visual, não prova de integração nem autoridade sobre regras de negócio.
+**Estado:** implementação autorizada para o frontend em `apps/web/`; não altera o backend nem aprova os checkpoints pendentes. Os módulos e contratos funcionais continuam sendo os de `CAPABILITIES.md` e das respectivas `SPEC-*.md`. A refatoração `refactor/frontend` integra as novas telas de `docs/banani/byZqYk7YE568/`, substituindo `banani-selecao.json` como referência visual vigente. O solicitante aprovou dados e estados reais e a preservação de senha/TOTP, em vez do login Google ilustrado.
 
 ## Objetivo e usuários
 
@@ -34,7 +34,7 @@ Ordem proposta: identidade → autorização e monitoramentos → consulta/dashb
 
 ## Visual e acessibilidade
 
-Usar `docs/design-system.md` como contrato visual e `banani-selecao.json` como referência de telas. Paleta preta/branca/cinza, cantos retos, fonte de sistema, sem gradientes ou sombras decorativas; navegação responsiva e leitura jurídica sem truncamento. Corrigir divergências do design exportado em favor das specs. Teclado, foco visível, rótulos e mensagens associadas, contraste e funcionamento a partir de 320px são obrigatórios. A escolha explícita de `apps/web/` substitui referências anteriores ao diretório previsto `frontend/`.
+Usar `docs/design-system.md` e a exportação preservada em `docs/banani/byZqYk7YE568/` como contrato visual: layout, tokens, IBM Plex Sans local, ícones Lucide, cabeçalho com abas e variante móvel. Não redesenhar as telas. Controles devem ser funcionais e os estados ilustrativos só aparecem quando aplicáveis; dados reais e regras funcionais prevalecem sobre exemplos do desenho. Preservar operações existentes, texto jurídico inerte, teclado, foco visível, rótulos e mensagens associadas. A adaptação móvel deve funcionar a partir de 320px. A escolha explícita de `apps/web/` substitui referências anteriores ao diretório previsto `frontend/`.
 
 ## Stack, comandos e estrutura
 

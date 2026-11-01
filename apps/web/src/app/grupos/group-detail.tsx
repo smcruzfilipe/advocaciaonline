@@ -9,7 +9,7 @@ import type { AuthorizationGroup, CatalogOperation, Court } from "./types";
 import GroupRules from "./group-rules";
 import GroupMembers from "./group-members";
 import GroupSettings from "./group-settings";
-import styles from "../equipe/admin.module.css";
+import { PageShell } from "@/components/ui";
 
 export default function GroupDetail({ id }: { id: string }) {
   const [group, setGroup] = useState<AuthorizationGroup | null>(null);
@@ -94,20 +94,22 @@ export default function GroupDetail({ id }: { id: string }) {
   }, [loadGroup, loadCatalogs, loadMembers]);
 
   return (
-    <div className="page stack">
-      <header className={styles.header}>
-        <div className="stack">
-          <Link href="/grupos">← Grupos e permissões</Link>
-          <h1>
+    <PageShell maxWidth="max-w-4xl">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <Link className="text-xs text-accent underline" href="/grupos">
+            ← Grupos e permissões
+          </Link>
+          <h1 className="text-xl font-semibold font-headings text-foreground">
             {deleted ? "Grupo excluído" : (group?.name ?? "Detalhes do grupo")}
           </h1>
-          <p className="muted">
+          <p className="text-sm text-muted-foreground">
             Regras e associações deste ambiente. Administração exclusiva do
             titular.
           </p>
         </div>
         <button
-          className="button-secondary"
+          className="border border-border px-3 py-2 text-sm disabled:opacity-50"
           type="button"
           disabled={
             loading || catalogLoading || membersLoading || busy || deleted
@@ -125,7 +127,10 @@ export default function GroupDetail({ id }: { id: string }) {
         </button>
       </header>
       {deleted ? (
-        <div className="notice" role="status">
+        <div
+          className="border border-success bg-success-bg p-4 text-sm"
+          role="status"
+        >
           Grupo excluído, incluindo suas regras e associações. As credenciais
           não foram revogadas. <Link href="/grupos">Voltar aos grupos</Link>.
         </div>
@@ -197,6 +202,6 @@ export default function GroupDetail({ id }: { id: string }) {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

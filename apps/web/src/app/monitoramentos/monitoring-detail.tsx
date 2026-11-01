@@ -14,7 +14,7 @@ import { MonitoringForm } from "./monitoring-form";
 import { RequestError } from "./request-error";
 import { StatusActions } from "./status-actions";
 import { useRemote } from "./use-remote";
-import styles from "./monitoramentos.module.css";
+import { AlertBanner, Badge, Icon, PageShell } from "@/components/ui";
 
 export function MonitoringDetail({
   kind,
@@ -57,95 +57,107 @@ export function MonitoringDetail({
   }
 
   return (
-    <div className={`page ${styles.page}`}>
-      <nav aria-label="Caminho da página">
-        <Link href="/monitoramentos">Monitoramentos</Link> / {config.title}
+    <PageShell maxWidth="max-w-2xl">
+      <nav
+        className="flex items-center gap-2 text-sm text-muted-foreground mb-6"
+        aria-label="Caminho da página"
+      >
+        <Link className="underline text-accent" href="/monitoramentos">
+          Monitoramentos
+        </Link>
+        <Icon i="chevron-right" size={13} />
+        <span>{config.title}</span>
       </nav>
-      <header className={styles.header}>
-        <div>
-          <h1>{config.title}</h1>
-          <p className="muted">
-            Consulte e mantenha este alvo no vínculo autenticado. A autorização
-            é verificada no servidor a cada operação.
-          </p>
-        </div>
-        <div className={styles.actions}>
-          <Link href="/comunicacoes">Consultar comunicações</Link>
-          <Link href="/dashboard">Dashboard</Link>
-        </div>
+      <header className="flex items-start justify-between gap-3 mb-4">
+        <h1 className="text-xl font-semibold font-headings text-foreground">
+          {kind === "party"
+            ? "Editar parte monitorada"
+            : "Editar processo monitorado"}
+        </h1>
+        {record && (
+          <Badge
+            label={record.active ? "Ativo" : "Inativo"}
+            variant={record.active ? "active" : "inactive"}
+          />
+        )}
       </header>
-      {remote.loading && (
-        <p className="panel" role="status" aria-busy="true">
-          Carregando monitoramento…
-        </p>
-      )}
-      {readError && <RequestError error={readError} onRetry={reload} />}
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-        </div>
-      )}
-      {record && (
-        <section
-          className="panel stack"
-          aria-labelledby="monitoring-details-title"
-        >
-          <h2 id="monitoring-details-title">Dados do cadastro</h2>
-          <MonitoringDetails record={record} />
-        </section>
-      )}
-      {!remote.loading && !blocked && (
-        <>
-          {!record && (
-            <p className="notice">
-              Os dados do cadastro não estão disponíveis para leitura. Isso não
-              concede nem revoga permissões de escrita: você pode enviar apenas
-              a alteração que deseja realizar, e o servidor autorizará a ação.
-              Manter o filtro não exige consultar seu conteúdo.
-            </p>
-          )}
-          <section
-            className="panel stack"
-            aria-labelledby="monitoring-edit-title"
+      <div className="flex flex-col gap-5">
+        {remote.loading && (
+          <p
+            className="border border-border p-5 text-sm text-muted-foreground"
+            role="status"
+            aria-busy="true"
           >
-            <h2 id="monitoring-edit-title">Editar cadastro</h2>
-            <p className={styles.help}>
-              O filtro atual é preservado por padrão, mesmo se um tribunal salvo
-              deixar de constar no catálogo. Editar dados e desativar são
-              operações independentes.
-            </p>
-            <MonitoringForm
-              key={editRevision}
+            Carregando monitoramento…
+          </p>
+        )}
+        {readError && <RequestError error={readError} onRetry={reload} />}
+        {notice && <AlertBanner variant="success">{notice}</AlertBanner>}
+        {record && (
+          <details className="border border-border p-5 text-sm">
+            <summary className="cursor-pointer font-medium text-foreground">
+              Dados do cadastro
+            </summary>
+            <div className="mt-4">
+              <MonitoringDetails record={record} />
+            </div>
+          </details>
+        )}
+        {!remote.loading && !blocked && (
+          <>
+            {!record && (
+              <AlertBanner variant="info">
+                Os dados do cadastro não estão disponíveis para leitura. Isso
+                não concede nem revoga permissões de escrita: você pode enviar
+                apenas a alteração que deseja realizar, e o servidor autorizará
+                a ação. Manter o filtro não exige consultar seu conteúdo.
+              </AlertBanner>
+            )}
+            <section
+              className="flex flex-col gap-3"
+              aria-labelledby="monitoring-edit-title"
+            >
+              <h2 id="monitoring-edit-title" className="text-sm font-semibold">
+                Editar cadastro
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                O filtro atual é preservado por padrão, mesmo se um tribunal
+                salvo deixar de constar no catálogo. Editar dados e desativar
+                são operações independentes.
+              </p>
+              <MonitoringForm
+                key={editRevision}
+                kind={kind}
+                recordId={recordId}
+                record={record}
+                locked={busy}
+                onBusyChange={setBusy}
+                onSaved={(result) => saved(result, "Alterações salvas.", true)}
+              />
+            </section>
+            <StatusActions
               kind={kind}
               recordId={recordId}
-              record={record}
+              active={record?.active}
               locked={busy}
               onBusyChange={setBusy}
-              onSaved={(result) => saved(result, "Alterações salvas.", true)}
+              onSaved={(result, active) =>
+                saved(
+                  result,
+                  active
+                    ? "Reativação confirmada pelo servidor."
+                    : "Desativação confirmada pelo servidor.",
+                )
+              }
             />
-          </section>
-          <StatusActions
-            kind={kind}
-            recordId={recordId}
-            active={record?.active}
-            locked={busy}
-            onBusyChange={setBusy}
-            onSaved={(result, active) =>
-              saved(
-                result,
-                active
-                  ? "Reativação confirmada pelo servidor."
-                  : "Desativação confirmada pelo servidor.",
-              )
-            }
-          />
-        </>
-      )}
-      {!remote.loading && (
-        <div className={styles.actions}>
-          <Link href="/monitoramentos">Voltar aos monitoramentos</Link>
-        </div>
-      )}
-    </div>
+          </>
+        )}
+        {!remote.loading && (
+          <div className="flex flex-wrap items-center gap-3 text-sm text-accent underline">
+            <Link href="/monitoramentos">Voltar aos monitoramentos</Link>
+          </div>
+        )}
+      </div>
+    </PageShell>
   );
 }

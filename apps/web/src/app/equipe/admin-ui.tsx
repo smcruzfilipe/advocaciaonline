@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ApiError } from "@/lib/api";
+import { Btn } from "@/components/ui";
 
 export function errorMessage(error: unknown) {
   return error instanceof Error
@@ -30,7 +31,11 @@ export function ErrorNotice({
   const status = error instanceof ApiError ? error.status : undefined;
   const delivery = isDeliveryError(error);
   return (
-    <div className="error stack" role="alert" id={id}>
+    <div
+      className="border border-error bg-error-bg p-3 flex flex-col gap-2 text-sm text-error"
+      role="alert"
+      id={id}
+    >
       <strong>
         {delivery
           ? "Convite registrado; entrega não confirmada"
@@ -61,9 +66,9 @@ export function ErrorNotice({
       )}
       {onRetry && status !== 401 && status !== 403 && (
         <div>
-          <button className="button-secondary" type="button" onClick={onRetry}>
+          <Btn variant="secondary" size="sm" type="button" onClick={onRetry}>
             Tentar novamente
-          </button>
+          </Btn>
         </div>
       )}
     </div>
@@ -72,17 +77,20 @@ export function ErrorNotice({
 
 export function PolicyNotice() {
   return (
-    <aside className="notice stack" aria-label="Como as permissões funcionam">
+    <aside
+      className="border border-border bg-input p-4 mb-6 flex flex-col gap-2 text-xs text-muted-foreground leading-relaxed"
+      aria-label="Como as permissões funcionam"
+    >
       <p>
         <strong>
           Concessões se somam; negação explícita prevalece no mesmo escopo.
         </strong>{" "}
-        Com grupos, uma operação exige concessão aplicável. A dashboard não
-        amplia os tribunais permitidos para comunicações.
+        Com grupos, uma operação exige concessão aplicável. O painel não amplia
+        os tribunais permitidos para comunicações.
       </p>
       <p>
         Sem grupos, a equipe tem as leituras padrão de monitoramentos,
-        comunicações e dashboard, sem escrita automática. Remover o último grupo
+        comunicações e painel, sem escrita automática. Remover o último grupo
         não revoga a credencial e volta a aplicar essas leituras.
       </p>
       <p>

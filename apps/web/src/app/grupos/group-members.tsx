@@ -6,7 +6,6 @@ import { api } from "@/lib/api";
 import { ErrorNotice } from "../equipe/admin-ui";
 import { credentialState, type TeamCredential } from "../equipe/types";
 import type { AuthorizationGroup } from "./types";
-import styles from "../equipe/admin.module.css";
 
 export default function GroupMembers({
   group,
@@ -65,7 +64,7 @@ export default function GroupMembers({
     const label = credential?.invited_email ?? `vínculo ${id}`;
     if (
       !window.confirm(
-        `Desassociar ${label} do grupo “${group.name}”? A credencial não será revogada. Se este for o último grupo, voltam a valer as leituras padrão de monitoramentos, comunicações e dashboard, sem escrita automática.`,
+        `Desassociar ${label} do grupo “${group.name}”? A credencial não será revogada. Se este for o último grupo, voltam a valer as leituras padrão de monitoramentos, comunicações e painel, sem escrita automática.`,
       )
     )
       return;
@@ -99,22 +98,33 @@ export default function GroupMembers({
 
   return (
     <section
-      className="panel stack"
+      className="border border-border p-5 mb-6 flex flex-col gap-4 text-sm"
       aria-labelledby="members-heading"
       aria-busy={busy}
     >
-      <div className={styles.header}>
-        <h2 id="members-heading">Membros associados</h2>
-        <Link className="button-secondary" href="/equipe">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2
+          id="members-heading"
+          className="text-base font-semibold font-headings"
+        >
+          Membros associados
+        </h2>
+        <Link
+          className="border border-border px-3 py-1.5 text-sm"
+          href="/equipe"
+        >
           Gerenciar credenciais
         </Link>
       </div>
-      <p className="muted">
+      <p className="text-xs text-muted-foreground">
         Convites pendentes e credenciais expiradas também podem ter grupos.
         Associação não aceita o convite, não renova e não revoga a credencial.
       </p>
       {message && (
-        <div className="notice" role="status">
+        <div
+          className="border border-success bg-success-bg p-3 text-sm"
+          role="status"
+        >
           {message}
         </div>
       )}
@@ -125,22 +135,29 @@ export default function GroupMembers({
       {group.membership_ids.length === 0 ? (
         <p>Nenhum vínculo associado a este grupo.</p>
       ) : (
-        <ul className={styles.list}>
+        <ul className="border border-border flex flex-col">
           {group.membership_ids.map((id) => {
             const credential = credentials?.find((row) => row.id === id);
             return (
-              <li className={`${styles.item} ${styles.header}`} key={id}>
-                <div className="stack">
-                  <h3>{credential?.invited_email ?? "Vínculo associado"}</h3>
-                  <p className="muted">
+              <li
+                className="border-b border-border last:border-b-0 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3"
+                key={id}
+              >
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <h3 className="text-sm font-medium break-all">
+                    {credential?.invited_email ?? "Vínculo associado"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
                     {credential
                       ? credentialState(credential)
                       : "Identificação por e-mail não disponível na lista de credenciais."}
                   </p>
-                  <code className={styles.code}>{id}</code>
+                  <code className="text-xs text-muted-foreground break-all">
+                    {id}
+                  </code>
                 </div>
                 <button
-                  className="button-secondary"
+                  className="border border-border px-3 py-1.5 text-sm disabled:opacity-50"
                   type="button"
                   disabled={busy || disabled}
                   onClick={() => {
@@ -154,9 +171,9 @@ export default function GroupMembers({
           })}
         </ul>
       )}
-      <h3>Associar membro</h3>
+      <h3 className="text-sm font-medium">Associar membro</h3>
       {credentials === null ? (
-        <p className="muted">
+        <p className="text-xs text-muted-foreground">
           Carregue as credenciais reais do ambiente para selecionar um membro.
         </p>
       ) : available?.length === 0 ? (
@@ -166,15 +183,16 @@ export default function GroupMembers({
         </p>
       ) : (
         <form
-          className={styles.form}
+          className="flex flex-col gap-4"
           onSubmit={assign}
           aria-describedby={error != null ? "group-member-error" : undefined}
         >
-          <div className="field">
+          <div className="flex flex-col gap-1.5 text-sm">
             <label htmlFor="group-member">
               Credencial da equipe (obrigatória)
             </label>
             <select
+              className="border border-border bg-input px-3 py-2 text-sm w-full"
               id="group-member"
               required
               value={membershipId}
@@ -191,7 +209,7 @@ export default function GroupMembers({
           </div>
           <div>
             <button
-              className="button"
+              className="bg-primary text-primary-foreground px-4 py-2 text-sm disabled:opacity-50"
               type="submit"
               disabled={busy || disabled}
             >
@@ -200,7 +218,7 @@ export default function GroupMembers({
           </div>
         </form>
       )}
-      <p className="muted">
+      <p className="text-xs text-muted-foreground">
         Desassociar o último grupo volta a aplicar as leituras padrão. Para
         interromper todo o acesso, use “Revogar credencial” na página da equipe.
       </p>

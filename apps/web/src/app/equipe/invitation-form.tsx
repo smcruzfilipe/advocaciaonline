@@ -10,7 +10,7 @@ import ValidityFields, {
   type ValidityChoice,
 } from "./validity-fields";
 import type { TeamCredential } from "./types";
-import styles from "./admin.module.css";
+import { Btn } from "@/components/ui";
 
 export default function InvitationForm({
   groups,
@@ -89,20 +89,31 @@ export default function InvitationForm({
   }
 
   return (
-    <section className="panel stack" aria-labelledby="invite-heading">
-      <h2 id="invite-heading">Convidar para a equipe</h2>
-      <p>
+    <section
+      className="mb-6 flex flex-col gap-4"
+      aria-labelledby="invite-heading"
+    >
+      <h2
+        id="invite-heading"
+        className="text-base font-semibold font-headings text-foreground"
+      >
+        Enviar convite
+      </h2>
+      <p className="text-sm text-muted-foreground">
         O e-mail recebe um link de aceite. A validade da credencial começa ao
         confirmar a criação, mesmo quando a entrega do e-mail falha.
       </p>
       {message && (
-        <div className="notice" role="status">
+        <div
+          className="border border-success bg-success-bg p-3 text-sm"
+          role="status"
+        >
           {message}
         </div>
       )}
       {error != null && <ErrorNotice error={error} id="invite-error" />}
       {recorded && (
-        <div className="notice stack">
+        <div className="border border-border bg-input p-4 flex flex-col gap-3 text-sm">
           <p>
             A credencial já está registrada.{" "}
             <a href="#credentials">Consulte a lista de credenciais</a>; não crie
@@ -113,7 +124,7 @@ export default function InvitationForm({
           <div>
             <button
               type="button"
-              className="button-secondary"
+              className="border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
               disabled={busy || disabled}
               onClick={newInvitation}
             >
@@ -124,16 +135,20 @@ export default function InvitationForm({
       )}
       <form
         onSubmit={submit}
-        className={styles.form}
+        className="border border-border p-5 flex flex-col gap-5"
         aria-busy={busy}
         aria-describedby={error != null ? "invite-error" : undefined}
       >
-        <fieldset className="stack" disabled={busy || recorded || disabled}>
-          <div className="field">
+        <fieldset
+          className="flex flex-col gap-5"
+          disabled={busy || recorded || disabled}
+        >
+          <div className="flex flex-col gap-1.5 text-sm">
             <label htmlFor="invite-email">
               E-mail do convidado (obrigatório)
             </label>
             <input
+              className="border border-border px-3 py-2 text-sm bg-input w-full"
               id="invite-email"
               type="email"
               autoComplete="email"
@@ -143,7 +158,7 @@ export default function InvitationForm({
               onChange={(event) => setEmail(event.target.value)}
               aria-describedby="invite-email-help"
             />
-            <p className="muted" id="invite-email-help">
+            <p className="text-xs text-muted-foreground" id="invite-email-help">
               Informe apenas o endereço de e-mail, sem nome de exibição.
             </p>
           </div>
@@ -154,11 +169,17 @@ export default function InvitationForm({
             onChoice={setChoice}
             onDays={setDays}
           />
-          <fieldset className="stack" aria-describedby="invite-groups-help">
-            <legend>Grupos (opcional)</legend>
-            <p className="muted" id="invite-groups-help">
+          <fieldset
+            className="flex flex-col gap-2 text-sm"
+            aria-describedby="invite-groups-help"
+          >
+            <legend className="font-medium mb-2">Grupos (opcional)</legend>
+            <p
+              className="text-xs text-muted-foreground"
+              id="invite-groups-help"
+            >
               Sem grupos, a equipe recebe leituras padrão de monitoramentos,
-              comunicações e dashboard, sem escrita automática.
+              comunicações e painel, sem escrita automática.
             </p>
             {groupsError != null && (
               <ErrorNotice
@@ -169,7 +190,7 @@ export default function InvitationForm({
               />
             )}
             {groups === null ? (
-              <p className="muted">
+              <p className="text-xs text-muted-foreground">
                 A seleção de grupos ainda não está disponível.
               </p>
             ) : groups.length === 0 ? (
@@ -178,9 +199,12 @@ export default function InvitationForm({
                 <Link href="/grupos">Gerenciar grupos</Link>.
               </p>
             ) : (
-              <div className={styles.checks}>
+              <div className="flex flex-col gap-2">
                 {groups.map((group) => (
-                  <label key={group.id} className={styles.choice}>
+                  <label
+                    key={group.id}
+                    className="flex items-center gap-3 border border-border px-3 py-2.5"
+                  >
                     <input
                       type="checkbox"
                       checked={groupIds.includes(group.id)}
@@ -198,14 +222,14 @@ export default function InvitationForm({
               </div>
             )}
             {missingGroups.length > 0 && (
-              <div className="notice stack">
+              <div className="border border-warning bg-warning-bg p-3 flex flex-col gap-2 text-sm">
                 <p>
                   Alguns grupos selecionados não estão mais disponíveis.
                   Desmarque-os para continuar; as demais entradas foram
                   preservadas.
                 </p>
                 {missingGroups.map((id) => (
-                  <label key={id} className={styles.choice}>
+                  <label key={id} className="flex items-center gap-3">
                     <input
                       type="checkbox"
                       checked
@@ -221,12 +245,12 @@ export default function InvitationForm({
               </div>
             )}
           </fieldset>
-          <div>
-            <button className="button" type="submit" disabled={groups === null}>
+          <div className="flex justify-end">
+            <Btn icon="send" type="submit" disabled={groups === null}>
               {busy
                 ? "Criando credencial e enviando…"
                 : "Criar credencial e enviar convite"}
-            </button>
+            </Btn>
           </div>
         </fieldset>
       </form>

@@ -22,7 +22,7 @@ export type Court = { code: string; name: string };
 const operationLabels: Record<string, string> = {
   consultar_monitoramentos: "Consultar monitoramentos",
   consultar_comunicacoes: "Consultar comunicações",
-  consultar_dashboard: "Consultar dashboard",
+  consultar_dashboard: "Consultar painel",
   cadastrar_monitoramento: "Cadastrar monitoramento",
   editar_monitoramento: "Editar monitoramento",
   desativar_monitoramento: "Desativar monitoramento",

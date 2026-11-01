@@ -13,6 +13,8 @@ export type Communication = {
   identity_status: "complete" | "pending";
   warning: string | null;
   process_number?: string;
+  organ_name?: string;
+  process_number_masked?: string;
 };
 
 export type CommunicationList = {
