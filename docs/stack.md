@@ -33,7 +33,7 @@ As versões de referência também se aplicam ao runtime Ruby proposto para desp
 
 ## Requisitos para o desenho do isolamento
 
-RLS não substitui autenticação Google, expiração/revogação de acesso ou permissões por grupo, tribunal e dashboard. Contexto de usuário/tenant deve ser derivado no servidor; o parâmetro enviado pelo cliente não comprova acesso.
+RLS não substitui autenticação, expiração/revogação de acesso ou permissões por grupo, tribunal e dashboard. Contexto de usuário/tenant deve ser derivado no servidor; o parâmetro enviado pelo cliente não comprova acesso.
 
 A documentação PostgreSQL informa que superusuários e roles `BYPASSRLS` ignoram RLS; o proprietário normalmente também ignora as políticas, salvo `FORCE ROW LEVEL SECURITY`. O desenho deve separar administração/migração da role de execução e verificar isolamento usando a role real da aplicação, não uma role que contorne RLS.
 

@@ -1,0 +1,10 @@
+*
+!package.json
+!package-lock.json
+!.npmrc
+!next.config.ts
+!next-env.d.ts
+!tsconfig.json
+!src/
+!src/**
+src/**/*.test.*

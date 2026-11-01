@@ -9,13 +9,6 @@ class AppSettings
     value.delete_suffix("/")
   end
 
-  def self.google_client_id
-    ENV.fetch("GOOGLE_CLIENT_ID").presence || raise(ArgumentError, "GOOGLE_CLIENT_ID is required")
-  end
-
-  def self.google_client_secret
-    ENV.fetch("GOOGLE_CLIENT_SECRET").presence || raise(ArgumentError, "GOOGLE_CLIENT_SECRET is required")
-  end
 
   def self.smtp
     values = {

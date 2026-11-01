@@ -76,7 +76,7 @@ export default function InvitationPage() {
     setError(null);
     try {
       await logout();
-      navigateAfterIdentityChange("/auth/google");
+      navigateAfterIdentityChange("/login");
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -96,7 +96,7 @@ export default function InvitationPage() {
         <span className="eyebrow">Acesso de equipe</span>
         <h1>Convite para a equipe</h1>
         <p className="muted">
-          O acesso só será concedido após o aceite com a conta Google do e-mail
+          O acesso só será concedido após o aceite com a conta do e-mail
           convidado.
         </p>
       </header>
@@ -186,14 +186,14 @@ export default function InvitationPage() {
                 >
                   {working === "account"
                     ? "Saindo da conta atual…"
-                    : "Entrar com outra conta Google"}
+                    : "Entrar com outra conta"}
                 </button>
               </div>
             </>
           ) : (
-            <a className="button" href="/auth/google">
-              Continuar com o Google
-            </a>
+            <Link className="button" href="/login">
+              Entrar ou criar conta
+            </Link>
           )}
           <button
             className="button-secondary"

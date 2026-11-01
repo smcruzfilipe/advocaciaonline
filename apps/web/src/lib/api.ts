@@ -58,7 +58,11 @@ function notifyAuthentication(error: ApiError): void {
   }
 }
 
-async function request<T>(path: string, options: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestInit,
+  expectedStatus?: number,
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, {
@@ -74,6 +78,13 @@ async function request<T>(path: string, options: RequestInit): Promise<T> {
         ? "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente."
         : "Não foi possível confirmar o resultado. Atualize a lista e verifique se a operação já foi concluída antes de tentar novamente.",
       "network_error",
+    );
+  }
+  if (response.ok && expectedStatus && response.status !== expectedStatus) {
+    throw new ApiError(
+      response.status,
+      "O servidor retornou uma resposta inesperada. Tente novamente.",
+      "invalid_response",
     );
   }
   if (response.status === 204 || response.status === 205) return undefined as T;
@@ -129,7 +140,7 @@ async function confirmedSession(
   if (!session.authenticated || !session.csrf_token) {
     const error = new ApiError(
       401,
-      "Sua sessão terminou. Entre com sua conta Google para continuar.",
+      "Sua sessão terminou. Entre na sua conta para continuar.",
       "authentication_required",
     );
     notifyAuthentication(error);
@@ -148,6 +159,35 @@ async function confirmedSession(
     );
   }
   return session.csrf_token;
+}
+export async function authRequest<T>(
+  path:
+    | "/api/auth/register"
+    | "/api/auth/verify-email"
+    | "/api/auth/login"
+    | "/api/auth/totp"
+    | "/api/auth/password-reset"
+    | "/api/auth/password-reset/confirm",
+  body: unknown,
+): Promise<T> {
+  return withSessionLock(() =>
+    request<T>(
+      path,
+      {
+        method: "POST",
+        headers: new Headers({
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(body),
+      },
+      path === "/api/auth/password-reset"
+        ? 202
+        : path === "/api/auth/password-reset/confirm"
+          ? 204
+          : undefined,
+    ),
+  );
 }
 
 export async function api<T>(
@@ -175,7 +215,7 @@ export async function api<T>(
   if (!expected?.authenticated || !expected.csrf_token) {
     const error = new ApiError(
       401,
-      "Sua sessão terminou. Entre com sua conta Google para continuar.",
+      "Sua sessão terminou. Entre na sua conta para continuar.",
       "authentication_required",
     );
     notifyAuthentication(error);
@@ -187,8 +227,7 @@ export async function api<T>(
       const csrfToken = await confirmedSession(expected, headers);
       if (reading) {
         const result = await request<T>(path, { method, headers });
-        // OAuth callback navigations cannot take a browser lock. Recheck before
-        // exposing a response that may have raced with a new login.
+        // Recheck before exposing a response that may have raced with a new login.
         await confirmedSession(expected, headers);
         return result;
       }

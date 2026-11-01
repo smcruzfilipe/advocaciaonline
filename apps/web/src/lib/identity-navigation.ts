@@ -1,4 +1,4 @@
-type IdentityDestination = "/dashboard" | "/login" | "/auth/google";
+type IdentityDestination = "/dashboard" | "/login";
 
 export function navigateAfterIdentityChange(path: IdentityDestination): void {
   // A full same-origin navigation discards React state from the previous tenant.

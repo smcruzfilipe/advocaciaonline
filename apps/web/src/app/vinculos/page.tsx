@@ -64,7 +64,7 @@ export default function MembershipsPage() {
         <h1>Selecione seu vínculo</h1>
         <p className="muted">
           Escolha em qual ambiente deseja trabalhar. Somente os vínculos
-          disponíveis para sua conta Google são apresentados.
+          disponíveis para sua conta são apresentados.
         </p>
       </header>
       {error && (
@@ -77,8 +77,8 @@ export default function MembershipsPage() {
           <h2>Nenhum vínculo disponível</h2>
           <p>
             Seu acesso de equipe pode ter vencido ou sido revogado. Peça ao
-            titular uma renovação ou um novo convite. O login Google não
-            restabelece a credencial.
+            titular uma renovação ou um novo convite. O login não restabelece a
+            credencial.
           </p>
           <p>
             Se você é advogado e quer criar seu próprio ambiente, cadastre seu

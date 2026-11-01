@@ -10,7 +10,7 @@ Permitir que advogados e equipes autorizadas acessem, configurem monitoramentos 
 
 | Módulo existente | Telas e responsabilidades | Dependências |
 |---|---|---|
-| identidade | Login Google, cadastro inicial com nome/OABs/escritório opcional, seleção de vínculo, aceite de convite e saída | Sessão e endpoints de identidade existentes |
+| identidade | Cadastro com e-mail verificado, senha e aplicativo autenticador, seleção de vínculo, aceite de convite e saída | Sessão e endpoints de identidade existentes |
 | autorizacao | Equipe, credenciais, convites, grupos, regras e membros; decisões por operação e tribunal | identidade; somente titular administra equipe/grupos |
 | monitoramentos | Perfil monitorado, lista, cadastro, detalhe, edição, desativação e reativação de partes e processos; filtros de tribunal | identidade e autorizacao |
 | consulta | Dashboard, lista por tribunal e detalhe independente de comunicações; estados, avisos e pendências | identidade, autorizacao e coleta |
@@ -20,7 +20,8 @@ Ordem proposta: identidade → autorização e monitoramentos → consulta/dashb
 
 ## Comportamento e critérios de aceite
 
-- Login Google sem senha local; onboarding inclui nome completo, OAB principal, OABs secundárias opcionais e escritório opcional. Vínculo selecionado e validade são reconhecidos pelo servidor; convite usa o fluxo existente.
+- Login com senha e TOTP obrigatório; onboarding inclui nome completo, OAB principal, OABs secundárias opcionais e escritório opcional. Vínculo selecionado e validade são reconhecidos pelo servidor; convite exige e-mail verificado.
+- **Esqueci minha senha:** `/reset-password` solicita o link e recebe seu token por fragmento, removido da barra e mantido apenas em memória. Nova senha e confirmação seguem a política do cadastro; sucesso somente após `204`, sem login automático. Expiração, link inválido/consumido e falhas de transporte possuem estado explícito. TOTP continua obrigatório.
 - Usuários de equipe e grupos seguem `SPEC-identidade.md` e `SPEC-autorizacao.md`: sem grupos há leituras padrão, não escrita implícita; concessões se somam e negação explícita prevalece. Administração é exclusiva do titular; remover último grupo não revoga credencial.
 - Partes e processos usam catálogo real de tribunais; sem filtro significa todos, seleção explícita não vazia. CNJ e OAB preservam zeros. Erro de catálogo não produz opções inventadas.
 - Lista de comunicações agrupa por tribunal sem fundir publicações por processo; detalhe apresenta origem disponível, vínculos autorizados e aviso de possível duplicidade para identidade pendente. Campos não fornecidos não são inventados. Texto da fonte é não confiável: renderizar como texto, nunca HTML bruto.
@@ -28,7 +29,7 @@ Ordem proposta: identidade → autorização e monitoramentos → consulta/dashb
 - O Escrevente é somente leitura. Coleta é limitada a Diário Eletrônico `D`; não implementar editais, busca histórica automática, fontes adicionais, relatórios ou avisos de publicação por e-mail. Convites de equipe por e-mail permanecem previstos.
 - Cada fluxo deve tratar carregamento, vazio, erro, sucesso e ausência de permissão quando aplicáveis. Dados de demonstração jamais substituem respostas reais nem simulam gravação ou autenticação.
 - Leituras, alterações e troca de vínculo em abas da aplicação são coordenadas com Web Locks; leituras conferem a sessão antes e depois da solicitação, e mutações comparam sessão e vínculo antes de enviar. Navegador sem Web Locks recebe erro e não envia operações protegidas. O backend continua responsável pela autorização efetiva.
-- A limitação de início do Google permanece por IP do cliente: o ingresso HTTPS confiável substitui os cabeçalhos internos de IP e segredo, e o Next.js rejeita o início de login sem essa configuração. Os detalhes e variáveis estão no README.
+- A limitação de autenticação deve ser aplicada no servidor; detalhes de ingresso e variáveis estão no README.
 - O link `/invite/accept#token=...` emitido pelo backend é recebido pela interface; o fragmento é removido da barra de endereço e o token fica em cookie HttpOnly de curta duração. A confirmação compara a impressão digital do convite aberto naquela aba, evitando aceitar um convite de outra aba. Não armazenar o token no cliente.
 
 ## Visual e acessibilidade
@@ -57,7 +58,7 @@ if (masked || value === "*") return { value: "*", note: "Sem permissão" };
 
 ## Testes e verificação
 
-Exercitar no navegador headless desktop e móvel: login/onboarding, troca de vínculo, cadastro e ciclo de monitoramentos, administração restrita, comunicações com HTML da fonte escapado, identidade pendente e dashboard com zero, falha, parcial e máscara. Confirmar erros e ausência de acesso com chamadas reais; RLS e autorização do servidor não são substituídas por controles escondidos. Testar login Google real quando houver credenciais, sem incluí-las no repositório. `node:test` cobre bordas de estado e transporte; executar também lint, tipos, formatação, build e verificação integrada.
+Exercitar no navegador headless desktop e móvel: cadastro, confirmação de e-mail, configuração e validação TOTP, login/onboarding, troca de vínculo, cadastro e ciclo de monitoramentos, administração restrita, comunicações com HTML da fonte escapado, identidade pendente e dashboard com zero, falha, parcial e máscara. Confirmar erros e ausência de acesso com chamadas reais; RLS e autorização do servidor não são substituídas por controles escondidos. `node:test` cobre bordas de estado e transporte; executar também lint, tipos, formatação, build e verificação integrada.
 
 ## Fronteiras
 
@@ -67,4 +68,4 @@ Exercitar no navegador headless desktop e móvel: login/onboarding, troca de ví
 
 ## Dependências externas para comprovação
 
-O teste de OAuth Google real exige cliente web e segredo externos configurados para `APP_ORIGIN/auth/google/callback`; a entrega SMTP real exige servidor e credenciais externos. Sessões e convites controlados comprovam os caminhos internos, não essas integrações externas.
+A entrega SMTP real exige servidor e credenciais externos. Sessões e convites controlados comprovam os caminhos internos, não a entrega externa.

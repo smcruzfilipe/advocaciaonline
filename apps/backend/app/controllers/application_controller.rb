@@ -2,7 +2,7 @@ class ApplicationController < ActionController::API
   include ActionController::Cookies
 
   SESSION_COOKIE = "__Host-advocacia_session".freeze
-  OIDC_COOKIE = "__Host-advocacia_oidc".freeze
+  AUTH_COOKIE = "__Host-advocacia_auth".freeze
   class AuthorizationDenied < StandardError; end
 
   before_action :prevent_caching
@@ -31,7 +31,7 @@ class ApplicationController < ActionController::API
 
   def require_authentication
     return if authenticated_context
-    api_error("authentication_required", "Entre com sua conta Google para continuar.", :unauthorized)
+    api_error("authentication_required", "Entre na sua conta para continuar.", :unauthorized)
   end
 
   def verify_csrf

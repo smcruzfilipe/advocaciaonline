@@ -18,7 +18,7 @@ class TeamInvitationMailer
       message.body = <<~BODY
         Você recebeu um convite para integrar uma equipe no Advocacia Online.
 
-        Para aceitar, acesse o link abaixo e entre com a conta Google de #{email}:
+        Para aceitar, acesse o link abaixo e entre com a conta de #{email}:
 
         #{url}
 

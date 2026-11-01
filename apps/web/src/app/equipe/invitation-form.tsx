@@ -63,7 +63,7 @@ export default function InvitationForm({
       });
       setRecorded(true);
       setMessage(
-        "Credencial criada e envio do convite confirmado. O destinatário deve aceitar com a conta Google do e-mail convidado.",
+        "Credencial criada e envio do convite confirmado. O destinatário deve aceitar com a conta do e-mail convidado.",
       );
       await onChanged();
     } catch (caught) {

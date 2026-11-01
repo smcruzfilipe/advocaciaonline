@@ -1,0 +1,136 @@
+# Local validation only: never deploy this PostgreSQL service to the application server.
+name: advocacia-local
+
+x-backend-image: &backend-image
+  image: advocacia-backend:local
+  build:
+    context: ./apps/backend
+    target: runtime
+
+services:
+  db:
+    image: advocacia-postgres:local
+    build:
+      context: ./apps/backend
+      dockerfile: ../../docker/local/postgres.Dockerfile
+    user: "70:70"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: advocacia_local
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:?Execute bin/local-up primeiro}
+      LOCAL_RUNTIME_PASSWORD: ${LOCAL_RUNTIME_PASSWORD:?Execute bin/local-up primeiro}
+      LOCAL_MIGRATOR_PASSWORD: ${LOCAL_MIGRATOR_PASSWORD:?Execute bin/local-up primeiro}
+    volumes:
+      - postgres:/var/lib/postgresql
+    tmpfs:
+      - /var/run/postgresql:uid=70,gid=70,mode=0770
+    networks: [data]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, postgres, -d, advocacia_local]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  migrate:
+    <<: *backend-image
+    user: "1000:1000"
+    command: [ruby, bin/migrate]
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:?Execute bin/local-up primeiro}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Execute bin/local-up primeiro}
+      MIGRATION_DATABASE_URL: postgresql://advocacia_migrator:${LOCAL_MIGRATOR_PASSWORD}@db/advocacia_local
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [data]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  api:
+    <<: *backend-image
+    user: "1000:1000"
+    restart: unless-stopped
+    env_file:
+      - path: .local/integrations.env
+        required: false
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:?Execute bin/local-up primeiro}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Execute bin/local-up primeiro}
+      AUTH_INGRESS_SECRET: ${AUTH_INGRESS_SECRET:?Execute bin/local-up primeiro}
+      DATABASE_URL: postgresql://advocacia_runtime:${LOCAL_RUNTIME_PASSWORD}@db/advocacia_local
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [data, default]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test:
+        - CMD
+        - ruby
+        - -rnet/http
+        - -ruri
+        - -e
+        - 'u = URI("http://127.0.0.1:3000/api/session"); r = Net::HTTP::Get.new(u); r["Host"] = URI(ENV.fetch("APP_ORIGIN")).host; exit(Net::HTTP.start(u.host, u.port) { |h| h.request(r) }.code == "200" ? 0 : 1)'
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  web:
+    image: advocacia-web:local
+    build: ./apps/web
+    user: "1000:1000"
+    restart: unless-stopped
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:?Execute bin/local-up primeiro}
+      RAILS_API_ORIGIN: http://api:3000
+      AUTH_INGRESS_SECRET: ${AUTH_INGRESS_SECRET:?Execute bin/local-up primeiro}
+    depends_on:
+      api:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, node, -e, 'require("node:http").get("http://127.0.0.1:3000/login", r => {r.resume(); process.exit(r.statusCode === 200 ? 0 : 1)}).on("error", () => process.exit(1))']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  ingress:
+    image: advocacia-ingress:local
+    build: ./docker/local
+    user: "1000:1000"
+    restart: unless-stopped
+    environment:
+      LOCAL_APP_HOST: ${LOCAL_APP_HOST:?Execute bin/local-up primeiro}
+      AUTH_INGRESS_SECRET: ${AUTH_INGRESS_SECRET:?Execute bin/local-up primeiro}
+    ports:
+      - "0.0.0.0:${LOCAL_HTTPS_PORT:-3001}:3443"
+    volumes:
+      - ./.local/tls:/run/tls:ro,Z
+    read_only: true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=0700
+    depends_on:
+      web:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, --no-check-certificate, https://127.0.0.1:3443/login]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+networks:
+  data:
+    internal: true
+
+volumes:
+  postgres:

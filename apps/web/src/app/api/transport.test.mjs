@@ -12,11 +12,8 @@ import {
   publicOrigin,
   railsFetch,
   responseHeaders,
-  safeGoogleRedirect,
   sameOrigin,
-  sessionDestination,
   trustedClientIp,
-  uiRedirect,
 } from "./transport.ts";
 
 const previousOrigin = process.env.APP_ORIGIN;
@@ -50,6 +47,10 @@ test("public origin requires HTTPS and rejects credentials or non-origin compone
 test("proxy only accepts existing API resource paths", () => {
   for (const path of [
     "/api/session",
+    "/api/auth/register",
+    "/api/auth/verify-email",
+    "/api/auth/login",
+    "/api/auth/totp",
     "/api/session/membership",
     "/api/monitorings/parties/abc",
     "/api/team/credentials/abc/renewal",
@@ -60,7 +61,7 @@ test("proxy only accepts existing API resource paths", () => {
   for (const path of [
     "https://attacker.test/api/session",
     "//attacker.test",
-    "/api/../auth/google",
+    "/api/../auth/login",
     "/api/arbitrary",
     "/api/session/extra",
     "/api/team/credentials/a%2fb",
@@ -75,7 +76,7 @@ test("upstream host comes from configuration and actual Origin is never invented
       Host: "attacker.test",
       Origin: "https://attacker.test",
       Cookie:
-        "__Host-advocacia_session=session; __Host-advocacia_invitation=private-invitation",
+        "__Host-advocacia_session=session; __Host-advocacia_auth=challenge; __Host-advocacia_registration=registration; __Host-advocacia_invitation=private-invitation",
       "X-CSRF-Token": "csrf",
     },
   });
@@ -85,7 +86,10 @@ test("upstream host comes from configuration and actual Origin is never invented
   assert.equal(headers.get("x-forwarded-proto"), "https");
   assert.equal(headers.get("origin"), "https://attacker.test");
   assert.equal(headers.get("x-csrf-token"), "csrf");
-  assert.equal(headers.get("cookie"), "__Host-advocacia_session=session");
+  assert.equal(
+    headers.get("cookie"),
+    "__Host-advocacia_session=session; __Host-advocacia_auth=challenge; __Host-advocacia_registration=registration",
+  );
   assert.equal(
     forwardedHeaders(new Request("http://internal.test")).has("origin"),
     false,
@@ -99,7 +103,7 @@ test("all Set-Cookie headers and private caching policy survive response adaptat
   });
   headers.append(
     "set-cookie",
-    "__Host-advocacia_oidc=; Path=/; Secure; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    "__Host-advocacia_auth=; Path=/; Secure; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
   );
   headers.append(
     "set-cookie",
@@ -109,47 +113,6 @@ test("all Set-Cookie headers and private caching policy survive response adaptat
   assert.equal(forwarded.getSetCookie().length, 2);
   assert.equal(forwarded.get("cache-control"), "no-store");
   assert.equal(forwarded.get("referrer-policy"), "no-referrer");
-});
-
-test("OAuth redirects are restricted to the backend Google authorization endpoint", () => {
-  assert.equal(
-    safeGoogleRedirect(
-      "https://accounts.google.com/o/oauth2/v2/auth?state=bound",
-    ),
-    true,
-  );
-  for (const value of [
-    "https://attacker.test",
-    "//accounts.google.com/o/oauth2/v2/auth",
-    "https://accounts.google.com.attacker.test/o/oauth2/v2/auth",
-    "https://user@accounts.google.com/o/oauth2/v2/auth",
-    "https://accounts.google.com/other",
-  ])
-    assert.equal(safeGoogleRedirect(value), false);
-});
-
-test("callback chooses fixed UI destinations and invitation wins over onboarding", () => {
-  assert.equal(
-    sessionDestination({ authenticated: true, onboarded: false }, true),
-    "/convite",
-  );
-  assert.equal(
-    sessionDestination({ authenticated: true, selection_required: true }),
-    "/vinculos",
-  );
-  assert.equal(
-    sessionDestination({ authenticated: true, onboarded: false }),
-    "/onboarding",
-  );
-  assert.equal(
-    sessionDestination({
-      authenticated: true,
-      onboarded: true,
-      next: "https://attacker.test",
-    }),
-    "/dashboard",
-  );
-  assert.equal(sessionDestination({ authenticated: false }), "/login");
 });
 
 test("invitation cookie is an opaque backend token with no arbitrary cookie content", () => {
@@ -212,7 +175,7 @@ test("invitation persistence has secure host-only short-lived HttpOnly semantics
 test("only the authenticated ingress can supply an individual login address", () => {
   process.env.AUTH_INGRESS_SECRET = "s".repeat(43);
   const request = (secret, ip) =>
-    new Request("https://app.test/auth/google", {
+    new Request("https://app.test/api/auth/login", {
       headers: {
         "x-advocacia-ingress-secret": secret,
         "x-advocacia-client-ip": ip,
@@ -235,8 +198,10 @@ test("public host reaches the backend host authorization over a real connection"
   const server = createServer((request, response) => {
     const authorized =
       request.headers.host === "app.test" &&
-      (request.url !== "/auth/google" ||
-        request.headers["x-forwarded-for"] === "198.51.100.24");
+      (request.url !== "/api/auth/login" ||
+        (request.headers["x-advocacia-client-ip"] === "198.51.100.24" &&
+          request.headers["x-advocacia-ingress-secret"] === "s".repeat(43) &&
+          !request.headers["x-forwarded-for"]));
     response.writeHead(authorized ? 200 : 403);
     response.end();
   });
@@ -244,6 +209,7 @@ test("public host reaches the backend host authorization over a real connection"
   await once(server, "listening");
   try {
     process.env.APP_ORIGIN = "https://app.test";
+    process.env.AUTH_INGRESS_SECRET = "s".repeat(43);
     process.env.RAILS_API_ORIGIN = `http://127.0.0.1:${server.address().port}`;
     const response = await railsFetch(
       new Request("https://app.test/api/session"),
@@ -251,8 +217,8 @@ test("public host reaches the backend host authorization over a real connection"
     );
     assert.equal(response.status, 200);
     const authResponse = await railsFetch(
-      new Request("https://app.test/auth/google"),
-      "/auth/google",
+      new Request("https://app.test/api/auth/login"),
+      "/api/auth/login",
       { clientIp: "198.51.100.24" },
     );
     assert.equal(authResponse.status, 200);
@@ -347,22 +313,4 @@ test("an oversized streamed mutation is rejected before reaching the backend in 
     server.close();
     await once(server, "close");
   }
-});
-
-test("callback adaptation retains all cookies and never includes provider parameters in its redirect", () => {
-  process.env.APP_ORIGIN = "https://app.test";
-  const headers = new Headers();
-  headers.append(
-    "set-cookie",
-    "__Host-advocacia_oidc=; Path=/; Secure; HttpOnly; Max-Age=0",
-  );
-  headers.append(
-    "set-cookie",
-    "__Host-advocacia_session=opaque; Path=/; Secure; HttpOnly",
-  );
-  const result = uiRedirect("/convite", new Response(null, { headers }));
-  assert.equal(result.status, 303);
-  assert.equal(result.headers.get("location"), "https://app.test/convite");
-  assert.equal(result.headers.getSetCookie().length, 2);
-  assert.equal(result.headers.get("cache-control"), "no-store");
 });

@@ -71,6 +71,8 @@ async function invitationRequest(
 }
 
 function captureInvitation(): Promise<void> {
+  if (["/verify-email", "/reset-password"].includes(window.location.pathname))
+    return Promise.resolve();
   const fragment = new URLSearchParams(window.location.hash.slice(1));
   if (!fragment.has("token")) return fragmentCapture ?? Promise.resolve();
   // Erase the sensitive fragment before any navigation. No storage, URL query,

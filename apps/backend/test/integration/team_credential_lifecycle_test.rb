@@ -23,9 +23,7 @@ class TeamCredentialLifecycleTest < ActiveSupport::TestCase
   end
 
   def accept_credential
-    member = SecureRandom.urlsafe_base64(32)
-    IdentityStore.authenticate(subject: SecureRandom.uuid, email: @email, token: member,
-      csrf: SecureRandom.urlsafe_base64(32))
+    member, = authenticated_session(email: @email)
     IdentityStore.accept_invitation(token: member, invitation_token: @invitation)
     member
   end

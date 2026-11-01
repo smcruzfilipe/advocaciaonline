@@ -26,9 +26,8 @@ class TeamInvitationsTest < ActiveSupport::TestCase
     deliver { IdentityStore.create_credential(token: @owner, email: @email, validity_days: days, smtp: {}) }
   end
 
-  def google_identity(email = @email)
-    token = SecureRandom.urlsafe_base64(32)
-    IdentityStore.authenticate(subject: SecureRandom.uuid, email: email, token: token, csrf: SecureRandom.urlsafe_base64(32))
+  def verified_identity(email = @email)
+    token, = authenticated_session(email: email)
     token
   end
 
@@ -46,12 +45,12 @@ class TeamInvitationsTest < ActiveSupport::TestCase
     refute member.key?("token")
   end
 
-  test "acceptance requires the invited verified Google email and is single use" do
+  test "acceptance requires the invited verified email and is single use" do
     member = credential
-    wrong = google_identity("wrong@example.test")
+    wrong = verified_identity("wrong@example.test")
     assert_raises(IdentityStore::NotFound) { IdentityStore.accept_invitation(token: wrong, invitation_token: @sent_tokens.last) }
     assert_nil IdentityStore.context(wrong).fetch("tenant_id")
-    right = google_identity(@email.upcase)
+    right = verified_identity(@email.upcase)
     accepted = IdentityStore.accept_invitation(token: right, invitation_token: @sent_tokens.last)
     assert_equal member.fetch("id"), accepted.fetch("membership_id")
     assert_equal member.fetch("tenant_id"), IdentityStore.context(right).fetch("tenant_id")
@@ -66,7 +65,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
     refute_equal original, replacement
     assert_equal member.fetch("credential_started_at"), reissued.fetch("credential_started_at")
     assert_equal member.fetch("expires_at"), reissued.fetch("expires_at")
-    invited = google_identity
+    invited = verified_identity
     assert_raises(IdentityStore::NotFound) { IdentityStore.accept_invitation(token: invited, invitation_token: original) }
     assert_equal member.fetch("id"), IdentityStore.accept_invitation(token: invited, invitation_token: replacement).fetch("membership_id")
     assert_raises(IdentityStore::Conflict) { deliver { IdentityStore.reissue_invitation(token: @owner, membership_id: member.fetch("id"), smtp: {}) } }
@@ -78,7 +77,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
       row = connection.exec_params("SELECT i.expires_at = m.expires_at AS bounded FROM app_private.team_invitations i JOIN app_private.tenant_memberships m ON m.id = i.membership_id WHERE m.id = $1", [member.fetch("id")]).first
       assert_equal "t", row.fetch("bounded")
     end
-    invited = google_identity
+    invited = verified_identity
     IdentityStore.revoke_credential(token: @owner, membership_id: member.fetch("id"))
     assert_raises(IdentityStore::NotFound) { IdentityStore.accept_invitation(token: invited, invitation_token: @sent_tokens.last) }
     assert_raises(IdentityStore::Conflict) { deliver { IdentityStore.reissue_invitation(token: @owner, membership_id: member.fetch("id"), smtp: {}) } }
@@ -90,7 +89,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
       connection.exec_params("UPDATE app_private.team_invitations SET issued_at = statement_timestamp() - interval '24 hours', expires_at = statement_timestamp() WHERE membership_id = $1", [member.fetch("id")])
     end
     IdentityStore.renew_credential(token: @owner, membership_id: member.fetch("id"))
-    invited = google_identity
+    invited = verified_identity
     assert_raises(IdentityStore::NotFound) { IdentityStore.accept_invitation(token: invited, invitation_token: @sent_tokens.last) }
     deliver { IdentityStore.reissue_invitation(token: @owner, membership_id: member.fetch("id"), smtp: {}) }
     assert_equal member.fetch("id"), IdentityStore.accept_invitation(token: invited, invitation_token: @sent_tokens.last).fetch("membership_id")
@@ -112,7 +111,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
     reissued = deliver { IdentityStore.reissue_invitation(token: @owner, membership_id: member.fetch("id"), smtp: {}) }
     assert_equal member.fetch("credential_started_at"), reissued.fetch("credential_started_at")
     assert_equal member.fetch("expires_at"), reissued.fetch("expires_at")
-    invited = google_identity
+    invited = verified_identity
     assert_raises(IdentityStore::NotFound) { IdentityStore.accept_invitation(token: invited, invitation_token: uncertain) }
     assert_equal member.fetch("id"), IdentityStore.accept_invitation(token: invited, invitation_token: @sent_tokens.last).fetch("membership_id")
   end
@@ -130,7 +129,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
       end
     end
     uncertain = @sent_tokens.last
-    invited = google_identity
+    invited = verified_identity
     assert_raises(IdentityStore::NotFound) { IdentityStore.accept_invitation(token: invited, invitation_token: original) }
     reissued = deliver { IdentityStore.reissue_invitation(token: @owner, membership_id: member.fetch("id"), smtp: {}) }
     assert_equal member.fetch("credential_started_at"), reissued.fetch("credential_started_at")
@@ -176,7 +175,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
     administer do |connection|
       connection.exec_params("UPDATE app_private.tenant_memberships SET expires_at = statement_timestamp() WHERE id = $1", [member.fetch("id")])
     end
-    invited = google_identity
+    invited = verified_identity
     assert_raises(IdentityStore::NotFound) { IdentityStore.accept_invitation(token: invited, invitation_token: @sent_tokens.last) }
     assert_raises(IdentityStore::Conflict) do
       deliver { IdentityStore.reissue_invitation(token: @owner, membership_id: member.fetch("id"), smtp: {}) }
@@ -186,7 +185,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
 
   test "simultaneous acceptance consumes one token exactly once" do
     member = credential
-    invited = google_identity
+    invited = verified_identity
     invitation = @sent_tokens.last
     ready = Queue.new
     start = Queue.new

@@ -18,13 +18,13 @@ A raiz é compartilhada pelo produto inteiro; não é a raiz de uma aplicação 
 | `tasks/` | Plano, gates e checklist de implementação do monorepo. | Existente. |
 | `SPEC-*.md` e `CAPABILITIES.md` | Contratos funcionais e mapa de capacidades do produto. | Existentes na raiz. |
 
-Frontend e API terão imagens Docker separadas. O despachante já tem target próprio `despachante` em `apps/backend/Dockerfile`; o target da API é `runtime`. Processos e imagens separados não significam repositórios separados. PostgreSQL é infraestrutura compartilhada: imagem separada somente para testes locais e instância já existente no deploy.
+Frontend e API têm imagens Docker separadas. O despachante tem target próprio `despachante` em `apps/backend/Dockerfile`; o target da API é `runtime`. Processos e imagens separados não significam repositórios separados. PostgreSQL é infraestrutura compartilhada: imagem separada somente para testes locais e instância já existente no deploy.
 
 A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha as fronteiras. O [guia visual](docs/design-system.md#escopo-no-monorepo) orienta a interface de `apps/web/`, não uma aplicação independente deste repositório.
 
 ## Escopo funcional
 
-- Login Google para advogado e equipe; o contrato de identidade não prevê senha local para usuários da aplicação.
+- Login para advogado e equipe com senha e aplicativo autenticador (TOTP) obrigatório; o cadastro requer confirmação do e-mail.
 - Isolamento por tenant do advogado, autorização por grupos e tribunal, monitoramentos de advogados/partes/processos e consulta de comunicações.
 - Duas coletas diárias do DJEN, somente Diário Eletrônico (`D`), sem editais (`E`): cadernos e fallback paginado na primeira execução, API paginada diretamente na segunda e deduplicação pela combinação de `id` e `hash`.
 - Dashboard e registros append-only do fluxo de coleta.
@@ -37,9 +37,37 @@ O mapa de módulos e a ordem de dependências estão em [`CAPABILITIES.md`](CAPA
 - Frontend: Next.js.
 - Banco de dados: PostgreSQL com Row-Level Security (RLS).
 
-O projeto é um monorepo. As imagens de frontend e backend serão separadas; a imagem PostgreSQL será usada somente para testes locais. No deploy, a aplicação usará a instância PostgreSQL já existente no servidor. A criação do banco da aplicação e as migrations nessa instância dependem das permissões e do procedimento de deploy, ainda não definidos. Todas as imagens deverão ser mínimas e executar sem root, conforme [`AGENTS.md`](AGENTS.md).
+O projeto é um monorepo. As imagens de frontend e backend são separadas; a imagem PostgreSQL do Compose é exclusiva da validação local. No deploy, a aplicação usará a instância PostgreSQL já existente no servidor. A criação do banco da aplicação e as migrations nessa instância dependem das permissões e do procedimento de deploy, ainda não definidos. Os processos dos containers locais executam sem root, conforme [`AGENTS.md`](AGENTS.md).
 
 Versões de referência e limites da decisão: [`docs/stack.md`](docs/stack.md). Estrutura e ferramentas propostas para os demais componentes estão em [`docs/arquitetura.md`](docs/arquitetura.md).
+
+## Execução local pela Tailscale
+
+O `compose.yaml` é **somente local**, não um procedimento de deploy. Sobe PostgreSQL isolado, migration de execução única, API Rails, frontend Next.js standalone e ingresso Nginx HTTPS. Não inicia despachante nem processador de coletas, não cria dados demonstrativos e não oferece bypass de login.
+
+Pré-requisitos: Docker com Compose v2.24 ou superior, OpenSSL, Tailscale conectado com MagicDNS/HTTPS habilitados e permissão para `tailscale cert` (ou sudo). A chave TLS precisa ser legível pelo UID 1000 do ingresso; nesta máquina o usuário local também tem UID 1000.
+
+```bash
+bash bin/local-up apps-contabo.tail519952.ts.net 3001
+```
+
+Acesso nesta máquina: **https://apps-contabo.tail519952.ts.net:3001/login**. Abra pelo nome DNS em outra máquina da mesma tailnet; o certificado não cobre o IP numérico. A porta HTTPS é publicada em **`0.0.0.0:3001`**, inclusive nas interfaces externas, sujeita ao firewall; isso não restringe o acesso à Tailscale. API e PostgreSQL não publicam portas. O frontend escuta internamente em `0.0.0.0:3000`, acessível externamente apenas pelo ingresso HTTPS.
+
+O script gera segredos aleatórios uma única vez em `.local/compose.env`, arquivo privado ignorado pelo Git. Não apague esse arquivo ao reiniciar: as senhas precisam continuar correspondendo ao volume existente. O PostgreSQL inicializa diretamente como UID/GID `70:70` com SCRAM para conexões de rede; o volume `advocacia-local_postgres` herda as permissões preparadas na imagem. API e migration recebem somente suas próprias credenciais. Os demais containers executam como `1000:1000`, sem capabilities e sem escalada de privilégios.
+
+Para cadastro, redefinição de senha e convites, forneça as cinco variáveis `SMTP_*` documentadas abaixo em `.local/integrations.env`. Proteja o arquivo com `chmod 600 .local/integrations.env`; não versione nem publique seus valores. Sem SMTP, a confirmação do e-mail, a recuperação de senha e o envio de convites não funcionam.
+
+O link de confirmação deve ser aberto no mesmo navegador usado para iniciar o cadastro. Senhas podem ser redefinidas por **Esqueci minha senha**, em `/reset-password`: o link enviado por e-mail expira em 30 minutos, é de uso único e uma nova solicitação invalida o anterior. A confirmação encerra sessões e desafios de login anteriores; não cria sessão nem modifica o autenticador. Ainda não há recuperação do aplicativo autenticador. A perda de `SECRET_KEY_BASE` impede decifrar os segredos dos autenticadores já cadastrados; preserve esse segredo fora do repositório.
+
+```bash
+# Recriar a API após fornecer/alterar as integrações:
+docker compose --env-file .local/compose.env up -d --no-deps --force-recreate api
+# Consultar o estado ou parar sem apagar o banco:
+docker compose --env-file .local/compose.env ps
+docker compose --env-file .local/compose.env stop
+```
+
+Execute novamente `bin/local-up` para reiniciar/atualizar e renovar o certificado quando necessário; a emissão Tailscale é consultada em cada execução. Depois de uma renovação sem recriação do ingresso, use `docker compose --env-file .local/compose.env restart ingress` para carregar o certificado novo. Nunca use `down -v` como reinício: isso elimina o banco local. Este ambiente não muda os checkpoints funcionais nem autoriza deploy.
 
 ## Interface web em desenvolvimento
 
@@ -60,17 +88,17 @@ docker run --rm -it --name advocacia-web --network advocacia-local \
 
 Enquanto o container estiver ativo, `docker exec advocacia-web npm run format:check`, `docker exec advocacia-web npm run lint`, `docker exec advocacia-web npm run typecheck`, `docker exec advocacia-web npm test` e `docker exec advocacia-web npm run build` executam as verificações. O diretório de dependências e o build usam tmpfs; não são instalados no host.
 
-O ingresso público deve terminar TLS, encaminhar a mesma origem ao Next.js e **substituir**, não concatenar nem confiar nos valores do navegador, os cabeçalhos `X-Advocacia-Client-IP` pelo endereço IP real do cliente e `X-Advocacia-Ingress-Secret` pelo valor protegido de `AUTH_INGRESS_SECRET` nas requisições a `/auth/google`. O segredo deve ser acessível somente ao ingresso e ao processo Next.js; impedir acesso público direto ao Next.js e à API. O Next.js envia o IP autenticado ao Rails para preservar a limitação por cliente; a conexão interna deve vir de uma rede de proxy confiável para a configuração Rails. Se houver balanceador anterior, o ingresso só pode usar o IP repassado por ele depois de validar sua cadeia de confiança.
+O ingresso público deve terminar TLS, encaminhar a mesma origem ao Next.js e **substituir**, não concatenar nem confiar nos valores do navegador, os cabeçalhos `X-Advocacia-Client-IP` pelo endereço IP real do cliente e `X-Advocacia-Ingress-Secret` pelo valor protegido de `AUTH_INGRESS_SECRET` nas requisições de autenticação. O segredo deve ser acessível somente ao ingresso, Next.js e API; impedir acesso público direto ao Next.js e à API. Se houver balanceador anterior, o ingresso só pode usar o IP repassado por ele depois de validar sua cadeia de confiança.
 
-Não registrar query strings do callback OAuth nem os cabeçalhos internos em logs de ingresso ou observabilidade. O login requer cliente Google registrado e o convite requer SMTP configurado. A API e o frontend compartilham `APP_ORIGIN`; cookies `Secure` e CSRF exigem HTTPS também no desenvolvimento. Leituras e mutações exigem um navegador com Web Locks em contexto seguro para coordenar sessões e vínculos entre abas. O relay aceita até 1 MiB de corpo por requisição e impõe prazo de 20 segundos; configure também limites de corpo e tempo no ingresso HTTPS. Se uma mutação perder a confirmação, consulte o estado antes de repeti-la.
+Não registrar tokens, senhas, códigos TOTP nem os cabeçalhos internos em logs de ingresso ou observabilidade. A API e o frontend compartilham `APP_ORIGIN`; cookies `Secure` e CSRF exigem HTTPS também no desenvolvimento. Leituras e mutações exigem um navegador com Web Locks em contexto seguro para coordenar sessões e vínculos entre abas. O relay aceita até 1 MiB de corpo por requisição e impõe prazo de 20 segundos; configure também limites de corpo e tempo no ingresso HTTPS. Se uma mutação perder a confirmação, consulte o estado antes de repeti-la.
 
 ## Swagger UI e acesso à documentação
 
-Requisito registrado: a documentação interativa da API será publicada com Swagger UI e protegida por login e senha. O contrato proposto usa autenticação HTTP Basic separada do login Google, exclusivamente por HTTPS, conforme [`docs/arquitetura.md`](docs/arquitetura.md#identidade-convites-e-documentação). O Swagger UI ainda não existe; não há usuário ou senha padrão, nem credenciais versionadas.
+Requisito registrado: a documentação interativa da API será publicada com Swagger UI e protegida por login e senha. O contrato proposto usa autenticação HTTP Basic separada da aplicação, exclusivamente por HTTPS, conforme [`docs/arquitetura.md`](docs/arquitetura.md#identidade-convites-e-documentação). O Swagger UI ainda não existe; não há usuário ou senha padrão, nem credenciais versionadas.
 
 ## Variáveis de ambiente
 
-As variáveis abaixo são lidas pelos componentes, seus testes ou processos indicados; a conexão do processador é exclusiva dessa fronteira. Forneça valores sem default pelo gerenciador de segredos ou ambiente protegido do deploy; não versione credenciais nem URLs contendo senhas. As credenciais Google exigem um cliente OAuth web registrado externamente, com URI de redirecionamento exatamente `APP_ORIGIN/auth/google/callback`.
+As variáveis abaixo são lidas pelos componentes, seus testes ou processos indicados; a conexão do processador é exclusiva dessa fronteira. Forneça valores sem default pelo gerenciador de segredos ou ambiente protegido do deploy; não versione credenciais nem URLs contendo senhas.
 
 | Variável | Default | Obrigatória? | Finalidade |
 |---|---|---|---|
@@ -78,28 +106,34 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | `MIGRATION_DATABASE_URL` | Nenhum | Sim, para migration e teste administrativo de sessão; não fornecer à API web | Conexão com `advocacia_migrator`, separada da role de execução. |
 | `DESPACHANTE_DATABASE_URL` | Nenhum | Sim, no despachante e nos testes do despachante; não fornecer à API web | Conexão PostgreSQL isolada com a role `advocacia_despachante`, exclusiva do processo confiável de planejamento; fornecer externamente por ambiente protegido ou gerenciador de segredos. |
 | `PROCESSADOR_DATABASE_URL` | Nenhum | Sim, no processador e nos testes de fronteira do Escrevente; não fornecer à API nem ao despachante | Conexão PostgreSQL exclusiva com a role `advocacia_processador`, provisionada administrativamente por `apps/backend/db/provision_processador.sql` antes da migration do Escrevente. Fornecer credencial e URL externamente por ambiente protegido ou gerenciador de segredos, sem registrar segredo no repositório. |
-| `POSTGRES_DB` | `POSTGRES_USER` da imagem PostgreSQL; `postgres` quando este não é definido | Não na imagem; o CI define `advocacia_test` | Nome do banco criado na primeira inicialização do PostgreSQL descartável do CI; não configura o banco de deploy. |
-| `POSTGRES_HOST_AUTH_METHOD` | `scram-sha-256` na imagem PostgreSQL 18; `trust` no CI | Não na imagem; o CI define `trust` para o banco descartável sem senha | Método de autenticação para conexões de rede na inicialização do banco de teste; `trust` é usado exclusivamente na rede interna descartável do CI, nunca no deploy. |
+| `POSTGRES_DB` | `POSTGRES_USER` da imagem PostgreSQL; `postgres` quando este não é definido; `advocacia_local` no Compose local | Não na imagem; Compose e CI fornecem um nome | Banco criado na primeira inicialização do PostgreSQL local/descartável; o CI usa `advocacia_test`. Não configura o banco de deploy. |
+| `POSTGRES_HOST_AUTH_METHOD` | `scram-sha-256` na imagem PostgreSQL 18; `trust` no CI | Não na imagem; o CI define `trust` para o banco descartável sem senha | Método de autenticação para conexões de rede na inicialização do banco; o Compose local mantém SCRAM. `trust` é exclusivo da rede interna descartável do CI, nunca do deploy. |
+| `POSTGRES_PASSWORD` | Nenhum | Sim, no PostgreSQL local | Senha administrativa, recebida de `LOCAL_POSTGRES_PASSWORD` pelo Compose. Não é fornecida à API. |
+| `LOCAL_APP_HOST` | Nenhum | Sim, no ambiente local | Nome DNS Tailscale com certificado HTTPS; fornecido pelo primeiro argumento de `bin/local-up` e guardado em `.local/compose.env`. |
+| `LOCAL_HTTPS_PORT` | `3001` | Não | Porta HTTPS local publicada em `0.0.0.0`; segundo argumento de `bin/local-up` na primeira execução. |
+| `LOCAL_POSTGRES_PASSWORD` | Nenhum | Sim, no Compose local | Senha administrativa gerada por `bin/local-up` e preservada no arquivo privado `.local/compose.env`. |
+| `LOCAL_RUNTIME_PASSWORD` | Nenhum | Sim, no Compose local | Senha SCRAM da role `advocacia_runtime`, gerada no mesmo arquivo privado; compõe somente a URL da API. |
+| `LOCAL_MIGRATOR_PASSWORD` | Nenhum | Sim, no Compose local | Senha SCRAM da role `advocacia_migrator`, gerada no mesmo arquivo privado; compõe somente a URL do processo de migration. |
 | `COLETA_HORARIO_1` | Nenhum | Sim, no despachante | Primeiro horário diário em `HH:MM`, fuso `America/Sao_Paulo`, a partir de `04:00`; fornecer pela configuração do processo. |
 | `COLETA_HORARIO_2` | Nenhum | Sim, no despachante | Segundo horário diário em `HH:MM`, posterior ao primeiro; fornecer pela configuração do processo. |
 | `COLETA_TENTATIVAS_POR_CAMINHO` | `3` | Não | Número máximo de tentativas de cada caminho, inteiro de 1 a 3; qualquer mudança requer aprovação. |
 | `COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS` | `60` | Não | Espera em segundos após a primeira falha, inteiro positivo; alterações requerem aprovação. |
 | `COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS` | `300` | Não | Espera em segundos após a segunda falha, inteiro positivo; alterações requerem aprovação. |
 | `PROCESSADOR_TEST_ADMIN_DATABASE_URL` | Nenhum | Sim, apenas na integração do processador em banco descartável | Conexão administrativa usada exclusivamente para preparar e remover dados sintéticos do teste; fornecer no ambiente protegido de teste, nunca no processo de produção ou com acesso a banco real. |
-| `APP_ORIGIN` | Nenhum | Sim, para frontend, API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS compartilhada, sem caminho ou credenciais; forneça pelo ambiente protegido. A API valida origens de operações mutáveis e compõe o callback Google; o proxy web usa seu host canônico para contatar a API. |
-| `RAILS_API_ORIGIN` | Nenhum | Sim, no frontend | Origem interna da API Rails, acessível somente ao servidor Next.js; forneça pela configuração protegida do ambiente, sem expô-la ao navegador. |
-| `AUTH_INGRESS_SECRET` | Nenhum | Sim, no frontend para iniciar login Google | Segredo compartilhado com o proxy HTTPS confiável para autenticar o IP do cliente encaminhado à limitação de login. Gere pelo menos 32 bytes aleatórios e forneça ao Next.js e ao proxy por um gerenciador de segredos; nunca o exponha ao navegador nem registre seu valor. Sem ele ou sem os cabeçalhos confiáveis, o login falha fechado. |
-| `GOOGLE_CLIENT_ID` | Nenhum | Sim, para autenticação Google | Identificador do cliente OAuth web. |
-| `GOOGLE_CLIENT_SECRET` | Nenhum | Sim, para autenticação Google | Segredo do cliente OAuth web; fornecer por mecanismo de segredos. |
-| `SMTP_HOST` | Nenhum | Sim, para enviar convites | Host do servidor SMTP; fornecer pela configuração protegida do ambiente. |
-| `SMTP_PORT` | Nenhum | Sim, para enviar convites | Porta TCP do servidor SMTP com STARTTLS obrigatório; fornecer pela configuração protegida do ambiente. |
-| `SMTP_USERNAME` | Nenhum | Sim, para enviar convites | Usuário de autenticação SMTP; fornecer pela configuração protegida do ambiente. |
-| `SMTP_PASSWORD` | Nenhum | Sim, para enviar convites | Senha de autenticação SMTP; fornecer por gerenciador de segredos, sem versioná-la. |
-| `SMTP_FROM` | Nenhum | Sim, para enviar convites | Endereço remetente autorizado no servidor SMTP; fornecer pela configuração protegida do ambiente. |
-| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails usado para proteção de tentativas de autenticação; gerar e fornecer externamente. |
+| `APP_ORIGIN` | Nenhum | Sim, para frontend, API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS compartilhada, sem caminho ou credenciais; forneça pelo ambiente protegido. A API valida origens de operações mutáveis e compõe links de confirmação; o proxy web usa seu host canônico para contatar a API. |
+| `RAILS_API_ORIGIN` | Nenhum; `http://api:3000` no Compose local | Sim, no frontend | Origem interna da API Rails, acessível somente ao servidor Next.js; forneça pela configuração protegida do ambiente, sem expô-la ao navegador. |
+| `AUTH_INGRESS_SECRET` | Nenhum | Sim, no ingresso, frontend e API para autenticação | Segredo compartilhado para autenticar o IP do cliente encaminhado à limitação de autenticação. Gere pelo menos 32 bytes aleatórios e forneça por gerenciador de segredos; nunca exponha ao navegador nem registre seu valor. Sem ele ou sem os cabeçalhos confiáveis, a autenticação falha fechada. |
+| `SMTP_HOST` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Host do servidor SMTP; fornecer pela configuração protegida do ambiente. |
+| `SMTP_PORT` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Porta TCP do servidor SMTP com STARTTLS obrigatório; fornecer pela configuração protegida do ambiente. |
+| `SMTP_USERNAME` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Usuário de autenticação SMTP; fornecer pela configuração protegida do ambiente. |
+| `SMTP_PASSWORD` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Senha de autenticação SMTP; fornecer por gerenciador de segredos, sem versioná-la. |
+| `SMTP_FROM` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Endereço remetente autorizado no servidor SMTP; fornecer pela configuração protegida do ambiente. |
+| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails usado para proteção de tentativas e segredos de autenticação; gerar e fornecer externamente. Preservar entre reinícios. |
 | `RAILS_ENV` | `production` na imagem runtime; `test` na imagem de testes | Não | Seleciona o ambiente Rails. |
 | `RAILS_LOG_LEVEL` | `info` | Não | Nível de logging. |
-| `PORT` | `3000` | Não | Porta do servidor Puma. |
+| `PORT` | `3000` nas imagens API e web | Não | Porta interna do servidor Puma ou Next.js; a publicação HTTPS local é controlada por `LOCAL_HTTPS_PORT`. |
+| `HOSTNAME` | `0.0.0.0` na imagem web | Não | Endereço de escuta do servidor Next.js standalone dentro do container. |
+| `NODE_ENV` | `production` na imagem web | Não | Seleciona o runtime otimizado Next.js. |
 | `RAILS_MAX_THREADS` | `5` | Não | Número de threads Puma e tamanho do pool de conexões PostgreSQL. |
 | `BUNDLE_PATH` | `/bundle` na imagem | Não | Diretório das gems na imagem. |
 | `BUNDLE_FROZEN` | `true` na imagem | Não | Impede alteração do lockfile pelo Bundler. |
@@ -125,6 +159,23 @@ Não há prazo automático de retenção do Escrevente nesta etapa. As configura
 
 ## Implementação e verificações
 
+**Redefinição de senha:** suíte Rails em PostgreSQL descartável com roles segregadas: 480 testes, 10.711 assertions, sem falhas, erros ou skips. Passaram também os 30 testes Node, tipos, lint, formatação e build web. Na URL HTTPS da aplicação, Chromium exercitou redefinição com conta sintética, rejeição de senha antiga, exigência do autenticador já cadastrado e login com a nova senha e TOTP. A tela de recuperação foi conferida em 390px, sem transbordamento horizontal. Um pedido real para o endereço autorizado pelo Resend retornou 202 após aceitação SMTP; recebimento na caixa de entrada depende do destinatário. A fixture foi removida, sem alterar a senha da conta real. Os containers da aplicação foram atualizados e permanecem ativos.
+
+**Senha e TOTP:** em PostgreSQL descartável com roles segregadas, as migrations foram aplicadas e os testes focados de autenticação passaram: 11 testes, 96 assertions. A suíte Rails completa passou com 459 testes e 10.477 assertions. Um smoke HTTP no processo Rails verificou cadastro, confirmação de e-mail, recusa antes do segundo fator, login com TOTP e recusa de reutilização do código; o envio SMTP foi simulado. No frontend, passaram os 30 testes Node, verificação de tipos, lint, formatação e build; o servidor Next retornou `/login` e sessão anônima com HTTP 200. O navegador não pôde ser iniciado neste ambiente, portanto a interação visual não foi verificada. Os containers locais permaneceram parados. A entrega por SMTP externo não foi verificada.
+
+**Containerização local pela Tailscale:** builds das quatro imagens concluídos; verificação HTTP sem navegador confirmou certificado Let's Encrypt válido, `/login` com HTTP 200, sessão anônima real e dashboard protegida com HTTP 401. A API conectou como `advocacia_runtime`, sem credenciais administrativas, e leu sete migrations. Após reiniciar somente o PostgreSQL, as sete migrations permaneceram no volume. Processos reais de API, web e ingresso executaram com UID/GID 1000:1000; processos PostgreSQL com 70:70. As quatro roles da aplicação não possuem superuser nem BYPASSRLS. Google OAuth e SMTP não estão configurados neste ambiente; não houve teste no navegador nem comprovação dessas integrações externas.
+
+Tamanhos locais descompactados medidos com `docker image inspect`:
+
+| Imagem | Tamanho (MiB) | Base e motivo |
+|---|---:|---|
+| `advocacia-web:local` | 283,3 | Node 24.22.1 Alpine; build separado, somente saída standalone e assets, sem npm/yarn no runtime. |
+| `advocacia-backend:local` | 251,2 | Ruby 4.0.9 Alpine 3.23; compiladores e dependências de teste ficam fora do target runtime existente. |
+| `advocacia-postgres:local` | 409,7 | PostgreSQL 18.6 Alpine 3.23; imagem oficial menor que a variante Debian disponível, com diretórios preparados no build para inicialização não root. Exclusiva do ambiente local. |
+| `advocacia-ingress:local` | 68,8 | Nginx 1.28.0 Alpine; TLS e substituição dos cabeçalhos confiáveis, sem ferramentas adicionais. |
+
+Referências: [Next.js standalone](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [dependências e healthchecks Compose](https://docs.docker.com/reference/compose-file/services/), [entrypoint oficial PostgreSQL](https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh).
+
 **Interface web:** em containers não root, `npm run format:check`, `npm run lint`, `npm run typecheck` e `npm test` passaram; o runner executou **33 testes**, sem falhas ou skips. `npm run build` gerou o build Next.js de produção. No Chromium headless, o build foi exercitado com Rails e PostgreSQL descartável: onboarding, troca de vínculo entre abas, operações de monitoramento e equipe, grupos, dashboard parcial e mascarada, comunicações independentes e HTML da fonte como texto. A 320 px não houve transbordamento horizontal.
 
 Um SMTP descartável com STARTTLS e certificado de teste recebeu criação e reemissão de convite; o link efetivamente entregue foi aberto e aceito pela interface com sessão sintética. Também foi exercitada a falha de SMTP sem perder a credencial. Não houve login Google nem entrega em servidor SMTP externos. A consulta ao catálogo real do DJEN retornou 503 na API, após a fonte responder 403 neste ambiente; o fluxo de seleção bem-sucedida de tribunal real continua sem comprovação. O checklist detalhado está em [`apps/web/endpoints.md`](apps/web/endpoints.md).
@@ -141,19 +192,25 @@ As decisões de transação e privilégios seguem as referências oficiais de [f
 
 | Método e caminho | Comportamento |
 |---|---|
-| `GET /auth/google` | Inicia autenticação Google por authorization code com PKCE. |
-| `GET /auth/google/callback` | Valida o retorno Google e cria sessão; sucesso devolve JSON, falha devolve `401`. |
+| `POST /api/auth/register` | Solicita cadastro com e-mail e senha; a confirmação é enviada por e-mail. |
+| `POST /api/auth/verify-email` | Confirma o e-mail usando token de uso único. |
+| `POST /api/auth/login` | Valida senha e inicia o desafio TOTP, sem criar sessão. |
+| `POST /api/auth/totp` | Valida o código do autenticador e cria sessão somente após sucesso. |
+| `POST /api/auth/password-reset` | Recebe `email` e responde `202` genérico após o envio das instruções; não revela existência da conta. |
+| `POST /api/auth/password-reset/confirm` | Recebe `token` e `password`; responde `204` após alterar a senha, sem autenticar. Token inválido, expirado ou consumido retorna `422`. |
 | `GET /api/session` | Informa se há sessão autenticada, se o onboarding foi concluído e, quando autenticada, o token CSRF. |
 | `POST /api/onboarding` | Cria perfil e tenant do advogado autenticado. Exige `Origin` igual a `APP_ORIGIN` e `X-CSRF-Token` da sessão. |
 | `GET /api/onboarding` | Retorna o perfil, inscrições e tenant associados à sessão, sem aceitar seleção de tenant pelo cliente. |
 
 O corpo do POST contém `full_name`, `primary_oab` com `number` e `uf`, `secondary_oabs` como lista e `office_name` opcional. A OAB principal é obrigatória; as secundárias podem ser uma lista vazia. O número é textual para preservar zeros e sufixos. Não se confunde escritório com tenant.
 
+A redefinição segue a [orientação OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html): token aleatório de 256 bits armazenado apenas como hash, prazo de 30 minutos, consumo atômico e revogação de sessões/desafios. O link usa fragmento em `/reset-password#token=...`, removido da barra pelo frontend; o segredo fica somente em memória até a submissão. A solicitação usa a mesma operação SMTP e resposta genérica para endereços válidos, inclusive sem conta; somente identidades confirmadas e ativas recebem token utilizável. Falha de envio retorna `503` e invalida aquele token. Após a alteração é enviado um aviso; falha desse aviso registra `password_reset_notification_delivery_failed`, sem reverter a senha já alterada. Os limites de autenticação e a exigência de Origin/ingresso confiável continuam vigentes.
+
 ### Identidade de equipe e grupos
 
-A identidade Google pode ter vínculos em vários tenants. `GET /api/session` informa os vínculos disponíveis; `PATCH /api/session/membership` seleciona um `membership_id` validado pelo servidor e `DELETE /api/session` encerra a sessão. Uma credencial de equipe exige `validity_days` explícito: `null` para sem expiração ou inteiro positivo, contado em períodos de 24 horas desde a criação ou renovação. Alterar a escolha não altera o vencimento até a renovação; revogação é imediata e não é revertida por renovação.
+A identidade pode ter vínculos em vários tenants. `GET /api/session` informa os vínculos disponíveis; `PATCH /api/session/membership` seleciona um `membership_id` validado pelo servidor e `DELETE /api/session` encerra a sessão. Uma credencial de equipe exige `validity_days` explícito: `null` para sem expiração ou inteiro positivo, contado em períodos de 24 horas desde a criação ou renovação. Alterar a escolha não altera o vencimento até a renovação; revogação é imediata e não é revertida por renovação.
 
-O titular administra credenciais em `GET`/`POST /api/team/credentials`, `PATCH`/`DELETE /api/team/credentials/:id`, `POST /api/team/credentials/:id/renewal` e `POST /api/team/credentials/:id/invitation`. A criação recebe `email`, `validity_days` e `group_ids` opcional. O convite é enviado por SMTP após o commit: se a entrega não for confirmada, a credencial permanece criada e o titular pode reemitir o convite. A reemissão invalida o link anterior sem reiniciar a validade. O link usa fragmento `#token=...`; a interface preserva o token durante o login e o envia a `POST /api/team/invitations/accept`, com sessão Google, `Origin` e CSRF. Não registrar o token nem o conteúdo do convite.
+O titular administra credenciais em `GET`/`POST /api/team/credentials`, `PATCH`/`DELETE /api/team/credentials/:id`, `POST /api/team/credentials/:id/renewal` e `POST /api/team/credentials/:id/invitation`. A criação recebe `email`, `validity_days` e `group_ids` opcional. O convite é enviado por SMTP após o commit: se a entrega não for confirmada, a credencial permanece criada e o titular pode reemitir o convite. A reemissão invalida o link anterior sem reiniciar a validade. O link usa fragmento `#token=...`; a interface preserva o token durante o login e o envia a `POST /api/team/invitations/accept`, com sessão autenticada, `Origin` e CSRF. Não registrar o token nem o conteúdo do convite.
 
 O titular administra grupos, regras e associações em `/api/authorization/groups`, suas rotas `/:id/rules` e `/:id/memberships/:membership_id`; `GET /api/authorization/catalog` lista as operações. Uma regra contém `operation`, `effect` (`allow` ou `deny`) e `court` (`null` para escopo geral). Sem grupos, equipe recebe as leituras padrão; com grupos, concessões se somam e negação explícita prevalece. Escritas exigem concessões distintas. A consulta e a dashboard aplicam a política por tribunal e operação no servidor.
 

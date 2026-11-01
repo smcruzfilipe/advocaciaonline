@@ -26,7 +26,7 @@ class OnboardingProfileHttpTest < ActionDispatch::IntegrationTest
       "primary_oab" => { "number" => "001234-A", "uf" => "SP" },
       "secondary_oabs" => [{ "number" => "00a-B", "uf" => "RJ" }] }, first_body.fetch("profile"))
 
-    get "/api/onboarding", params: { tenant_id: second.tenant_id, subject: "another-google-user" }
+    get "/api/onboarding", params: { tenant_id: second.tenant_id, subject: "another-user" }
     assert_response :ok
     assert_equal first_body, response.parsed_body
 
