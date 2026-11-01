@@ -89,6 +89,38 @@ class AndamentosTest < Minitest::Test
     end
   end
 
+  def test_rejects_truncated_list_or_container_even_after_complete_items
+    movement = item(date: "05/05/2026", title: "Protocolo")
+    inner_list = item(date: "05/05/2026", title: "Protocolo", observation: "<ul><li>Detalhe</li></ul>")
+    [
+      "<div class='processo-andamentos'><ul>",
+      "<div class='processo-andamentos'><ul>#{movement}",
+      "<div class='processo-andamentos'><ul>#{movement}</ul>",
+      "<div class='processo-andamentos'><ul></ul>",
+      "<div class='processo-andamentos'><ul></div>",
+      "<div class='processo-andamentos'><ul>#{movement}</div>",
+      "<div class='processo-andamentos'><ul>#{inner_list}</div>",
+      "<div class='processo-andamentos'><ul>#{movement}</u"
+    ].each do |html|
+      assert_raises(STF::InvalidSource, html) do
+        STF::Andamentos.new(http: Http.new(html)).fetch(process: PROCESSO, date: DATA, captured_at: CAPTURA)
+      end
+    end
+  end
+
+  def test_accepts_complete_empty_list_with_padding_and_unrelated_legacy_errors
+    html = "\n \n<div class='processo-andamentos' data-x='1' data-x='2'><ul></ul></div>\n "
+    assert_equal [], STF::Andamentos.new(http: Http.new(html)).fetch(process: PROCESSO, date: DATA, captured_at: CAPTURA)
+  end
+
+  def test_preserves_complete_outer_list_with_nested_list
+    movement = item(date: "05/05/2026", title: "Protocolo", observation: "<ul><li>Detalhe</li></ul>", links: '<a href="downloadPeca.asp?id=1">Peça</a>')
+    results, = fetch(movement + movement)
+    assert_equal 2, results.size
+    assert_equal results.first, results.last
+    assert_equal "https://portal.stf.jus.br/processos/downloadPeca.asp?id=1", results.first.dig("stf", "links", 0, "url")
+  end
+
   def test_rejects_invalid_or_incomplete_source_instead_of_silent_empty_results
     ["<html><form>Login</form></html>", "<div class='processo-andamentos'></div>",
       "<div class='processo-andamentos'><ul><li>truncado</li></ul></div>",

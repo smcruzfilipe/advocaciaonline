@@ -1,6 +1,6 @@
 # Especificação: acompanhamento de processos do STF (`stf`)
 
-**Estado:** especificação criada por autorização expressa do solicitante na branch `stf`; descreve a entrega a implementar, não uma funcionalidade já disponível. A autorização para escrever esta spec e o [to-do](tasks/todo-stf.md) não é evidência de execução, aprovação técnica dos gates ou CI. A fonte STF é uma extensão separada: não substitui nem altera o contrato DJEN de [coleta](SPEC-coleta.md).
+**Estado:** spec e to-do aprovados expressamente pelo solicitante para implementação one-shot na branch `stf`. O [plano técnico](tasks/plan-stf.md) registra STF00 e a [issue #20](https://github.com/smcruzfilipe/advocaciaonline/issues/20) contém o handoff. Aprovação funcional não é evidência de execução, gates técnicos ou CI; suas provas permanecem no checklist. A fonte STF é uma extensão separada: não substitui nem altera o contrato DJEN de [coleta](SPEC-coleta.md).
 
 ## Objetivo e escopo confirmado
 
@@ -60,7 +60,7 @@ A resposta observada contém `totalDePaginas`, `totalDeRegistros` e `partes`. Ca
 
 Os números são exemplos da investigação, não alvos fixos do produto. Validar o CNJ conforme monitoramentos, preservando zeros. Classe e número STF são uma identificação adicional da fonte: não substituir a chave CNJ dos cadastros existentes nem aceitar número abreviado como CNJ válido. Confirmar a identidade do processo resolvido antes de persistir. Se duas identificações fornecidas discordarem, registrar falha de resolução, sem escolher silenciosamente uma delas.
 
-O JSON nominal informa `processoEmTramitacao` por registro; somente o valor `Sim` comprova a situação afirmativa observada. **Não foi comprovada uma API pública de situação para um processo arbitrário encontrado apenas por classe/CNJ.** STF00.B deve validar uma indicação inequívoca de tramitação nesse caminho; até isso ocorrer, não presumir elegibilidade por ausência de baixa nem declarar esse caminho implementado. Essa verificação é condição de aceite da modalidade direta, não autorização para omiti-la.
+O JSON nominal informa `processoEmTramitacao` por registro; somente o valor `Sim` comprova a situação afirmativa observada. Não foi comprovada uma API pública direta de situação por classe/CNJ. O caminho ratificado em STF00.B resolve o detalhe, obtém uma parte real na aba de partes e pesquisa seu nome no JSON, exigindo o mesmo incidente e CNJ e validando a paginação completa; consulta `nao` permite reconhecer baixa explícita quando o processo não aparece entre os ativos. A combinação foi observada para o incidente `7728350`, conforme o plano. Se a situação não puder ser comprovada, registrar falha de resolução, sem presumir atividade ou baixa por ausência.
 
 ### Andamentos — HTML público
 

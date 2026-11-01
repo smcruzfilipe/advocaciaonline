@@ -15,7 +15,9 @@ module STF
     def fetch(process:, date:, captured_at:)
       incidente = process.fetch("incidente")
       url = "#{PORTAL}/abaAndamentos.asp?incidente=#{incidente}&imprimir="
-      html = Nokogiri::HTML.fragment(html_text(@http.get(url)))
+      source = html_text(@http.get(url))
+      validate_complete_list(source)
+      html = Nokogiri::HTML.fragment(source)
       list = html.at_css(".processo-andamentos > ul")
       raise InvalidSource, "Aba de andamentos inválida" unless list
 
@@ -57,6 +59,29 @@ module STF
     end
 
     private
+
+    def validate_complete_list(source)
+      # Gumbo reports implicitly closed elements in its HTML5 parse errors.
+      # Keep HTML4 for extraction, since the STF serves legacy HTML fragments.
+      marker = "stf-end-of-response-#{Random.bytes(16).unpack1("H*")}"
+      raise InvalidSource, "Marcador de validação inválido" if source.include?(marker)
+      max_errors = 1_000
+      parsed = Nokogiri::HTML5.fragment("#{source}\n<#{marker}></#{marker}>", max_errors: max_errors)
+      raise InvalidSource, "HTML STF excede o limite de erros" if parsed.errors.length >= max_errors
+      list = parsed.at_css(".processo-andamentos > ul")
+      raise InvalidSource, "Aba de andamentos inválida" unless list
+
+      container = list.parent
+      sentinel = parsed.at_css(marker)
+      incomplete_list = parsed.errors.any? do |error|
+        error.line >= list.line &&
+          error.message.include?("End tag '#{container.name}' isn't allowed here. Currently open tags:") &&
+          error.message.lines.first.match?(/(?:\A|, )#{Regexp.escape(container.name)}, ul\.\s*\z/)
+      end
+      if !sentinel || sentinel.ancestors.include?(container) || incomplete_list
+        raise InvalidSource, "Lista de andamentos incompleta"
+      end
+    end
 
     def html_text(body)
       bytes = body.b

@@ -42,7 +42,7 @@ class ProcessorTest < Minitest::Test
 
   def teardown
     return unless @admin && @tenant
-    %w[collection_communication_links collection_job_results collection_job_failures collection_events collection_job_executions collection_jobs collection_communications stf_captures collection_run_audiences party_monitorings].each do |table|
+    %w[stf_capture_links collection_communication_links collection_job_results collection_job_failures collection_events collection_job_executions collection_jobs collection_communications stf_captures collection_run_audiences party_monitorings].each do |table|
       @admin.exec_params("DELETE FROM public.#{table} WHERE tenant_id = $1", [@tenant])
     end
     @admin.exec_params("DELETE FROM public.tenants WHERE id = $1", [@tenant])
@@ -101,6 +101,10 @@ class ProcessorTest < Minitest::Test
     assert_equal 1, result.fetch("eligible_process_count")
     assert_equal "1", scalar("SELECT count(*)::text FROM public.stf_captures WHERE tenant_id = $1", [@tenant])
     assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
+    metadata = JSON.parse(scalar("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1", [@tenant]))
+    assert_equal "0188263-19.2026.1.00.0000", metadata.fetch("cnj")
+    assert_equal "Sim", metadata.fetch("em_tramitacao")
+    assert_equal @job, scalar("SELECT job_id FROM public.stf_capture_links WHERE tenant_id = $1", [@tenant])
   end
 
   def test_day_change_after_last_response_prevents_commit

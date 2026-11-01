@@ -64,8 +64,8 @@ module STF
         end
         andamentos = Andamentos.new(http: http)
         payload = processes.map do |process|
-          { "incidente" => process.fetch("incidente"),
-            "items" => andamentos.fetch(process: process, date: date, captured_at: @time_source.call.utc) }
+          process.merge("em_tramitacao" => "Sim",
+            "items" => andamentos.fetch(process: process, date: date, captured_at: @time_source.call.utc))
         end
         guard.call
         store.commit(job_id, token, payload)

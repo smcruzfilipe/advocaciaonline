@@ -166,7 +166,7 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 | Checklist STF | Este documento; itens de execução não realizados permanecem abertos |
 | Issue e plano/handoff publicado | [#20](https://github.com/smcruzfilipe/advocaciaonline/issues/20), [plano técnico](plan-stf.md); gate documental STF00 concluído |
 | PR STF | [#21](https://github.com/smcruzfilipe/advocaciaonline/pull/21), draft; execução inicial publicada no commit `2e1c8c8` |
-| Testes/smoke de execução inicial | Aplicativo STF: 46 testes/185 assertions aprovados; SQL STF coberto na suíte backend, que encontrou uma assertion incidental de nome de constraint removida (rejeição de editais permaneceu aprovada: teste focado 1/10). Smoke CLI real: 2 movimentos/2 links cada; zero movimentos, nenhum elegível e falha distintos; leitura via `advocacia_runtime`, UID1000. |
+| Testes/smoke de execução inicial | Gate corrigido: aplicativo STF **50 testes/201 assertions**, SQL STF **16 testes/192 assertions**, sem falhas/erros/skips. CLI real preserva dois movimentos/links e proveniência mesmo vazia; HTML truncado agora termina `invalid_source`, não sucesso vazio. Rodadas anteriores e correções constam abaixo. |
 | Ativação diária/deploy | Não realizada; depende dos gates e condições de acesso |
 
 ### Evidências da execução inicial
@@ -178,3 +178,13 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 - Smoke da imagem runtime pela entrada `bin/processador JOB_UUID`, com fonte controlada externa ao produto: positivo `succeeded`, 2 movimentos pendentes; processo sem andamentos `succeeded`, 0 movimentos/1 elegível; nenhum elegível `succeeded`, 0/0; falha `source_unavailable`, exit1. Dados lidos pela role `advocacia_runtime`, 2 links por movimento e UID1000.
 - HTTP real do aplicativo: JSON por parte confirmou `Rcl 101463` em tramitação; HTML retornou zero andamentos da data corrente da execução, corretamente. Nenhuma peça foi aberta; não é prova positiva de movimentos reais do dia.
 - Runtime Alpine: 186.008.247 bytes não comprimidos, UID1000 observado, sem testes, gcc ou cache de gems. Fonte e SQL não exigiram novas variáveis; usos STF das conexões existentes documentados no README.
+
+### Correções observadas no gate inicial
+
+- Consulta direta de situação só confirma atividade depois de validar todas as páginas. Regressão falhou antes e passou depois; descoberta focada: 14 testes/36 assertions. A busca de inativos permanece explícita por `nao`, sem inferir baixa por ausência.
+- Política de fixture esclarecida: a proibição é cadastro/modelo paralelo no produto ou bypass; identidades sintéticas em banco descartável exercitam autenticação e RLS reais e não são dependência do produto.
+- Comparação do parser implementado com um HTML real: 9 itens históricos e URLs coincidem item a item, incluindo uma peça compartilhada por dois movimentos. Diagnóstico da biblioteca sem persistência/backfill, não movimento de hoje.
+- RLS sem contexto: teste PostgreSQL real provou zero capturas/comunicações sem sessão, somente o tenant correto com sessão válida e zero após rollback/reutilização ou hash inválido: 1 teste/9 assertions.
+- Migration incremental `20261102000008` conserva CNJ, classe/identificação, evidência `Sim` e vínculo ao trabalho mesmo quando não há movimentos; não fabrica proveniência para capturas legadas. SQL STF completo: **16 testes/192 assertions**, com replay, divergência, concorrência, dois tenants, vazio e ausência de contexto.
+- A resposta 200 truncada `<div class='processo-andamentos'><ul>` foi reproduzida como sucesso vazio incorreto na CLI anterior. Parser corrigido usa estrutura/diagnóstico HTML5 da versão Nokogiri fixada, mantém extração HTML4 para markup legado, limita erros e preserva os nove movimentos reais. Aplicativo: **50 testes/201 assertions**, sem falhas/erros/skips.
+- Smoke da CLI em imagem sem código montado, somente conexão de processador no runtime: positivo 2 movimentos, processo vazio 0/1 elegível, nenhum elegível 0/0, falha de fonte e HTML truncado terminam respectivamente `source_unavailable`/`invalid_source` com exit1. Leitura de captura vazia por `advocacia_runtime` comprovou metadados e vínculo preservados.
