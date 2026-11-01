@@ -10,6 +10,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { AuthenticatorSetup } from "@/components/authenticator-setup";
 import { useSession } from "@/components/session-provider";
 import { AlertBanner } from "@/components/ui";
 import { ApiError, authRequest } from "@/lib/api";
@@ -21,13 +22,11 @@ type Inspection = {
 };
 type Setup = {
   challenge: string;
-  secret: string;
   otpauth_uri: string;
   expires_at: string;
 };
 type LoginChallenge =
-  | { next: "totp" }
-  | { next: "totp_setup"; secret: string; otpauth_uri: string };
+  { next: "totp" } | { next: "totp_setup"; otpauth_uri: string };
 
 const formStyle =
   "flex flex-col gap-4 border border-border p-5 text-sm [&_input]:w-full [&_input]:border [&_input]:border-border [&_input]:bg-input [&_input]:px-3 [&_input]:py-2";
@@ -143,9 +142,7 @@ export default function FirstAccessPage() {
         });
         if (
           result.next !== "totp" &&
-          (result.next !== "totp_setup" ||
-            !result.secret ||
-            !result.otpauth_uri)
+          (result.next !== "totp_setup" || !result.otpauth_uri)
         )
           throw new Error("O servidor retornou uma resposta inesperada.");
         setLoginChallenge(result);
@@ -157,12 +154,7 @@ export default function FirstAccessPage() {
           password,
           password_confirmation: confirmation,
         });
-        if (
-          !result.challenge ||
-          !result.secret ||
-          !result.otpauth_uri ||
-          !result.expires_at
-        )
+        if (!result.challenge || !result.otpauth_uri || !result.expires_at)
           throw new Error("Não foi possível preparar o autenticador.");
         setSetup(result);
       }
@@ -353,30 +345,15 @@ export default function FirstAccessPage() {
           ) : setup || loginChallenge ? (
             <form className={formStyle} onSubmit={submitCode}>
               {authenticator ? (
-                <div className="flex min-w-0 flex-col gap-3 border border-info bg-info-bg p-4 text-info">
-                  <h2 className="font-semibold">Configure seu autenticador</h2>
-                  <p>
-                    Adicione a chave ao aplicativo autenticador ou abra o
-                    endereço de configuração. Não compartilhe a chave.
-                  </p>
-                  <p>
-                    <strong>Chave:</strong>{" "}
-                    <span className="break-all font-mono">
-                      {authenticator.secret}
-                    </span>
-                  </p>
-                  <p className="break-all">
-                    <a className="underline" href={authenticator.otpauth_uri}>
-                      Abrir no aplicativo autenticador
-                    </a>
-                  </p>
+                <>
+                  <AuthenticatorSetup otpauthUri={authenticator.otpauth_uri} />
                   {setup && (
                     <p>
                       Preparação válida até{" "}
                       {new Date(setup.expires_at).toLocaleString("pt-BR")}.
                     </p>
                   )}
-                </div>
+                </>
               ) : (
                 <p>Informe o código atual do aplicativo autenticador.</p>
               )}

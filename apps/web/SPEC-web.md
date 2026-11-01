@@ -33,7 +33,8 @@ Ordem proposta: identidade → autorização e monitoramentos → consulta/dashb
 - O link `/invite/accept#token=...` emitido pelo backend é recebido pela interface; o fragmento é removido da barra de endereço e o token fica em cookie HttpOnly de curta duração. A confirmação compara a impressão digital do convite aberto naquela aba, evitando aceitar um convite de outra aba. Não armazenar o token no cliente.
 - `/primeiro-acesso#token=...` captura o segredo separadamente do convite de equipe, remove o fragmento e o mantém apenas na memória da tela. Conta existente usa login/TOTP na mesma tela antes do resgate; após confirmação, a sessão comum segue ao onboarding sem repetir o fator.
 - A sessão informa `can_create_tenant` quando existe liberação para criar tenant próprio. O perfil pode ser retomado pelo menu mesmo com vínculo de equipe ativo; a capacidade na interface não substitui a autorização do servidor.
-- `/admin/convites` usa a sessão comum e exige autorização no servidor. Emissão, cópia, envio e reemissão são ações distintas; aceitação SMTP não comprova entrega e falha de envio não impede copiar o link ativo.
+- `/admin/convites` usa a sessão comum e exige autorização no servidor. “Enviar convite por e-mail” emite e solicita envio SMTP; aceitação não comprova entrega e falha mantém o link copiável. WhatsApp exige telefone com país e DDD, somente em memória, e abre `api.whatsapp.com/send/` com destinatário, mensagem e link preenchidos; não dispara a mensagem automaticamente. Convites ativos permitem cópia, WhatsApp, reenvio e reemissão explícita, sem renovação oculta.
+- Inscrição e reinscrição de autenticador mostram somente QR code gerado localmente com a URI do backend, sem chave manual ou fallback textual. Não há serviço externo de QR nem QR novo no desafio de TOTP já confirmado.
 
 ## Visual e acessibilidade
 

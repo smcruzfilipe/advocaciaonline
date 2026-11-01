@@ -5,6 +5,10 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSession } from "@/components/session-provider";
 import { AlertBanner, Btn } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import {
+  normalizeWhatsappPhone,
+  whatsappInvitationUrl,
+} from "@/lib/whatsapp-invitation";
 
 type Invitation = {
   id: string;
@@ -27,6 +31,15 @@ function mutationError(
   reason: unknown,
   action: "criação" | "reemissão" | "envio",
 ) {
+  if (
+    action === "envio" &&
+    reason instanceof ApiError &&
+    ["invitation_email_unconfigured", "invitation_email_failed"].includes(
+      reason.code,
+    )
+  ) {
+    return reason.message;
+  }
   if (
     !(reason instanceof ApiError) ||
     reason.status === 0 ||
@@ -65,11 +78,13 @@ export function PlatformAdminInvitations() {
 function AdminInvitations() {
   const [invitations, setInvitations] = useState<Invitation[] | null>(null);
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [link, setLink] = useState<InvitationLink | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const working = useRef(false);
+  const phoneInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -129,6 +144,17 @@ function AdminInvitations() {
     }
   }
 
+  async function deliverEmail(invitation: Invitation) {
+    const result = await api<{ accepted: boolean; message: string }>(
+      `/api/admin/invitations/${encodeURIComponent(invitation.id)}/email`,
+      { method: "POST", body: {} },
+    );
+    if (result.accepted !== true || typeof result.message !== "string") {
+      throw new ApiError(200, "Resposta inesperada.", "invalid_response");
+    }
+    setNotice({ variant: "info", text: result.message });
+  }
+
   async function createInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (working.current) return;
@@ -142,12 +168,91 @@ function AdminInvitations() {
       });
       setInvitations((current) => [created, ...(current ?? [])]);
       setEmail("");
-      setNotice({
-        variant: "success",
-        text: "Convite criado. Escolha copiar o link ou enviar por e-mail.",
-      });
+      try {
+        await deliverEmail(created);
+      } catch (reason) {
+        setNotice({
+          variant: "error",
+          text: `Convite criado e disponível para cópia. ${mutationError(reason, "envio")}`,
+        });
+      }
     } catch (reason) {
       setNotice({ variant: "error", text: mutationError(reason, "criação") });
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function shareWhatsapp(invitation?: Invitation) {
+    if (working.current) return;
+    const normalizedPhone = normalizeWhatsappPhone(phone);
+    if (!normalizedPhone) {
+      setNotice({
+        variant: "error",
+        text: "Informe um telefone internacional válido, com país, DDD e número (8 a 15 dígitos).",
+      });
+      phoneInput.current?.focus();
+      return;
+    }
+    if (!invitation && !phoneInput.current?.form?.reportValidity()) return;
+
+    const popup = window.open("", "_blank");
+    if (!popup) {
+      setNotice({
+        variant: "error",
+        text: "Não foi possível abrir o WhatsApp. Permita a abertura de abas e tente novamente.",
+      });
+      return;
+    }
+    try {
+      popup.opener = null;
+      const referrer = popup.document.createElement("meta");
+      referrer.name = "referrer";
+      referrer.content = "no-referrer";
+      popup.document.head.appendChild(referrer);
+    } catch {
+      popup.close();
+      setNotice({
+        variant: "error",
+        text: "Não foi possível preparar a aba do WhatsApp com segurança.",
+      });
+      return;
+    }
+    working.current = true;
+    setBusy(true);
+    setNotice(null);
+    let created = invitation;
+    try {
+      if (!created) {
+        created = await api<Invitation>("/api/admin/invitations", {
+          method: "POST",
+          body: { email },
+        });
+        const newInvitation = created;
+        setInvitations((current) => [newInvitation, ...(current ?? [])]);
+        setEmail("");
+      }
+      const result = await api<{ link: string; expires_at: string }>(
+        `/api/admin/invitations/${encodeURIComponent(created.id)}/link`,
+      );
+      setLink({ id: created.id, ...result });
+      if (popup.closed) throw new Error("A aba do WhatsApp foi fechada.");
+      popup.location.replace(
+        whatsappInvitationUrl(
+          normalizedPhone,
+          result.link,
+          formatDate(result.expires_at),
+        ),
+      );
+    } catch (reason) {
+      popup.close();
+      setNotice({
+        variant: "error",
+        text: created
+          ? `O convite continua disponível para cópia. ${reason instanceof Error ? reason.message : "Não foi possível abrir o WhatsApp."}`
+          : mutationError(reason, "criação"),
+      });
     } finally {
       working.current = false;
       setBusy(false);
@@ -197,11 +302,7 @@ function AdminInvitations() {
     setBusy(true);
     setNotice(null);
     try {
-      const result = await api<{ accepted: true; message: string }>(
-        `/api/admin/invitations/${encodeURIComponent(invitation.id)}/email`,
-        { method: "POST", body: {} },
-      );
-      setNotice({ variant: "info", text: result.message });
+      await deliverEmail(invitation);
     } catch (reason) {
       setNotice({ variant: "error", text: mutationError(reason, "envio") });
     } finally {
@@ -284,13 +385,36 @@ function AdminInvitations() {
           onChange={(event) => setEmail(event.target.value)}
           className="min-w-0 w-full border border-border bg-background px-3 py-2 text-sm"
         />
-        <Btn
-          type="submit"
-          disabled={busy || invitations === null}
-          className="self-start"
-        >
-          Criar convite
-        </Btn>
+        <label htmlFor="invitation-phone" className="text-sm font-medium">
+          Telefone do advogado para WhatsApp (país, DDD e número)
+        </label>
+        <input
+          id="invitation-phone"
+          ref={phoneInput}
+          type="tel"
+          autoComplete="tel"
+          placeholder="+55 11 99266-9299"
+          value={phone}
+          onChange={(event) => setPhone(event.target.value)}
+          className="min-w-0 w-full border border-border bg-background px-3 py-2 text-sm"
+        />
+        <p className="text-sm text-muted-foreground">
+          O telefone é necessário apenas para compartilhar no WhatsApp,
+          inclusive nos convites ativos abaixo. Não é salvo no cadastro.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Btn type="submit" disabled={busy || invitations === null}>
+            Enviar convite por e-mail
+          </Btn>
+          <Btn
+            type="button"
+            variant="secondary"
+            disabled={busy || invitations === null}
+            onClick={() => shareWhatsapp()}
+          >
+            Compartilhar no WhatsApp
+          </Btn>
+        </div>
       </form>
 
       <div className="flex flex-col gap-4">
@@ -348,6 +472,14 @@ function AdminInvitations() {
                     aria-label={`Enviar convite por e-mail para ${invitation.email}`}
                   >
                     Enviar por e-mail
+                  </Btn>
+                  <Btn
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => shareWhatsapp(invitation)}
+                    aria-label={`Compartilhar convite no WhatsApp para ${invitation.email}`}
+                  >
+                    Compartilhar no WhatsApp
                   </Btn>
                   <Btn
                     variant="secondary"

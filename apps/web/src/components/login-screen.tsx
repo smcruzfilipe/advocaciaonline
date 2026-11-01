@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { AuthenticatorSetup } from "@/components/authenticator-setup";
 import { destination, useSession } from "@/components/session-provider";
 import { authRequest } from "@/lib/api";
 import { AlertBanner } from "@/components/ui";
 
-type Challenge =
-  | { next: "totp" }
-  | { next: "totp_setup"; secret: string; otpauth_uri: string };
+type Challenge = { next: "totp" } | { next: "totp_setup"; otpauth_uri: string };
 
-type RecoverySetup = { challenge: string; secret: string; otpauth_uri: string };
+type RecoverySetup = { challenge: string; otpauth_uri: string };
 
 export function LoginScreen() {
   const router = useRouter();
@@ -69,7 +68,7 @@ export function LoginScreen() {
             recovery_code: recoveryCode,
           },
         );
-        if (!result.challenge || !result.secret || !result.otpauth_uri)
+        if (!result.challenge || !result.otpauth_uri)
           throw new Error("Não foi possível preparar o novo autenticador.");
         setRecoverySetup(result);
         setPassword("");
@@ -97,9 +96,7 @@ export function LoginScreen() {
         });
         if (
           result.next !== "totp" &&
-          (result.next !== "totp_setup" ||
-            !result.secret ||
-            !result.otpauth_uri)
+          (result.next !== "totp_setup" || !result.otpauth_uri)
         )
           throw new Error(
             "O servidor retornou uma resposta inesperada. Tente novamente.",
@@ -263,19 +260,7 @@ export function LoginScreen() {
           onSubmit={submitCode}
         >
           {setup ? (
-            <div className="flex flex-col gap-3 border border-info bg-info-bg p-4 text-info">
-              <h2 className="font-semibold">Configure seu autenticador</h2>
-              <p>
-                Adicione uma conta no aplicativo autenticador usando a chave
-                abaixo. Em seguida, informe o código de seis dígitos gerado pelo
-                aplicativo.
-              </p>
-              <p>
-                <strong>Chave de configuração:</strong>{" "}
-                <span className="break-all font-mono">{setup.secret}</span>
-              </p>
-              <p>Guarde esta chave em local seguro e não a compartilhe.</p>
-            </div>
+            <AuthenticatorSetup otpauthUri={setup.otpauth_uri} />
           ) : (
             <p>Informe o código atual do seu aplicativo autenticador.</p>
           )}
