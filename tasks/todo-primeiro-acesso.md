@@ -1,6 +1,14 @@
 # Tarefas: primeiro acesso controlado
 
-**Estado:** plano aprovado e recomendações delegadas pelo solicitante; PA00 concluída documentalmente após integração, revisão independente e validação do orquestrador. A [spec](../SPEC-primeiro-acesso.md#decisões-de-pa00) é a fonte normativa das decisões. PA01–PA15 permanecem não concluídas. Este checklist e o [plano](plan-primeiro-acesso.md) não autorizam implementação, testes da aplicação, infraestrutura ou deploy.
+**Estado:** plano e implementação autorizados na issue #16. PA00/R01 concluídas documentalmente; PA01.A–B implementadas e verificadas na branch interna, aguardando revisão humana R02. PA02–PA15 não concluídas. A [spec](../SPEC-primeiro-acesso.md#decisões-de-pa00) é a fonte normativa; deploy permanece não autorizado.
+
+## Execução autorizada — issue #16
+
+O solicitante autorizou implementação e criação da [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16), com [plano/handoff publicado](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6554202739). As quatro fases e a exceção de publicação draft após PA12 constam no [plano](plan-primeiro-acesso.md#autorização-de-implementação-e-pipeline). As menções históricas a planejamento sem execução descrevem PA00; não cancelam a autorização atual. R02–R18 e checkpoints humanos permanecem obrigatórios.
+
+Primeiro grupo implementado: PA01.A e PA01.B; nenhum grupo posterior está liberado antes da revisão humana R02. Nomes ratificados conforme PA01, com propriedade única de migration/criptografia/teste de autorização e integração separada de teste de provisionamento/README. A atualização de estado em `SPEC-primeiro-acesso.md` integra PA01.A: quatro funcionais mais rastreio. Nenhuma mudança de contrato de registro, proveniência ou titularidade foi antecipada.
+
+PA01.B inclui também `apps/backend/test/services/password_reset_mailer_test.rb`: a regressão agregada encontrou dependência de ordem no carregamento lazy de Mail e interceptação da inicialização padrão pelo stub SMTP. A folha passa a três arquivos funcionais (teste de provisionamento, teste de mailer, README) mais rastreio. Corrigir isolamento de carregamento sem mudar validação/TLS/assertions; verificar mailer isolado e suíte agregada.
 
 ## Regras de execução futura e rastreio
 
@@ -125,14 +133,14 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 ## PA01 — Provisionamento e autorização da administradora
 
-- [ ] Concluir PA01.
+- [x] Concluir PA01 tecnicamente; revisão humana R02 permanece pendente.
 
 **Descrição:** provisionar a única conta administrativa por procedimento protegido no mecanismo existente de identidade, sem cadastro público, conta demo, senha padrão ou autoelevação de titular/equipe. Estender senha/TOTP e recuperação atuais; não criar autenticação paralela, comando novo só para encaminhamento ou configuração desnecessária.
 
 **Critérios verificáveis:**
-- [ ] Somente procedimento protegido provisiona a conta e sua capacidade; operador fornece e-mail/senha reais sem defaults secretos, valores inventados ou exposição em código/log/saída. Cliente e papel de tenant não concedem administração.
-- [ ] Códigos de recuperação de uso único são exibidos na inscrição/troca do autenticador e guardados somente como hashes; senha+código consumido atomicamente habilitam apenas reinscrição de TOTP. Novo autenticador validado precede acesso administrativo; troca invalida códigos antigos/sessões/desafios.
-- [ ] Reset reutiliza e-mail, prazo de 30 minutos e uso único existentes, preservando MFA e sem login automático. Sem TOTP nem códigos, não há recuperação pelos fluxos normais, bypass por e-mail/suporte ou novo fluxo exclusivamente de servidor para MFA.
+- [x] Somente procedimento protegido provisiona a conta e sua capacidade; operador fornece e-mail/senha reais sem defaults secretos, valores inventados ou exposição em código/log/saída. Cliente e papel de tenant não concedem administração.
+- [x] Códigos de recuperação de uso único são exibidos na inscrição/troca do autenticador e guardados somente como hashes; senha+código consumido atomicamente habilitam apenas reinscrição de TOTP. Novo autenticador validado precede acesso administrativo; troca invalida códigos antigos/sessões/desafios.
+- [x] Reset reutiliza e-mail, prazo de 30 minutos e uso único existentes, preservando MFA e sem login automático. Sem TOTP nem códigos, não há recuperação pelos fluxos normais, bypass por e-mail/suporte ou novo fluxo exclusivamente de servidor para MFA.
 
 **Dependências:** PA00. **Rastreio:** Q1; C1, C8.
 **Teste focado:** `B test/integration/platform_admin_authorization_test.rb test/integration/platform_admin_provisioning_test.rb`, condicionado aos testes novos.
@@ -141,6 +149,13 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 **Folhas; B depende de A:**
 - **A — Capacidade e fatores no mecanismo comum:** `apps/backend/db/migrate/20261102000000_create_platform_administration.rb` (**novo proposto**); `apps/backend/app/services/password_authentication.rb`; `apps/backend/test/integration/platform_admin_authorization_test.rb` (**novo proposto**). Aceite: capacidade restrita, hashes/uso único e reinscrição conforme Q1, sem segunda base de identidade. Teste: `B test/integration/platform_admin_authorization_test.rb`; smoke: privilégios e recuperação no mecanismo real, com senha/código incorretos e repetidos. **Tamanho M: 3 + rastreio = 4.**
 - **B — Procedimento operacional protegido:** `apps/backend/test/integration/platform_admin_provisioning_test.rb` (**novo proposto**); `README.md`. Aceite: documentar/testar provisionamento protegido usando as capacidades Rails existentes, sem novo executável por conveniência, default secreto ou recuperação de MFA por bypass operacional. Teste: `B test/integration/platform_admin_provisioning_test.rb`; smoke futuro: provisionar conta sintética e negar atribuição fora do procedimento. **Tamanho S: 2 + rastreio = 3.**
+
+**Evidência PA01.A–B:** imagem `advocacia-pa16:review`, PostgreSQL 18.6 descartável na rede interna `advocacia-pa16`, banco novo por execução `advocacia_pa01_final`, roles runtime/migrator/despachante/processador segregadas. `ruby bin/migrate` aplicou todas as migrations, incluindo a nova, sem alterar banco persistente. `ruby bin/rails test` nessa imagem, com os dois testes ajustados montados somente leitura, executou **492 testes, 10.929 assertions, zero falhas, erros ou skips**, seed 32198. Foco anterior em autorização/provisionamento/reset/sessão: **32 testes, 312 assertions**, sem falhas/erros/skips. Mailer isolado após correção de carregamento lazy: **3 testes, 21 assertions**, sem falhas/erros/skips. Regressões de expiração/inscrição inicial falharam na versão anterior: **2 testes, 2 falhas**; passaram com a correção.
+
+**Smoke PA01:** runner Rails com PostgreSQL real e identidade sintética executou transação protegida de provisionamento, HTTP senha/primeiro TOTP, negação de sessão antes do fator, revogação da sessão ao iniciar reinscrição, recusa de replay/código incorreto e confirmação do novo TOTP com rotação de códigos sem sessão automática; processo Rails UID 1000 e PostgreSQL UID 70. Fixture removida pelo próprio cenário; nenhum destinatário/credencial real, SMTP, UI administrativa ou endpoint de recuperação futuro foi declarado validado. Receita operacional: `ruby -c` retornou `Syntax OK`. Imagem de teste medida em 372.984.208 bytes (Ruby Alpine existente, dependências de testes separadas do runtime); PostgreSQL oficial em 429.615.951 bytes, iniciado efetivamente não root. O resultado integral e o pedido de R02 são registrados na issue #16.
+
+**Falhas tratadas:** revisão corrigiu bloqueio permanente por recovery vencido/reset, reinscrição inicial e risco de eco no console. A primeira agregação encontrou inicialização lazy de Mail interceptada por stub; setup corrigido sem enfraquecer assertions/TLS/validação. Reexecução em banco já usado acumulou vínculos da fixture fixa de equipe (esperado 2, observado 4): resultado recusado; nova execução usou banco vazio, como o CI, sem alterar assertion nem contrato. A suite em banco vazio acima é a evidência válida. R02 não está aprovada por esses resultados existirem.
+
 
 ## PA02 — Sessão comum e proteção administrativa
 
@@ -459,4 +474,4 @@ A enumeração mantém todos os consumidores conhecidos de `authenticated_sessio
 
 ## Limites do estado registrado
 
-Este arquivo registra decisões delegadas e trabalho futuro. PA00 e R01 estão concluídas somente documentalmente; PA01–PA15 não foram implementadas. Não houve migration, teste da aplicação, envio SMTP ou smoke funcional nesta etapa. Distinguir comandos propostos e critérios futuros das verificações documentais observadas; escolhas delegadas não autorizam código, infraestrutura ou deploy.
+O registro original de PA00 foi exclusivamente documental. A execução posterior autorizada implementou/verificou somente PA01.A–B conforme evidência acima; R02 humana e PA02–PA15 permanecem pendentes. Comandos e critérios dos demais PAs continuam propostas, não provas executadas. Nenhum deploy foi autorizado.

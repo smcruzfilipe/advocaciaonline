@@ -222,6 +222,59 @@ O histórico da consolidação anterior registra 276 testes e 7.678 assertions, 
 
 As decisões de transação e privilégios seguem as referências oficiais de [funções PostgreSQL seguras](https://www.postgresql.org/docs/18/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY), [RLS](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) e [travas de advisory](https://www.postgresql.org/docs/18/explicit-locking.html#ADVISORY-LOCKS). O transporte usa o [SMTP da biblioteca Mail](https://github.com/mikel/mail/blob/2.9.1/lib/mail/network/delivery_methods/smtp.rb).
 
+### Provisionamento protegido da administradora
+
+A capacidade administrativa da plataforma é única e distinta da titularidade de um tenant. Sua criação usa exclusivamente uma conexão `advocacia_migrator` em processo operacional protegido, nunca a credencial da API. O operador fornece e-mail e senha reais sem defaults; não colocar entradas em argumentos, histórico, arquivos, logs ou sessões gravadas. O primeiro login permanece no mecanismo comum, com senha e confirmação inicial do autenticador.
+
+Em um terminal protegido, use `ruby bin/rails runner` para executar o bloco abaixo como uma única unidade, não colando expressões individuais em IRB/console Rails (que pode imprimir seus resultados). Configure `DATABASE_URL` exclusivamente com a conexão migrator, `APP_ORIGIN` e `SECRET_KEY_BASE` legítimos pelo ambiente protegido; desative gravação do terminal. Não há nova variável ou executável. Para validação, usar somente banco descartável e endereço sintético; isto não autoriza operação em produção.
+
+```ruby
+begin
+require "io/console"
+ActiveRecord::Base.logger = nil
+console = IO.console or abort "Terminal protegido obrigatório"
+db = ApplicationRecord.connection
+abort "Role incorreta" unless db.select_value("SELECT current_user") == "advocacia_migrator"
+console.print "E-mail: "
+email = console.noecho(&:gets)&.chomp
+console.puts
+console.print "Senha: "
+password = console.noecho(&:gets)&.chomp
+console.puts
+email = TeamInvitationMailer.normalize_recipient!(email)
+abort "Senha inválida" unless password.is_a?(String) && password.valid_encoding? &&
+  password.length.between?(12, 128) && password.bytesize <= 512
+codes = PasswordAuthentication.new_recovery_codes
+db.transaction do
+  db.execute("SELECT 1")
+  pg = db.raw_connection
+  identity = pg.exec_params(
+    "INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [email]
+  ).getvalue(0, 0)
+  pg.exec_params(
+    "INSERT INTO app_private.password_credentials(identity_id,password_hash,totp_secret) VALUES ($1,$2,$3)",
+    [identity, PasswordAuthentication.password_hash(password),
+      PasswordAuthentication.encrypt(PasswordAuthentication.new_secret)]
+  )
+  pg.exec_params("INSERT INTO app_private.platform_administrator(identity_id) VALUES ($1)", [identity])
+  codes.each do |code|
+    pg.exec_params(
+      "INSERT INTO app_private.platform_recovery_codes(identity_id,code_hash) VALUES ($1,$2)",
+      [identity, PasswordAuthentication.recovery_code_hash(code)]
+    )
+  end
+end
+console.puts "Guarde os códigos fora da plataforma; esta é sua única exibição:"
+codes.each { |code| console.puts code }
+rescue StandardError
+  abort "Provisionamento não concluído; confira somente o estado sanitizado."
+end
+```
+
+A transação é materializada antes das chamadas PostgreSQL parametrizadas: erro ou segunda administradora fazem rollback integral, sem substituir a conta existente. Não imprimir exceções ou seus parâmetros; consultar somente o estado sanitizado. Os códigos só são exibidos após commit e persistidos como hashes. Guarde-os fora da plataforma e preserve `SECRET_KEY_BASE`.
+
+Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha por e-mail mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. As rotas e telas administrativas pertencem às próximas folhas; esta capacidade de persistência não declara esses fluxos HTTP implementados.
+
 ### API de onboarding
 
 | Método e caminho | Comportamento |
