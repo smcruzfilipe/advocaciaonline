@@ -279,6 +279,29 @@ class StfCollectionTest < ActiveSupport::TestCase
     end
   end
 
+  test "runtime without valid context sees no STF data and rollback clears tenant context" do
+    commit(@job_a, start(@job_a), [{ incidente: 123, items: [movement("first")] }])
+    commit(@job_b, start(@job_b), [{ incidente: 123, items: [movement("second")] }])
+    assert_equal "2", @migrator.exec_params(
+      "SELECT count(*) FROM public.stf_captures WHERE tenant_id = ANY($1::uuid[])",
+      ["{#{@lawyer_a.tenant_id},#{@lawyer_b.tenant_id}}"]).getvalue(0, 0)
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.stf_captures").getvalue(0, 0)
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.collection_communications").getvalue(0, 0)
+    @runtime.exec("BEGIN")
+    @runtime.exec_params("SELECT set_config('app.session_hash', $1, true)", [IdentityStore.digest(@session_a)])
+    assert_equal "1", @runtime.exec("SELECT count(*) FROM public.stf_captures").getvalue(0, 0)
+    assert_equal "1", @runtime.exec("SELECT count(*) FROM public.collection_communications").getvalue(0, 0)
+    @runtime.exec("ROLLBACK")
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.stf_captures").getvalue(0, 0)
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.collection_communications").getvalue(0, 0)
+    @runtime.exec("BEGIN")
+    @runtime.exec_params("SELECT set_config('app.session_hash', $1, true)", ["0" * 64])
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.stf_captures").getvalue(0, 0)
+    assert_equal "0", @runtime.exec("SELECT count(*) FROM public.collection_communications").getvalue(0, 0)
+  ensure
+    @runtime.exec("ROLLBACK") if @runtime.transaction_status != PG::PQTRANS_IDLE
+  end
+
   private
 
   def create_run(date)
