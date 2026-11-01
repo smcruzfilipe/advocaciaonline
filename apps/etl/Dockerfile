@@ -14,7 +14,7 @@ USER 1000:1000
 
 FROM base AS dependencies
 USER root
-RUN apk add --no-cache build-base postgresql-dev
+RUN --mount=type=cache,target=/etc/apk/cache,sharing=locked apk add build-base libpq-dev
 USER 1000:1000
 COPY --link --chown=1000:1000 Gemfile Gemfile.lock ./
 RUN bundle install --jobs 4 \
