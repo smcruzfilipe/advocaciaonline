@@ -167,18 +167,24 @@ export async function authRequest<T>(
     | "/api/auth/login"
     | "/api/auth/totp"
     | "/api/auth/password-reset"
-    | "/api/auth/password-reset/confirm",
+    | "/api/auth/password-reset/confirm"
+    | "/api/admin/auth/recovery"
+    | "/api/admin/auth/recovery/confirm",
   body: unknown,
 ): Promise<T> {
-  return withSessionLock(() =>
-    request<T>(
+  const expected = displayedSession;
+  return withSessionLock(async () => {
+    const headers = new Headers({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    });
+    if (path.startsWith("/api/admin/auth/") && expected?.authenticated)
+      headers.set("X-CSRF-Token", await confirmedSession(expected, headers));
+    return request<T>(
       path,
       {
         method: "POST",
-        headers: new Headers({
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        }),
+        headers,
         body: JSON.stringify(body),
       },
       path === "/api/auth/password-reset"
@@ -186,8 +192,8 @@ export async function authRequest<T>(
         : path === "/api/auth/password-reset/confirm"
           ? 204
           : undefined,
-    ),
-  );
+    );
+  });
 }
 
 export async function api<T>(

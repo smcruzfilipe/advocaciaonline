@@ -1,12 +1,12 @@
 # Tarefas: primeiro acesso controlado
 
-**Estado:** plano e implementação autorizados na issue #16. PA00/R01 concluídas documentalmente; PA01.A–B implementadas, verificadas e aprovadas expressamente pelo solicitante em R02. PA02.A/B1/B2 tecnicamente concluídas, aguardando revisão humana R03 e checkpoint após PA00–PA02; PA03–PA15 não concluídas. A [spec](../SPEC-primeiro-acesso.md#decisões-de-pa00) é a fonte normativa; deploy permanece não autorizado.
+**Estado:** plano e implementação autorizados na issue #16. PA01/PA02 e checkpoint após PA00–PA02 aprovados em R02/R03. PA03.A–C implementadas e verificadas tecnicamente, aguardando revisão humana R04; PA04–PA15 não concluídas. A [spec](../SPEC-primeiro-acesso.md#decisões-de-pa00) é a fonte normativa; deploy permanece não autorizado.
 
 ## Execução autorizada — issue #16
 
 O solicitante autorizou implementação e criação da [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16), com [plano/handoff publicado](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6554202739). As quatro fases e a exceção de publicação draft após PA12 constam no [plano](plan-primeiro-acesso.md#autorização-de-implementação-e-pipeline). As menções históricas a planejamento sem execução descrevem PA00; não cancelam a autorização atual. R02–R18 e checkpoints humanos permanecem obrigatórios.
 
-PA01.A–B foi aprovada expressamente pelo solicitante (“pa01 a-b ta aprovado”), concluindo R02 e liberando somente o próximo grupo PA02. Nenhuma aprovação de R03 ou dos checkpoints posteriores é presumida. A branch continua interna, sem PR antes de PA12.
+O solicitante aprovou PA01.A–B (“pa01 a-b ta aprovado”) e depois PA02.A/B1/B2 com o checkpoint após PA00–PA02 (“aprovado”), concluindo R02/R03 e liberando somente PA03.A–C. R04 e checkpoints posteriores não estão aprovados. A branch continua interna, sem PR antes de PA12.
 
 PA01.B inclui também `apps/backend/test/services/password_reset_mailer_test.rb`: a regressão agregada encontrou dependência de ordem no carregamento lazy de Mail e interceptação da inicialização padrão pelo stub SMTP. A folha passa a três arquivos funcionais (teste de provisionamento, teste de mailer, README) mais rastreio. Corrigir isolamento de carregamento sem mudar validação/TLS/assertions; verificar mailer isolado e suíte agregada.
 
@@ -86,7 +86,7 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 - [x] R01: PA00.A–B — integração e revisão documental concluídas por delegação; sem liberação de execução da aplicação.
 - [x] R02: PA01.A–B — aprovadas expressamente pelo solicitante após apresentação do código e das evidências de PA01.
-- [ ] R03: PA02.A e PA02.B1–B2 — três folhas; sessão/recuperação HTTP, capacidade server-side e documentação atualizada.
+- [x] R03: PA02.A e PA02.B1–B2 — três folhas aprovadas expressamente pelo solicitante, junto do checkpoint após PA00–PA02.
 - [ ] R04: PA03.A–C — três folhas.
 - [ ] R05: PA04 e PA05.A–B — três folhas.
 - [ ] R06: PA06.A–B e PA07 — três folhas.
@@ -159,7 +159,7 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 ## PA02 — Sessão comum e proteção administrativa
 
-- [x] Concluir PA02 tecnicamente; revisão humana R03 e checkpoint após PA00–PA02 permanecem pendentes.
+- [x] Concluir PA02; R03 e checkpoint após PA00–PA02 aprovados expressamente pelo solicitante.
 
 **Descrição:** reusar login, TOTP, consulta de sessão, saída e reset existentes; transportar capacidade administrativa reconhecida e exigida pelo servidor. A recuperação de MFA administrativa é extensão restrita à reinscrição, não outro login/cookie/sistema de sessão.
 
@@ -186,23 +186,23 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 **Revisão PA02 e mutação:** duas revisões independentes de segurança e fronteiras não identificaram achados concretos. Inverter temporariamente a condição de capacidade em `IdentityStore.require_platform_admin!` fez `ruby bin/rails test test/integration/platform_admin_authorization_test.rb --name /tenant_owner_and_member_roles/` falhar (**1 teste, 11 assertions, 1 falha**: autorização indevida detectada). Condição restaurada e comando atualizado para `--include /tenant_owner_and_member_roles/`: **1 teste, 18 assertions, zero falhas/erros/skips**. A guarda foi exercitada em rota exclusiva da suíte; não existe endpoint fictício de administração em produção. Convites e superfícies web seguem pertencendo a PA03/PA05 e posteriores; os consumidores web atuais ignoram campos adicionais da sessão e permanecem intencionalmente inalterados. Nenhuma dependência ou variável de ambiente foi criada/alterada.
 
-**Handoff R03:** revisar PA02.A/B1/B2 e o checkpoint após PA00–PA02 com as evidências acima e o [pedido publicado](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6557291332). A aprovação R02 não libera PA03; aguardar decisão humana explícita sobre R03 e esse checkpoint. Branch interna sem push/PR; publicação somente após PA12 conforme autorização da issue #16.
+**Handoff R03 concluído:** o solicitante aprovou expressamente PA02.A/B1/B2 e o checkpoint após PA00–PA02; registro da liberação restrita de PA03 no [comentário6560284606](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6560284606). Isso não aprova R04 nem etapas posteriores. Publicação somente após PA12.
 
 
 ### Checkpoint — após PA00–PA02
 
-- [ ] Registrar evidência das folhas futuras, revisar provisionamento/recuperação, fatores, autorização direta e segredo de sessão; revisão humana antes do próximo bloco. Nada foi executado neste planejamento.
+- [x] Evidências de provisionamento/recuperação, fatores, autorização direta e segredo de sessão revisadas; solicitante respondeu “aprovado” ao pedido R03 e checkpoint após PA00–PA02, liberando somente o próximo grupo PA03.A–C.
 
 ## PA03 — Destino administrativo no login comum
 
-- [ ] Concluir PA03.
+- [x] Concluir PA03 tecnicamente; revisão humana R04 permanece pendente.
 
 **Descrição:** acrescentar destino `/admin` ao login e à sessão existentes na mesma aplicação web. Reusar telas/fatores/reset comuns, exibindo recuperação por senha+código somente para reinscrição administrativa; não criar `/admin/login`, componente de login separado ou cookie paralelo.
 
 **Critérios verificáveis:**
-- [ ] Login comum autentica a administradora com senha/TOTP e só entra em `/admin` após autorização server-side; recuperação por código exige confirmar novo TOTP e reset por e-mail não dispensa MFA nem autentica automaticamente.
-- [ ] Abrir rota administrativa como anônimo/titular/membro sem capacidade não revela dados; relay mantém cookies e envelope comuns sem ampliar origens/caminhos/confiança de IP indiscriminadamente nem duplicar sessão.
-- [ ] Estados reais de erro/carregamento/expiração/saída, teclado, foco, rótulos e viewport de 320 px funcionam; shell/provider distinguem destino administrativo, onboarding e equipe, sem captura indevida de tokens entre abas.
+- [x] Login comum autentica a administradora com senha/TOTP e só entra em `/admin` após autorização server-side; recuperação por código exige confirmar novo TOTP e reset por e-mail não dispensa MFA nem autentica automaticamente.
+- [x] Abrir rota administrativa como anônimo/titular/membro sem capacidade não revela dados; relay mantém cookies e envelope comuns sem ampliar origens/caminhos/confiança de IP indiscriminadamente nem duplicar sessão.
+- [x] Estados reais de erro/carregamento/expiração/saída, teclado, foco, rótulos e viewport de 320 px funcionam; shell/provider distinguem destino administrativo, onboarding e equipe, sem captura indevida de tokens entre abas.
 
 **Dependências:** PA02. **Rastreio:** Q1; C1, C8; mesma aplicação web.
 **Teste focado:** `W src/app/api/transport.test.mjs` e `W src/lib/api.test.mjs`; navegador real para login/recuperação/destino, sem runner novo presumido.
@@ -212,6 +212,16 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 - **A — Relay dos endpoints administrativos:** `apps/web/src/app/api/transport.ts`; `apps/web/src/app/api/[...path]/route.ts`; `apps/web/src/app/api/transport.test.mjs`. Aceite: allowlist e proteção HTTP futuras com sessão/cookies comuns, sem autorização somente no relay; `W src/app/api/transport.test.mjs`. Smoke: mesma operação por relay e API direta é autorizada/negada pelo servidor. **Tamanho M: 3 + rastreio = 4.**
 - **B — Login comum e destino autorizado:** `apps/web/src/components/login-screen.tsx`; `apps/web/src/app/admin/page.tsx` (**novo proposto**); `apps/web/src/lib/api.ts`; `apps/web/src/lib/api.test.mjs`. Aceite: reusar senha/TOTP/reset e acrescentar estados de reinscrição por código sem outro login; `W src/lib/api.test.mjs` e navegador. Smoke: entrada, senha/fator incorreto, recuperação e destino administrativo negado à conta sem capacidade. **Tamanho M: 4 + rastreio = 5.**
 - **C — Composição na mesma aplicação:** `apps/web/src/app/layout.tsx`; `apps/web/src/components/application-shell.tsx`; `apps/web/src/components/session-provider.tsx`; `apps/web/src/app/admin/layout.tsx` (**novo proposto**). Aceite: mesma sessão e guarda server-side, sem tratar `/admin` como onboarding/equipe. Teste focado: navegador com identidade administrativa e comum; smoke: navegação e abas sem troca indevida de identidade/privilégio. **Tamanho M: 4 + rastreio = 5.**
+
+**Ratificação antes de PA03:** A libera somente os dois endpoints de recuperação já implementados, reutilizando origem/ingresso/IP/cookies, sem antecipar convites PA05. B mantém seus quatro arquivos; senha+código prepara o novo TOTP, confirmação exibe novos códigos sem login, e a volta exige senha/TOTP comuns. C usa `application-shell.tsx`, `session-provider.tsx` e `README.md` (três funcionais mais rastreio). Root layout permanece intencionalmente inalterado porque já compõe o único provider/shell; não criar layout administrativo pass-through. A própria página `/admin` verifica sessão/capacidade diretamente no servidor antes de renderizar: a documentação oficial Next16 alerta que layouts não impedem execução/RSC de páginas e não revalidam em toda navegação. APIs continuam autorizando junto da operação, não no relay/cliente. Destino administrativo não depende de tenant e precede convite de equipe pendente; fragmentos em `/admin` não são capturados como convite de equipe. Página fornece destino autorizado real e estado de acesso, sem simular convites de PA07. Reusar tokens/controles existentes, manter segredos somente em memória e limpar ao voltar/avançar; não alterar dependências, env, SMTP/reset ou cutover. R04 exige nova aprovação humana após A–C.
+
+**Evidência PA03.A–C:** `npm test` executado por Node24.22.1 em container não root: **44 testes,44 aprovados,zero falhas/cancelados/skips**. `npm run typecheck`, `npm run lint` e `npm run format:check` aprovados; `docker build -t advocacia-pa03:web apps/web` concluiu build standalone Next16.4.3/TypeScript. `npm audit --omit=dev`: zero vulnerabilidades; 15 moderadas herdadas na árvore completa de desenvolvimento, sem atualização forçada. Prova anterior do relay falhou (rota recovery não permitida); teste de troca de conta falhou antes do preflight e teste de fila falhou antes de capturar contexto fora do lock. Ambos passaram no agregado. Primeiro lint recusou `<a href="/">`; corrigido para Link e reexecutados somente lint/formatação/build afetados.
+
+**Smoke real PA03:** Rails/Puma, Next standalone, nginx HTTPS e PostgreSQL18.6 descartável com roles segregadas, banco exclusivo `advocacia_pa03`. HTTP por socket verificou envelope idêntico ao backend, origem/método/ingresso, CSRF atual, negação de owner/member, capacidade administrativa sem tenant e ausência de CSRF no RSC. Chromium149 **headless** em container descartável (sem navegador gráfico no host) verificou senha/TOTP incorretos, login administrativo, recuperação por código, TOTP incorreto, expiração do desafio, códigos novos sem sessão, novo login obrigatório, logout/replay do cookie antigo via HTTPS com certificado verificado, código consumido e sessão expirada recusados. Verificados papel administrativo/profissional na mesma identidade, fragmentos sem captura de equipe, zero consultas de perfil na área administrativa, menu/teclado/foco a320px e nenhum overflow a320/768/1024/1440px. Em targets distintos com cookies compartilhados, foco controlado no headless reconheceu nova conta mantendo códigos até confirmação; falha real de rede também preservou os códigos. Sem SMTP ou dados reais; reset existente intencionalmente inalterado e coberto em PA02.
+
+**Revisão/limpeza PA03:** cinco achados concretos corrigidos: perda de códigos em revalidação/troca de conta, contexto lido depois do lock, regressão de acesso profissional da administradora, herança de fragmento no redirect e controles de tenant na área administrativa. Revisores conferiram correções sem novos achados; não substitui R04. Limites do driver headless (daemon ausente, aliases CDP no mesmo target e waiters) foram contornados com Chromium descartável/CDP explícito, targets realmente distintos e observação direta, sem mudar proteções do produto. Fixtures próprias removidas, containers da prova encerrados/removidos, rede frontal e imagem exclusiva do navegador removidas, chaves TLS descartadas. Web/ingresso observados UID/GID1000:1000; imagens303.629.026/72.190.907bytes, bases já vigentes. Nenhuma dependência/env permanente criada.
+
+**Handoff R04:** aguardar aprovação humana explícita das folhas PA03.A–C antes de PA04/PA05. A feature completa, convites e cutover continuam não entregues; branch interna sem PR/push até PA12.
 
 ## PA04 — Persistência e ciclo do convite do advogado
 
@@ -487,4 +497,4 @@ A enumeração mantém todos os consumidores conhecidos de `authenticated_sessio
 
 ## Limites do estado registrado
 
-O registro original de PA00 foi exclusivamente documental. A execução autorizada implementou/verificou PA01.A–B e PA02.A/B1/B2 conforme evidências acima; R02 foi aprovada expressamente, mas R03 e o checkpoint após PA00–PA02 permanecem pendentes. PA03–PA15 e a feature integral não estão concluídos. Comandos e critérios dos demais PAs continuam propostas, não provas executadas. Nenhum deploy foi autorizado.
+PA00 foi documental; PA01/PA02 e checkpoint após PA00–PA02 foram aprovados em R02/R03. PA03.A–C foi implementada e verificada, aguardando R04 humana. PA04–PA15 e a feature integral não estão concluídos; seus comandos continuam propostas, não provas executadas. Nenhum deploy foi autorizado.

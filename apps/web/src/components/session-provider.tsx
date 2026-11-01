@@ -20,6 +20,7 @@ export type Membership = {
 export type Session = {
   authenticated: boolean;
   onboarded: boolean;
+  platform_admin?: boolean;
   csrf_token?: string;
   membership_id?: string | null;
   tenant_id?: string | null;
@@ -74,6 +75,18 @@ function captureInvitation(): Promise<void> {
   if (["/verify-email", "/reset-password"].includes(window.location.pathname))
     return Promise.resolve();
   const fragment = new URLSearchParams(window.location.hash.slice(1));
+  if (
+    window.location.pathname === "/admin" ||
+    window.location.pathname.startsWith("/admin/")
+  ) {
+    if (fragment.has("token"))
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    return Promise.resolve();
+  }
   if (!fragment.has("token")) return fragmentCapture ?? Promise.resolve();
   // Erase the sensitive fragment before any navigation. No storage, URL query,
   // React state, diagnostic output or third-party request ever receives it.
@@ -221,6 +234,7 @@ export function destination(
   session: Session,
   pendingInvitation = false,
 ): string {
+  if (session.authenticated && session.platform_admin === true) return "/admin";
   if (pendingInvitation) return "/convite";
   if (!session.authenticated) return "/login";
   if (session.selection_required) return "/vinculos";

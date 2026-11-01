@@ -35,14 +35,21 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const accessPage = accessPaths[pathname] === true;
+  const administrativePage =
+    pathname === "/admin" || pathname.startsWith("/admin/");
+  const administrator =
+    session?.authenticated && session.platform_admin === true;
   const ready =
     session?.authenticated &&
-    session.onboarded &&
-    !session.selection_required &&
-    !pendingInvitation;
+    (administrativePage
+      ? administrator
+      : session.onboarded && !session.selection_required && !pendingInvitation);
 
   const profileKey =
-    session?.authenticated && session.onboarded && session.role === "owner"
+    !administrativePage &&
+    session?.authenticated &&
+    session.onboarded &&
+    session.role === "owner"
       ? `${session.tenant_id}:${session.membership_id}:${session.csrf_token}`
       : null;
   const [profileName, setProfileName] = useState<{
@@ -97,9 +104,11 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
     ? profileName?.key === profileKey
       ? (profileName.name ?? "Nome indisponível")
       : "Carregando nome…"
-    : session?.role === "member"
-      ? "Membro da equipe"
-      : "Conta autenticada";
+    : administrativePage && administrator
+      ? "Administradora da plataforma"
+      : session?.role === "member"
+        ? "Membro da equipe"
+        : "Conta autenticada";
   const identity = session?.authenticated ? (
     <div className="flex min-w-0 items-center gap-2">
       <span className="max-w-xs break-words text-sm text-error">
@@ -117,7 +126,13 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
   ) : null;
   const brand = (
     <Link
-      href={ready ? "/dashboard" : "/"}
+      href={
+        administrativePage && administrator
+          ? "/admin"
+          : ready
+            ? "/dashboard"
+            : "/"
+      }
       className="inline-flex shrink-0 items-center"
     >
       <Image
@@ -129,7 +144,27 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
       />
     </Link>
   );
-  const navigationLinks = navigation
+  const navigationLinks = (
+    administrativePage
+      ? [
+          { href: "/admin", label: "Administração", owner: false },
+          ...(session?.onboarded
+            ? [
+                {
+                  href: "/dashboard",
+                  label: "Ambiente profissional",
+                  owner: false,
+                },
+              ]
+            : []),
+        ]
+      : [
+          ...navigation,
+          ...(administrator
+            ? [{ href: "/admin", label: "Administração", owner: false }]
+            : []),
+        ]
+  )
     .filter((item) => !item.owner || session?.role === "owner")
     .map((item) => {
       const active =
@@ -177,13 +212,21 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
           {brand}
           {identity}
         </header>
+        {error && pathname === "/login" && (
+          <div className="max-w-sm mx-auto px-4 mt-6">
+            <AlertBanner variant="error">{error}</AlertBanner>
+            <Btn onClick={() => void refresh().catch(() => undefined)}>
+              Revalidar sessão
+            </Btn>
+          </div>
+        )}
         <main id="conteudo" tabIndex={-1}>
           {logoutError && (
             <div className="max-w-xl mx-auto px-4 mt-6">
               <AlertBanner variant="error">{logoutError}</AlertBanner>
             </div>
           )}
-          {error && pathname !== "/reset-password" ? (
+          {error && pathname !== "/reset-password" && pathname !== "/login" ? (
             <section className="max-w-sm mx-auto px-4 py-20 flex flex-col gap-6">
               <h1 className="text-2xl font-semibold font-headings">
                 Não foi possível abrir sua sessão
@@ -200,8 +243,8 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
           ) : accessPage ? (
             <div
               key={
-                pathname === "/reset-password"
-                  ? "password-reset"
+                pathname === "/reset-password" || pathname === "/login"
+                  ? pathname
                   : (session?.csrf_token ?? "anonymous")
               }
             >
@@ -229,21 +272,23 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
         <div className="hidden md:flex items-center justify-between px-8 py-3 border-b border-border gap-4">
           {brand}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Icon i="building-2" size={14} />
-              <span
-                className="max-w-48 truncate"
-                title={`Ambiente: ${session.tenant_id}`}
-              >
-                Ambiente: {session.tenant_id}
-              </span>
-              <Link
-                href="/vinculos"
-                className="text-accent underline text-xs ml-1"
-              >
-                trocar
-              </Link>
-            </div>
+            {!administrativePage && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Icon i="building-2" size={14} />
+                <span
+                  className="max-w-48 truncate"
+                  title={`Ambiente: ${session.tenant_id}`}
+                >
+                  Ambiente: {session.tenant_id}
+                </span>
+                <Link
+                  href="/vinculos"
+                  className="text-accent underline text-xs ml-1"
+                >
+                  trocar
+                </Link>
+              </div>
+            )}
             {identity}
           </div>
         </div>
@@ -281,9 +326,11 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
             </summary>
             <div className="absolute right-0 z-20 w-56 border border-border bg-background p-4 flex flex-col gap-3 text-sm">
               <span className="text-error">{accountLabel}</span>
-              <Link href="/vinculos" className="text-accent underline">
-                Trocar vínculo
-              </Link>
+              {!administrativePage && (
+                <Link href="/vinculos" className="text-accent underline">
+                  Trocar vínculo
+                </Link>
+              )}
               <button
                 type="button"
                 className="text-muted-foreground underline text-left"

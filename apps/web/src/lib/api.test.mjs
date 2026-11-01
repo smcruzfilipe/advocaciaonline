@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-import { api, ApiError, setDisplayedSession } from "./api.ts";
+import {
+  api,
+  authRequest,
+  ApiError,
+  setDisplayedSession,
+  withSessionLock,
+} from "./api.ts";
 
 const originalFetch = globalThis.fetch;
 const originalNavigator = Object.getOwnPropertyDescriptor(
@@ -207,4 +213,63 @@ test("writes fail closed when cross-tab locking is unavailable", async () => {
       error instanceof ApiError && error.code === "browser_not_supported",
   );
   assert.equal(count, 0);
+});
+
+test("administrative recovery never consumes a code prepared for an account replaced in another tab", async () => {
+  let recoveryStarted = false;
+  globalThis.fetch = async (path) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "csrf-another-account",
+        membership_id: null,
+      });
+    recoveryStarted = true;
+    return Response.json({});
+  };
+  await assert.rejects(
+    authRequest("/api/admin/auth/recovery", {
+      email: "synthetic@example.test",
+      password: "synthetic password",
+      recovery_code: "synthetic recovery code",
+    }),
+    (error) =>
+      error instanceof ApiError && error.code === "session_context_changed",
+  );
+  assert.equal(recoveryStarted, false);
+});
+
+test("queued administrative recovery retains the identity shown when it was prepared", async () => {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  let recoveryStarted = false;
+  globalThis.fetch = async (path) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "csrf-b",
+        membership_id: "b",
+      });
+    recoveryStarted = true;
+    return Response.json({});
+  };
+  const holding = withSessionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const recovering = authRequest("/api/admin/auth/recovery", {});
+  setDisplayedSession({
+    authenticated: true,
+    csrf_token: "csrf-b",
+    membership_id: "b",
+  });
+  release.resolve();
+  await holding;
+  await assert.rejects(
+    recovering,
+    (error) =>
+      error instanceof ApiError && error.code === "session_context_changed",
+  );
+  assert.equal(recoveryStarted, false);
 });

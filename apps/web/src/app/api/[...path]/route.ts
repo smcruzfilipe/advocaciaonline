@@ -19,7 +19,9 @@ async function forward(request: Request, context: Context): Promise<Response> {
     const pathname = `/api/${path.map(encodeURIComponent).join("/")}`;
     if (!isApiPath(pathname))
       return failure("not_found", "Recurso não encontrado.", 404);
-    const auth = pathname.startsWith("/api/auth/");
+    const auth =
+      pathname.startsWith("/api/auth/") ||
+      pathname.startsWith("/api/admin/auth/");
     if (auth && (request.method !== "POST" || !sameOrigin(request)))
       return failure("invalid_origin", "Solicitação de acesso inválida.", 403);
     const clientIp = auth ? trustedClientIp(request) : null;

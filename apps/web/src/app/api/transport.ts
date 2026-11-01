@@ -38,7 +38,7 @@ export function publicOrigin(): URL {
 }
 
 export function isApiPath(path: string): boolean {
-  return /^\/api\/(?:auth\/(?:register|verify-email|login|totp|password-reset(?:\/confirm)?)|session(?:\/membership)?|onboarding|courts|dashboard|communications(?:\/[A-Za-z0-9_-]+)?|monitorings\/(?:lawyer|(?:parties|processes)(?:\/[A-Za-z0-9_-]+)?)|team\/(?:invitations\/accept|credentials(?:\/[A-Za-z0-9_-]+(?:\/(?:renewal|invitation))?)?)|authorization\/(?:catalog|groups(?:\/[A-Za-z0-9_-]+(?:\/rules(?:\/[A-Za-z0-9_-]+)?|\/memberships\/[A-Za-z0-9_-]+)?)?)|collection-runs(?:\/[A-Za-z0-9_-]+\/(?:jobs|events|execution))?)$/.test(
+  return /^\/api\/(?:auth\/(?:register|verify-email|login|totp|password-reset(?:\/confirm)?)|admin\/auth\/recovery(?:\/confirm)?|session(?:\/membership)?|onboarding|courts|dashboard|communications(?:\/[A-Za-z0-9_-]+)?|monitorings\/(?:lawyer|(?:parties|processes)(?:\/[A-Za-z0-9_-]+)?)|team\/(?:invitations\/accept|credentials(?:\/[A-Za-z0-9_-]+(?:\/(?:renewal|invitation))?)?)|authorization\/(?:catalog|groups(?:\/[A-Za-z0-9_-]+(?:\/rules(?:\/[A-Za-z0-9_-]+)?|\/memberships\/[A-Za-z0-9_-]+)?)?)|collection-runs(?:\/[A-Za-z0-9_-]+\/(?:jobs|events|execution))?)$/.test(
     path,
   );
 }
@@ -131,7 +131,11 @@ export async function railsFetch(
   const send = target.protocol === "https:" ? httpsRequest : httpRequest;
   const headers = forwardedHeaders(request);
   if (options?.clientIp) {
-    if (!target.pathname.startsWith("/api/auth/") || !isIP(options.clientIp))
+    if (
+      (!target.pathname.startsWith("/api/auth/") &&
+        !target.pathname.startsWith("/api/admin/auth/")) ||
+      !isIP(options.clientIp)
+    )
       throw new Error("Invalid client address");
     headers.set("X-Advocacia-Ingress-Secret", process.env.AUTH_INGRESS_SECRET!);
     headers.set("X-Advocacia-Client-IP", options.clientIp);
