@@ -1,5 +1,10 @@
 # Regras do projeto
 
+## YAGNI: especificação, planejamento e implementação
+
+- Antes de criar ou alterar especificações, elaborar planos ou implementar mudanças, ler e seguir as regras de [YAGNI.md](YAGNI.md).
+- Aplicar essas regras nas três etapas: especificação, planejamento e implementação, limitando o escopo à necessidade real e presente.
+
 ## Registro de variáveis de ambiente
 
 - Toda variável de ambiente criada ou alterada em uma implementação deve ser registrada em `README.md` na mesma mudança.
