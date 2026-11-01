@@ -5,10 +5,15 @@ require "timeout"
 class FirstAccessInvitationMailer
   class DeliveryFailed < StandardError; end
   class DeliveryUnknown < DeliveryFailed; end
+  class ConfigurationMissing < DeliveryFailed; end
 
   def self.deliver!(email:, link:)
     origin = AppSettings.origin
-    settings = TeamInvitationMailer.send(:smtp_settings, AppSettings.smtp)
+    settings = begin
+      TeamInvitationMailer.send(:smtp_settings, AppSettings.smtp)
+    rescue KeyError, ArgumentError
+      raise ConfigurationMissing, "O envio de e-mail não está configurado.", cause: nil
+    end
     message = Mail.new
     message.from = settings.fetch(:from)
     message.to = TeamInvitationMailer.normalize_recipient!(email)
@@ -27,6 +32,8 @@ class FirstAccessInvitationMailer
     # Direct transport avoids global Mail callbacks that could log the invitation.
     Mail::SMTP.new(settings.except(:from).merge(domain: URI(origin).host)).deliver!(message)
     nil
+  rescue ConfigurationMissing
+    raise
   rescue Timeout::Error, Errno::ETIMEDOUT, IO::TimeoutError
     raise DeliveryUnknown, "O resultado do envio por SMTP é desconhecido.", cause: nil
   rescue StandardError

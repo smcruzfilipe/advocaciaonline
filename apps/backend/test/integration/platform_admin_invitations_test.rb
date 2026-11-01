@@ -175,6 +175,25 @@ class PlatformAdminInvitationsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "missing SMTP is reported as configuration failure without losing the invitation" do
+    issue
+    assert_response :created
+    id = response.parsed_body.fetch("id")
+    get "/api/admin/invitations/#{id}/link", headers: @headers
+    original = response.parsed_body
+    AppSettings.stub(:smtp, -> { raise KeyError, "private SMTP configuration" }) do
+      post "/api/admin/invitations/#{id}/email", params: {}, headers: @headers, as: :json
+    end
+    assert_response :service_unavailable
+    assert_equal "invitation_email_unconfigured", response.parsed_body.fetch("error").fetch("code")
+    refute_includes response.body, "private SMTP configuration"
+    refute_includes response.body, original.fetch("link")
+    refute response.parsed_body.key?("accepted")
+    get "/api/admin/invitations/#{id}/link", headers: @headers
+    assert_response :ok
+    assert_equal original, response.parsed_body
+  end
+
   test "email requires administrator origin csrf and an active invitation" do
     issue
     assert_response :created

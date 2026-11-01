@@ -20,12 +20,15 @@ class PlatformAdminInvitationsController < ApplicationController
     api_error("invitation_conflict", "Não foi possível emitir o convite. Se já houver cadastro, use o login. Um convite ativo só pode ser substituído por reemissão explícita.", :conflict)
   end
   rescue_from FirstAccessInvitationMailer::DeliveryFailed do |error|
-    message = if error.is_a?(FirstAccessInvitationMailer::DeliveryUnknown)
-      "O resultado do envio é desconhecido. O convite continua disponível para cópia ou reenvio explícito."
+    code, message = case error
+    when FirstAccessInvitationMailer::ConfigurationMissing
+      ["invitation_email_unconfigured", "O envio de e-mail não está configurado. Configure o SMTP; o convite continua disponível para copiar ou compartilhar no WhatsApp."]
+    when FirstAccessInvitationMailer::DeliveryUnknown
+      ["invitation_email_failed", "O resultado do envio é desconhecido. O convite continua disponível para cópia ou reenvio explícito."]
     else
-      "Não foi possível enviar o convite. Ele continua disponível para cópia ou reenvio explícito."
+      ["invitation_email_failed", "Não foi possível enviar o convite. Ele continua disponível para cópia ou reenvio explícito."]
     end
-    api_error("invitation_email_failed", message, :service_unavailable)
+    api_error(code, message, :service_unavailable)
   end
 
   def index
