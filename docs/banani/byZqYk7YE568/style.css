@@ -1,0 +1,49 @@
+@theme {
+  /* used via utility-classes, bg-background, text-primary, and many more */
+  --color-background: #ffffff;
+  --color-foreground: #111111;
+  --color-border: #d4d4d4;
+  --color-input: #f5f5f5;
+  --color-primary: #111111;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f0f0f0;
+  --color-secondary-foreground: #111111;
+  --color-muted: #e8e8e8;
+  --color-muted-foreground: #737373;
+  --color-accent: #2563eb;
+  --color-accent-foreground: #ffffff;
+  --color-success: #16a34a;
+  --color-success-bg: #f0fdf4;
+  --color-warning: #b45309;
+  --color-warning-bg: #fffbeb;
+  --color-error: #dc2626;
+  --color-error-bg: #fef2f2;
+  --color-info: #0369a1;
+  --color-info-bg: #f0f9ff;
+  --color-nav-bg: #fafafa;
+  --color-table-row-alt: #fafafa;
+
+  /* DO NOT REMOVE: these radius variables are required by the theme editor. */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+
+  /* DONT CHANGE OR REMOVE THIS VARIABLE */
+  --radius: var(--radius-sm);
+
+  /* DO NOT REMOVE: these font variables are required by the theme editor. */
+  /* available fonts: "Inter", "DM Sans", "Nunito", "PT Serif", "Space Grotesk", "IBM Plex Mono", "IBM Plex Sans", "Roboto Slab", "Geist", "Shantell Sans" */
+  --font-body: IBM Plex Sans;
+  --font-headings: IBM Plex Sans;
+
+  /* Add and change text sizes as you see fit */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+  --text-4xl: 36px;
+}
