@@ -57,6 +57,8 @@ O script gera segredos aleatórios uma única vez em `.local/compose.env`, arqui
 
 Para cadastro, redefinição de senha e convites, forneça as cinco variáveis `SMTP_*` documentadas abaixo em `.local/integrations.env`. Proteja o arquivo com `chmod 600 .local/integrations.env`; não versione nem publique seus valores. Sem SMTP, a confirmação do e-mail, a recuperação de senha e o envio de convites não funcionam.
 
+Para [Resend via SMTP](https://resend.com/docs/send-with-smtp), use `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587` (STARTTLS), `SMTP_USERNAME=resend` e **a chave de API como `SMTP_PASSWORD`**. `SMTP_FROM` deve ser um remetente autorizado no domínio verificado do Resend. Não é preciso outro login/senha do provedor, SDK ou variável `RESEND_API_KEY`; mantenha a chave apenas na configuração protegida. No ambiente local preparado, host/porta/usuário e remetente já estão preenchidos: falta somente fornecer a chave em `SMTP_PASSWORD`.
+
 O link de confirmação deve ser aberto no mesmo navegador usado para iniciar o cadastro. Senhas podem ser redefinidas por **Esqueci minha senha**, em `/reset-password`: o link enviado por e-mail expira em 30 minutos, é de uso único e uma nova solicitação invalida o anterior. A confirmação encerra sessões e desafios de login anteriores; não cria sessão nem modifica o autenticador. A recuperação do autenticador administrativo está no login comum, em **Perdi meu autenticador administrativo**, usando a API descrita abaixo; não há recuperação do autenticador de contas comuns. A perda de `SECRET_KEY_BASE` impede decifrar os segredos dos autenticadores já cadastrados; preserve esse segredo fora do repositório.
 
 ```bash
