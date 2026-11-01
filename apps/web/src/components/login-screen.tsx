@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { destination, useSession } from "@/components/session-provider";
 import { authRequest } from "@/lib/api";
 import { AlertBanner } from "@/components/ui";
@@ -11,10 +11,19 @@ type Challenge =
   | { next: "totp" }
   | { next: "totp_setup"; secret: string; otpauth_uri: string };
 
+type RecoverySetup = { challenge: string; secret: string; otpauth_uri: string };
+
 export function LoginScreen() {
   const router = useRouter();
-  const { session, loading, pendingInvitation, refresh } = useSession();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const {
+    session,
+    loading,
+    pendingInvitation,
+    invitationMismatch,
+    invitationFingerprint,
+    refresh,
+  } = useSession();
+  const [mode, setMode] = useState<"login" | "register" | "recovery">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -23,11 +32,23 @@ export function LoginScreen() {
   const [registered, setRegistered] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoverySetup, setRecoverySetup] = useState<RecoverySetup | null>(
+    null,
+  );
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const setup =
+    recoverySetup ?? (challenge?.next === "totp_setup" ? challenge : null);
 
   useEffect(() => {
-    if (!loading && session?.authenticated)
+    heading.current?.focus();
+  }, [mode, challenge, recoverySetup, recoveryCodes]);
+
+  useEffect(() => {
+    if (!recoveryCodes && !loading && session?.authenticated)
       router.replace(destination(session, pendingInvitation));
-  }, [loading, pendingInvitation, router, session]);
+  }, [loading, pendingInvitation, recoveryCodes, router, session]);
 
   async function submitCredentials(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,8 +60,33 @@ export function LoginScreen() {
     setWorking(true);
     setError(null);
     try {
-      if (mode === "register") {
-        await authRequest("/api/auth/register", { email, password });
+      if (mode === "recovery") {
+        const result = await authRequest<RecoverySetup>(
+          "/api/admin/auth/recovery",
+          {
+            email,
+            password,
+            recovery_code: recoveryCode,
+          },
+        );
+        if (!result.challenge || !result.secret || !result.otpauth_uri)
+          throw new Error("Não foi possível preparar o novo autenticador.");
+        setRecoverySetup(result);
+        setPassword("");
+        setRecoveryCode("");
+        setCode("");
+      } else if (mode === "register") {
+        if (!pendingInvitation || invitationMismatch || !invitationFingerprint)
+          throw new Error("Abra novamente o link de convite nesta aba.");
+        await authRequest(
+          "/api/auth/team-register",
+          {
+            email,
+            password,
+            password_confirmation: confirmation,
+          },
+          invitationFingerprint,
+        );
         setPassword("");
         setConfirmation("");
         setRegistered(true);
@@ -78,10 +124,26 @@ export function LoginScreen() {
     setWorking(true);
     setError(null);
     try {
-      await authRequest("/api/auth/totp", { code });
+      if (recoverySetup) {
+        const result = await authRequest<{ recovery_codes: string[] }>(
+          "/api/admin/auth/recovery/confirm",
+          { token: recoverySetup.challenge, code },
+        );
+        if (
+          !Array.isArray(result.recovery_codes) ||
+          !result.recovery_codes.every((value) => typeof value === "string")
+        )
+          throw new Error(
+            "Não foi possível obter os novos códigos de recuperação.",
+          );
+        setRecoverySetup(null);
+        setRecoveryCodes(result.recovery_codes);
+      } else {
+        await authRequest("/api/auth/totp", { code });
+        const current = await refresh();
+        window.location.assign(destination(current, pendingInvitation));
+      }
       setCode("");
-      const current = await refresh();
-      router.replace(destination(current, pendingInvitation));
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -93,7 +155,7 @@ export function LoginScreen() {
     }
   }
 
-  function switchMode(next: "login" | "register") {
+  function switchMode(next: "login" | "register" | "recovery") {
     setMode(next);
     setChallenge(null);
     setRegistered(false);
@@ -101,6 +163,9 @@ export function LoginScreen() {
     setConfirmation("");
     setCode("");
     setError(null);
+    setRecoveryCode("");
+    setRecoverySetup(null);
+    setRecoveryCodes(null);
   }
 
   return (
@@ -109,12 +174,22 @@ export function LoginScreen() {
       aria-busy={loading || working}
     >
       <header>
-        <h1 className="mb-2 font-headings text-2xl font-semibold text-foreground">
-          {challenge
-            ? "Confirme seu acesso"
-            : mode === "register"
-              ? "Crie sua conta"
-              : "Entrar"}
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="mb-2 font-headings text-2xl font-semibold text-foreground"
+        >
+          {recoveryCodes
+            ? "Guarde seus novos códigos"
+            : recoverySetup
+              ? "Confirme o novo autenticador"
+              : challenge
+                ? "Confirme seu acesso"
+                : mode === "recovery"
+                  ? "Recuperar autenticador administrativo"
+                  : mode === "register"
+                    ? "Crie sua conta"
+                    : "Entrar"}
         </h1>
         <p className="text-sm text-muted-foreground">
           Acesse sua conta com e-mail, senha e autenticador para continuar.
@@ -130,10 +205,39 @@ export function LoginScreen() {
         </div>
       )}
       {error && <AlertBanner variant="error">{error}</AlertBanner>}
-      {loading || session?.authenticated ? (
+      {!recoveryCodes && (loading || session?.authenticated) ? (
         <p role="status">
           {loading ? "Consultando sua sessão…" : "Abrindo seu ambiente…"}
         </p>
+      ) : recoveryCodes ? (
+        <div className="flex flex-col gap-4 border border-border p-6 text-sm">
+          <p role="status">
+            Autenticador substituído. Nenhuma sessão foi criada.
+          </p>
+          <p>
+            Guarde estes códigos fora da plataforma. Cada um pode ser usado uma
+            única vez; os anteriores foram invalidados.
+          </p>
+          <ul
+            className="flex flex-col gap-2 break-all font-mono"
+            aria-label="Novos códigos de recuperação"
+          >
+            {recoveryCodes.map((value) => (
+              <li key={value}>{value}</li>
+            ))}
+          </ul>
+          <p>
+            Ao continuar, os códigos deixam de ser exibidos. Entre novamente com
+            senha e o novo autenticador.
+          </p>
+          <button
+            type="button"
+            className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            onClick={() => switchMode("login")}
+          >
+            Guardei os códigos. Voltar ao login
+          </button>
+        </div>
       ) : registered ? (
         <div
           className="flex flex-col gap-4 border border-border p-6 text-sm"
@@ -141,9 +245,9 @@ export function LoginScreen() {
         >
           <h2 className="font-semibold">Confira seu e-mail</h2>
           <p>
-            Se o endereço puder ser cadastrado, você receberá um link de
-            confirmação. Abra o link neste mesmo navegador e confirme seu e-mail
-            antes de entrar.
+            Se o convite estiver disponível, enviaremos instruções para
+            confirmação do e-mail. Confirme sua caixa antes de entrar para
+            aceitar o convite de equipe.
           </p>
           <button
             className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
@@ -153,12 +257,12 @@ export function LoginScreen() {
             Ir para o login
           </button>
         </div>
-      ) : challenge ? (
+      ) : challenge || recoverySetup ? (
         <form
           className="flex flex-col gap-4 border border-border p-6 text-sm [&_input]:w-full [&_input]:border [&_input]:border-border [&_input]:bg-input [&_input]:px-3 [&_input]:py-2"
           onSubmit={submitCode}
         >
-          {challenge.next === "totp_setup" ? (
+          {setup ? (
             <div className="flex flex-col gap-3 border border-info bg-info-bg p-4 text-info">
               <h2 className="font-semibold">Configure seu autenticador</h2>
               <p>
@@ -168,7 +272,7 @@ export function LoginScreen() {
               </p>
               <p>
                 <strong>Chave de configuração:</strong>{" "}
-                <span className="break-all font-mono">{challenge.secret}</span>
+                <span className="break-all font-mono">{setup.secret}</span>
               </p>
               <p>Guarde esta chave em local seguro e não a compartilhe.</p>
             </div>
@@ -199,7 +303,11 @@ export function LoginScreen() {
             type="submit"
             disabled={working}
           >
-            {working ? "Validando…" : "Validar e entrar"}
+            {working
+              ? "Validando…"
+              : recoverySetup
+                ? "Confirmar novo autenticador"
+                : "Validar e entrar"}
           </button>
           <button
             className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
@@ -210,8 +318,9 @@ export function LoginScreen() {
             Voltar ao login
           </button>
           <p className="text-xs text-muted-foreground">
-            Se o desafio expirar ou você atualizar a página, entre novamente com
-            seu e-mail e senha.
+            {recoverySetup
+              ? "A preparação expira em dez minutos. Se expirar ou você sair desta tela, reinicie com outro código de recuperação. Confirmar não cria sessão."
+              : "Se o desafio expirar ou você atualizar a página, entre novamente com seu e-mail e senha."}
           </p>
         </form>
       ) : (
@@ -281,6 +390,33 @@ export function LoginScreen() {
               </label>
             </>
           )}
+          {mode === "recovery" && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Somente para a conta administrativa. Senha e um código de uso
+                único permitem cadastrar um novo autenticador, sem entrar na
+                conta. Sem autenticador e sem códigos, não há recuperação por
+                e-mail ou suporte.
+              </p>
+              <label
+                className="flex flex-col gap-1.5 text-sm font-medium"
+                htmlFor="recovery-code"
+              >
+                Código de recuperação
+                <input
+                  id="recovery-code"
+                  name="recovery_code"
+                  type="password"
+                  autoComplete="off"
+                  minLength={43}
+                  maxLength={43}
+                  required
+                  value={recoveryCode}
+                  onChange={(event) => setRecoveryCode(event.target.value)}
+                />
+              </label>
+            </>
+          )}
           <button
             className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
             type="submit"
@@ -290,31 +426,52 @@ export function LoginScreen() {
               ? "Enviando…"
               : mode === "register"
                 ? "Criar conta"
-                : "Continuar"}
+                : mode === "recovery"
+                  ? "Preparar novo autenticador"
+                  : "Continuar"}
           </button>
           {mode === "login" && (
-            <Link
-              className="text-center text-xs text-accent underline"
-              href="/reset-password"
-            >
-              Esqueci minha senha
-            </Link>
+            <>
+              <Link
+                className="text-center text-xs text-accent underline"
+                href="/reset-password"
+              >
+                Esqueci minha senha
+              </Link>
+              <button
+                type="button"
+                className="text-center text-xs text-accent underline disabled:opacity-50"
+                disabled={working}
+                onClick={() => switchMode("recovery")}
+              >
+                Perdi meu autenticador administrativo
+              </button>
+            </>
           )}
-          <button
-            className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
-            type="button"
-            disabled={working}
-            onClick={() => switchMode(mode === "login" ? "register" : "login")}
-          >
-            {mode === "login" ? "Criar conta" : "Já tenho conta"}
-          </button>
+          {(mode === "recovery" ||
+            (pendingInvitation && !invitationMismatch)) && (
+            <button
+              className="border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
+              type="button"
+              disabled={working}
+              onClick={() =>
+                switchMode(mode === "login" ? "register" : "login")
+              }
+            >
+              {mode === "recovery"
+                ? "Voltar ao login"
+                : mode === "login"
+                  ? "Criar conta para convite de equipe"
+                  : "Já tenho conta"}
+            </button>
+          )}
         </form>
       )}
       <div className="flex flex-col gap-1 text-center text-xs text-muted-foreground">
         <h2 className="font-medium">Primeiro acesso?</h2>
         <p>
-          Confirme seu e-mail e configure o autenticador. Depois você poderá
-          cadastrar seu perfil profissional ou aceitar um convite válido.
+          O cadastro está disponível apenas por convite. Entre em contato com o
+          responsável pela plataforma para solicitar acesso.
         </p>
       </div>
     </section>

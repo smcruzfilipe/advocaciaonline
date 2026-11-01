@@ -10,7 +10,7 @@ class LawyerMonitoringHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "returns the existing lawyer identity and all current OABs without copying the profile" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     input = profile_payload.merge("secondary_oabs" => [
       { "number" => "00a-B", "uf" => "rj" },
       { "number" => "001234-A", "uf" => "mg" }
@@ -47,8 +47,8 @@ class LawyerMonitoringHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "each tenant receives only its own lawyer and forged tenant queries cannot switch identity" do
-    first_token, = authenticated_session
-    second_token, = authenticated_session
+    first_token, = authenticated_session(owner: true)
+    second_token, = authenticated_session(owner: true)
     first = LawyerOnboarding.call(token: first_token, input: profile_payload)
     second = LawyerOnboarding.call(token: second_token, input: profile_payload.merge(
       "full_name" => "Bruno Lima",
@@ -85,7 +85,7 @@ class LawyerMonitoringHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "an absent session cannot read a lawyer using a tenant query" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     lawyer = LawyerOnboarding.call(token: token, input: profile_payload)
 
     get "/api/monitorings/lawyer", params: { tenant_id: lawyer.tenant_id }
@@ -97,7 +97,7 @@ class LawyerMonitoringHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "a revoked session immediately loses access to its existing lawyer" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     lawyer = LawyerOnboarding.call(token: token, input: profile_payload)
     cookies[ApplicationController::SESSION_COOKIE] = token
     IdentityStore.revoke(token)
@@ -112,7 +112,7 @@ class LawyerMonitoringHttpTest < ActionDispatch::IntegrationTest
   end
 
   test "an authenticated session without onboarding has no lawyer even when another tenant is requested" do
-    onboarded_token, = authenticated_session
+    onboarded_token, = authenticated_session(owner: true)
     other_lawyer = LawyerOnboarding.call(token: onboarded_token, input: profile_payload)
     token, = authenticated_session
     cookies[ApplicationController::SESSION_COOKIE] = token

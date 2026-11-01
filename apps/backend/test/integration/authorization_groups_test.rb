@@ -12,7 +12,7 @@ class AuthorizationGroupsTest < ActiveSupport::TestCase
     @runtime = ApplicationRecord.connection
     @runtime_timeouts = %w[lock_timeout statement_timeout].to_h { |name| [name, @runtime.select_value("SHOW #{name}")] }
     @runtime.execute("SET lock_timeout = '5s'; SET statement_timeout = '10s'")
-    @owner, = authenticated_session
+    @owner, = authenticated_session(owner: true)
     @lawyer = LawyerOnboarding.call(token: @owner, input: profile_payload)
   end
 
@@ -98,7 +98,7 @@ class AuthorizationGroupsTest < ActiveSupport::TestCase
   test "another tenant cannot read mutate or assign a group and a member cannot administer any group" do
     member, membership = member_session
     group = as_owner { AuthorizationGroupStore.create_group(name: "Privado") }
-    other_owner, = authenticated_session
+    other_owner, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: other_owner, input: profile_payload)
     DatabaseContext.with_session(other_owner) do
       assert_empty AuthorizationGroupStore.list_groups

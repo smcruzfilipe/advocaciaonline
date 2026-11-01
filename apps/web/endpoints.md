@@ -2,8 +2,16 @@
 
 Fonte: `apps/backend/config/routes.rb`. `[x]` indica integração e comportamento exercitados pela interface ou pelo relay contra Rails e PostgreSQL locais; não implica autorização de deploy. Os convites foram enviados a um SMTP descartável com STARTTLS. A recuperação foi exercitada na URL HTTPS com conta sintética; o pedido para o endereço autorizado pelo Resend foi aceito pelo SMTP real. Cadastro e confirmação de e-mail ainda exigem comprovação visual integrada; o catálogo real retornou 503 após a fonte responder 403 neste ambiente.
 
-- [ ] `POST /api/auth/register` — cadastro com e-mail e senha
-- [ ] `POST /api/auth/verify-email` — confirmação do e-mail
+- [ ] `POST /api/auth/team-register` — cadastro e verificação contextual vinculados a convite de equipe
+- [ ] `POST /api/auth/verify-email` — confirmação real do e-mail para equipe
+- [ ] `POST /api/auth/first-access/inspect` — inspeção do convite administrativo
+- [ ] `POST /api/auth/first-access` — preparação pendente ou resgate por identidade existente
+- [ ] `POST /api/auth/first-access/confirm` — primeiro TOTP e criação da sessão
+- [ ] `GET /api/admin/invitations` — lista de convites ativos
+- [ ] `POST /api/admin/invitations` — emissão sem envio automático
+- [ ] `GET /api/admin/invitations/:id/link` — recuperação do mesmo link ativo
+- [ ] `POST /api/admin/invitations/:id/email` — envio ou reenvio explícito
+- [ ] `POST /api/admin/invitations/:id/reissue` — reemissão explícita
 - [x] `POST /api/auth/login` — senha nova aceita e senha antiga recusada após redefinição, com conta sintética
 - [x] `POST /api/auth/totp` — segundo fator preservado e sessão criada após senha redefinida
 - [x] `POST /api/auth/password-reset` — solicitação pela interface e aceitação SMTP Resend

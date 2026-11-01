@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { authRequest } from "@/lib/api";
+import { useSession } from "@/components/session-provider";
 import { AlertBanner } from "@/components/ui";
 
 let verification: Promise<void> | undefined;
@@ -36,12 +37,14 @@ function verifyFragment(): Promise<void> {
 }
 
 export default function VerifyEmailPage() {
+  const { loading } = useSession();
   const [status, setStatus] = useState<"pending" | "success" | "error">(
     "pending",
   );
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (loading) return;
     let active = true;
     void verifyFragment()
       .then(() => {
@@ -60,7 +63,7 @@ export default function VerifyEmailPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [loading]);
 
   return (
     <section
@@ -80,9 +83,9 @@ export default function VerifyEmailPage() {
           role="status"
         >
           <p>
-            E-mail confirmado. Entre com sua senha para configurar o
-            autenticador e concluir o acesso. Se recebeu um convite, volte à aba
-            em que o abriu ou reabra o link do convite antes de entrar.
+            E-mail confirmado. Volte à aba em que abriu o convite de equipe ou
+            reabra o link do convite. Se ainda não entrou, use sua senha e o
+            autenticador para concluir o aceite.
           </p>
           <Link
             className="bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground"

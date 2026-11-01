@@ -585,7 +585,7 @@ class PartyMonitoringsHttpTest < ActionDispatch::IntegrationTest
   end
 
   def sign_in_lawyer(subject: SecureRandom.uuid)
-    token, csrf = authenticated_session(subject: subject)
+    token, csrf = authenticated_session(subject: subject, owner: true)
     lawyer = LawyerOnboarding.call(token: token, input: profile_payload)
     cookies[ApplicationController::SESSION_COOKIE] = token
     [token, csrf, lawyer]

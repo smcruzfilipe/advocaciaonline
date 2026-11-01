@@ -22,7 +22,7 @@ class DespachanteExecutionTest < ActiveSupport::TestCase
     @date = Date.iso8601(@database.exec(<<~SQL).getvalue(0, 0))
       SELECT COALESCE(MAX(collection_date) + 3, DATE '2060-01-01')::text FROM public.collection_runs
     SQL
-    @token, = authenticated_session
+    @token, = authenticated_session(owner: true)
     @lawyer = LawyerOnboarding.call(token: @token, input: profile_payload)
   end
 

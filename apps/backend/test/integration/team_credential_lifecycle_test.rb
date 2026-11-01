@@ -4,7 +4,7 @@ class TeamCredentialLifecycleTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
   setup do
-    @owner, = authenticated_session
+    @owner, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: @owner, input: profile_payload)
     @email = "member-#{SecureRandom.hex(6)}@example.test"
   end
@@ -89,7 +89,7 @@ class TeamCredentialLifecycleTest < ActiveSupport::TestCase
     member = accept_credential
     assert_raises(IdentityStore::AccessDenied) { IdentityStore.team_credentials(member) }
     assert_raises(IdentityStore::AccessDenied) { IdentityStore.revoke_credential(token: member, membership_id: credential.fetch("id")) }
-    other, = authenticated_session
+    other, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: other, input: profile_payload)
     assert_raises(IdentityStore::NotFound) { IdentityStore.revoke_credential(token: other, membership_id: credential.fetch("id")) }
     assert_empty IdentityStore.team_credentials(other)

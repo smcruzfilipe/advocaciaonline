@@ -17,7 +17,7 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
     assert_equal "advocacia_despachante", @planner.exec("SELECT current_user").getvalue(0, 0)
     assert_equal "advocacia_processador", @processor.exec("SELECT current_user").getvalue(0, 0)
     assert_equal "advocacia_runtime", ApplicationRecord.connection.select_value("SELECT current_user")
-    @owner, = authenticated_session
+    @owner, = authenticated_session(owner: true)
     @lawyer = LawyerOnboarding.call(token: @owner, input: profile_payload)
     @member, = authenticated_session
     identity = IdentityStore.context(@member).fetch("identity_id")
@@ -230,7 +230,7 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
     own = persist(@sp_job, publication(1)).sole
     denied = persist(@rj_job, publication(2, court: "TJRJ").merge(
       "nomeOrgao" => "Órgão restrito", "numeroprocessocommascara" => "máscara restrita")).sole
-    other_token, = authenticated_session
+    other_token, = authenticated_session(owner: true)
     other_lawyer = LawyerOnboarding.call(token: other_token, input: profile_payload)
     other_job = create_job("TJSP", lawyer: other_lawyer)
     foreign = persist(other_job, publication(1).merge("texto" => "conteúdo de outro tenant",
@@ -387,7 +387,7 @@ class CommunicationsHttpTest < ActionDispatch::IntegrationTest
 
   test "query cache cannot carry communication data between tenants or across a changed group decision" do
     own = persist(@sp_job, publication(1)).sole
-    other_token, = authenticated_session
+    other_token, = authenticated_session(owner: true)
     other_lawyer = LawyerOnboarding.call(token: other_token, input: profile_payload)
     foreign = persist(create_job("TJSP", lawyer: other_lawyer), publication(1)).sole
 

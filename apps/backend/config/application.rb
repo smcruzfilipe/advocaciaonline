@@ -18,7 +18,7 @@ module AdvocaciaOnline
     config.middleware.use ActionDispatch::Cookies
     config.action_controller.wrap_parameters_by_default = false
     config.filter_parameters += %i[code state nonce code_verifier id_token access_token refresh_token
-      token csrf_token csrf secret password cookie authorization email full_name office_name number]
+      token challenge csrf_token csrf secret password cookie authorization email full_name office_name number]
     config.action_dispatch.default_headers.merge!(
       "Content-Security-Policy" => "default-src 'none'; frame-ancestors 'none'",
       "Referrer-Policy" => "no-referrer",

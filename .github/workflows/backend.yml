@@ -64,15 +64,19 @@ jobs:
       - name: Smoke final despachante image
         run: |
           docker run --rm --network advocacia-ci \
-            -e RAILS_ENV -e DATABASE_URL -e APP_ORIGIN -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL \
+            -e RAILS_ENV -e DATABASE_URL -e MIGRATION_DATABASE_URL -e APP_ORIGIN -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL \
             advocacia-ci:test ruby bin/rails runner '
               require "securerandom"
-              verification = SecureRandom.urlsafe_base64(32)
-              hash = IdentityStore.digest(verification)
               secret = PasswordAuthentication.new_secret
-              IdentityStore.call("register_password", hash, hash, "ci@example.test",
-                PasswordAuthentication.password_hash("ci-test-password"), PasswordAuthentication.encrypt(secret))
-              raise "verification failed" unless IdentityStore.call("verify_password_email", hash, hash).fetch("verified")
+              PG.connect(ENV.fetch("MIGRATION_DATABASE_URL")) do |db|
+                raise "expected isolated test database" unless db.db == "advocacia_test"
+                db.transaction do
+                  id = db.exec_params("INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id", ["ci@example.test"]).getvalue(0, 0)
+                  db.exec_params("INSERT INTO app_private.password_credentials(identity_id,password_hash,totp_secret) VALUES ($1,$2,$3)",
+                    [id, PasswordAuthentication.password_hash("ci-test-password"), PasswordAuthentication.encrypt(secret)])
+                  db.exec_params("INSERT INTO app_private.first_access_grants(identity_id) VALUES ($1)", [id])
+                end
+              end
               credential = IdentityStore.call("password_lookup", "ci@example.test")
               challenge = IdentityStore.digest(SecureRandom.urlsafe_base64(32))
               IdentityStore.call("create_password_challenge", credential.fetch("identity_id"), challenge,

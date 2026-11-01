@@ -19,8 +19,8 @@ class TenantIsolationTest < ActiveSupport::TestCase
   end
 
   test "no context fabricated tenant and reused connections fail closed" do
-    token_a, = authenticated_session
-    token_b, = authenticated_session
+    token_a, = authenticated_session(owner: true)
+    token_b, = authenticated_session(owner: true)
     lawyer_a = LawyerOnboarding.call(token: token_a, input: profile_payload)
     lawyer_b = LawyerOnboarding.call(token: token_b, input: profile_payload)
     assert_equal 0, Lawyer.count
@@ -52,7 +52,7 @@ class TenantIsolationTest < ActiveSupport::TestCase
   end
 
   test "revoked server session loses access immediately" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: token, input: profile_payload)
     IdentityStore.revoke(token)
     assert_nil IdentityStore.context(token)

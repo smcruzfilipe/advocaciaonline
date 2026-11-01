@@ -1,8 +1,21 @@
 # Plano: primeiro acesso controlado
 
+## Autorização de implementação e pipeline
+
+O solicitante autorizou executar este plano e criar a [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16), com [plano e handoff publicados](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6554202739). As restrições históricas de entrega apenas documental abaixo descrevem PA00, não impedem esta execução autorizada.
+
+| Fase do pipeline | Unidades | Gate |
+|---|---|---|
+| Planejamento | PA00 e preparação | Fontes, contratos, inventário, decisões e plano publicados na issue. |
+| Execução inicial | PA01–PA12 | Folhas e checkpoints aprovados; corte integrado; um único PR draft após PA12. |
+| Refinamento | PA13–PA15 | Conferência de consumidores, documentação e validação integrada real em ambiente descartável. |
+| Finalização | Fechamento do mesmo PR | Caminho definitivo antes de limpar provas, DoD integral, reviews resolvidas e CI terminal verde; retirar draft somente depois. |
+
+A publicação em draft após PA12 foi autorizada e ocorreu no PR #17. Posteriormente o solicitante aprovou globalmente a continuidade one-shot e as revisões humanas intermediárias, sem novas pausas. Gates técnicos, preservação de dados e ausência de deploy continuam obrigatórios.
+
 ## Estado, objetivo e limites da autorização
 
-**Estado: plano aprovado pelo solicitante; PA00 concluída documentalmente.** A [SPEC-primeiro-acesso.md](../SPEC-primeiro-acesso.md) registra as [decisões escolhidas por delegação](../SPEC-primeiro-acesso.md#decisões-de-pa00), integradas e revisadas independentemente. Foram conferidos links, critérios, dependências, limites das folhas e sintaxe dos exemplos de shell. Isso não comprova execução da aplicação nem autoriza implementação, testes da aplicação, infraestrutura ou deploy; os comandos abaixo permanecem propostas de verificação futura.
+**Estado: plano e implementação aprovados pelo solicitante, com verificação integrada no PR #17.** PA00 foi exclusivamente documental; as seções históricas de diagnóstico registram aquele ponto de partida. Resultados técnicos atuais constam do encerramento do todo e do README. Nenhum merge ou deploy está autorizado.
 
 O objetivo é substituir o cadastro público do advogado por uma liberação emitida exclusivamente pela administradora da plataforma, preservando contas existentes, recuperação segura, senha e TOTP e o cadastro de membros convidados. Convite de equipe autoriza participação no tenant convidante; não autoriza criação de tenant próprio. A conclusão deve ser segura tanto pela interface quanto por HTTP e pelas funções de banco acessíveis à role de runtime.
 
@@ -12,7 +25,7 @@ Não fazem parte deste plano integração automatizada com WhatsApp, contas de d
 
 ## Fontes e estado real observado
 
-A spec governa o comportamento futuro; os caminhos abaixo ancoram o diagnóstico do código atual. [SPEC-identidade.md](../SPEC-identidade.md), [docs/arquitetura.md](../docs/arquitetura.md) e a documentação web preservam seus contratos atuais; o desenho ainda não implementado fica na spec de primeiro acesso e neste planejamento separado. Trechos históricos não substituem inspeção do código nem comprovam verificações desta entrega.
+A spec governa o comportamento; [SPEC-identidade.md](../SPEC-identidade.md), [docs/arquitetura.md](../docs/arquitetura.md) e a documentação web descrevem o contrato implementado. O diagnóstico histórico abaixo não substitui o código ou as evidências atuais de encerramento.
 
 | Fronteira atual | Fonte real | Consequência para o planejamento |
 |---|---|---|
@@ -180,7 +193,7 @@ Não reverter dados de consumo, não ressuscitar convites e não apagar identida
 
 ## Verificação futura: ambientes, comandos e evidências
 
-**Nada nesta seção foi executado para este plano.** São referências rastreáveis para o integrador usar somente após aprovação, decisões e preparação de ambiente. Não há afirmação de teste aprovado, cobertura, conformidade de container ou sucesso de SMTP. Evitar execução concorrente de gates enquanto houver arquivos compartilhados em alteração.
+As receitas abaixo registram o ambiente descartável e não autorizam operação em base persistente. Os resultados efetivamente executados e seus limites estão no encerramento do todo e no README; comandos condicionados do plano não substituem essa evidência.
 
 Os gates pertinentes são condição de saída de cada unidade integrada e de avanço entre folhas e fases, não uma dívida a resolver na validação final. Antes de executar a unidade, registrar no todo o teste focado, as regressões dos helpers/callers afetados e o smoke do contrato; o integrador executa-os após a integração, sem concorrência sobre arquivos ou banco em alteração. Resultado vermelho interrompe a sequência até correção na própria unidade, sem bypass ou enfraquecimento de expectativas. PA13 e PA15 consolidam e ampliam as evidências; não substituem essas verificações intermediárias.
 
@@ -250,4 +263,12 @@ O teste HTTP direto deve demonstrar recusa para anônimo e usuário comum na ár
 
 PA15 reúne evidência sanitizada ligada a cada critério de aceite 1–8 da spec e aos IDs do todo: comando/ambiente realmente usado, resultado observado, limite do teste e revisão humana. Distinguir aceitação pelo SMTP de recebimento, teste controlado de integração externa real, inspeção estática de comportamento no navegador e proposta de execução de execução efetiva. Não incluir links completos, tokens, e-mails reais, senhas ou segredos.
 
-PA14 consolida contratos e operação junto da implementação futura autorizada, sem antecipar mudança nos contratos atuais. Toda variável efetivamente criada/alterada exige `README.md` na mesma mudança, com nome exato, default, obrigatoriedade, finalidade e fornecimento sem segredo; as decisões atuais não exigem nova variável. Expurgo ocorre nas operações necessárias de convites, sem rotina agendada ou promessa de exclusão física sem atividade. Após restore, invalidar todos os convites administrativos restaurados antes da reabertura, preservando identidades/liberações válidas do snapshot; não implementar infraestrutura de backup. PA00 foi concluída apenas documentalmente; código e gates operacionais continuam não executados.
+PA14 consolidou contratos/operação na mudança implementada. O README registra as variáveis vigentes, sem novo parâmetro; o expurgo é oportunista, sem prazo físico sem atividade. Restore exige invalidar todos os convites antes de reabrir, preservando identidades/liberações válidas, sem nova infraestrutura de backup. Evidências técnicas atuais estão no encerramento abaixo, separadas do planejamento histórico de PA00.
+
+## Encerramento da implementação
+
+Implementação integrada em [PR #17](https://github.com/smcruzfilipe/advocaciaonline/pull/17), com autorização one-shot registrada na issue #16. Gates técnicos das quatro fases são acompanhados pelo todo e evidências do PR; não há autorização de merge ou deploy.
+
+O código usa `verified_email` como endereço canônico histórico e `email_verified_at` nullable como prova real de caixa; grant administrativo é separado. A retomada usa `can_create_tenant` do servidor, nunca parâmetro da URL como autorização. SMTP e clipboard são canais do mesmo convite ativo. Fixtures de titular requerem liberação explícita e o workflow foi migrado junto ao corte.
+
+Backend CI: 560 testes e 11.949 assertions; processador: 135 e 1.253; web: 47 testes e todos os gates existentes aprovados. Smoke headless com PostgreSQL/HTTPS/SMTP reais descartáveis comprovou advogado novo até perfil, equipe confirmada, membro sem grant recusado, retomada de membro liberado e restore sem reviver convite. Upgrade a partir da imagem anterior preservou contas/sessões e invalidou cadastro público pendente. SMTP sintético não atesta entrega externa.

@@ -12,10 +12,7 @@ class PasswordResetTest < ActiveSupport::TestCase
     @password = "senha anterior segura"
     @new_password = "minha nova senha segura"
     @secret = PasswordAuthentication.new_secret
-    verification = IdentityStore.digest(SecureRandom.urlsafe_base64(32))
-    IdentityStore.call("register_password", verification, verification, @email,
-      PasswordAuthentication.password_hash(@password), PasswordAuthentication.encrypt(@secret))
-    assert IdentityStore.call("verify_password_email", verification, verification).fetch("verified")
+    fixture_identity(email: @email, password: @password, secret: @secret, verified: true)
     @credential = IdentityStore.call("password_lookup", @email)
     @identity = @credential.fetch("identity_id")
   end
@@ -44,7 +41,7 @@ class PasswordResetTest < ActiveSupport::TestCase
     step = Time.now.to_i / 30
     session = SecureRandom.urlsafe_base64(32)
     assert finish(first, step, session: session).fetch("created")
-    second_session, = authenticated_session(email: @email)
+    second_session, = authenticated_session(email: @email, owner: true)
     LawyerOnboarding.call(token: session, input: profile_payload)
     context = IdentityStore.context(session)
     memberships = IdentityStore.memberships(session)
@@ -80,21 +77,25 @@ class PasswordResetTest < ActiveSupport::TestCase
     assert_equal "0", @admin.exec_params("SELECT count(*) FROM app_private.password_resets WHERE identity_id = $1", [@identity]).getvalue(0, 0)
   end
 
-  test "disabled unknown and unverified identities do not receive a usable token" do
+  test "disabled and unknown identities do not receive a usable token" do
     absent = SecureRandom.urlsafe_base64(32)
     assert IdentityStore.call("request_password_reset", "absent-#{@email}", IdentityStore.digest(absent)).fetch("accepted")
-    refute confirm(absent).fetch("changed")
-    pending = IdentityStore.digest(SecureRandom.urlsafe_base64(32))
-    pending_email = "pending-#{@email}"
-    IdentityStore.call("register_password", pending, pending, pending_email,
-      PasswordAuthentication.password_hash(@password), PasswordAuthentication.encrypt(@secret))
-    assert IdentityStore.call("request_password_reset", pending_email, IdentityStore.digest(absent)).fetch("accepted")
     refute confirm(absent).fetch("changed")
     token = issue
     @admin.exec_params("UPDATE app_private.identities SET disabled_at = clock_timestamp() WHERE id = $1", [@identity])
     refute confirm(token).fetch("changed")
     assert IdentityStore.call("request_password_reset", @email, IdentityStore.digest(absent)).fetch("accepted")
     refute confirm(absent).fetch("changed")
+  end
+
+  test "reset for an active identity without verified mailbox preserves that distinction and TOTP" do
+    id = fixture_identity(email: "unverified-#{@email}", password: @password, secret: @secret, verified: false)
+    before = @admin.exec_params("SELECT totp_secret, totp_confirmed, last_totp_step FROM app_private.password_credentials WHERE identity_id=$1", [id]).first
+    token = SecureRandom.urlsafe_base64(32)
+    assert IdentityStore.call("request_password_reset", "unverified-#{@email}", IdentityStore.digest(token)).fetch("accepted")
+    assert confirm(token).fetch("changed")
+    assert_nil @admin.exec_params("SELECT email_verified_at FROM app_private.identities WHERE id=$1", [id]).getvalue(0, 0)
+    assert_equal before, @admin.exec_params("SELECT totp_secret, totp_confirmed, last_totp_step FROM app_private.password_credentials WHERE identity_id=$1", [id]).first
   end
 
   test "failed delivery invalidation cannot invalidate a newer request" do

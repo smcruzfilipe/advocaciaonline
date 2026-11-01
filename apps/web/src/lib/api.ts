@@ -162,32 +162,60 @@ async function confirmedSession(
 }
 export async function authRequest<T>(
   path:
-    | "/api/auth/register"
+    | "/api/auth/team-register"
+    | "/api/auth/first-access/inspect"
+    | "/api/auth/first-access"
+    | "/api/auth/first-access/confirm"
     | "/api/auth/verify-email"
     | "/api/auth/login"
     | "/api/auth/totp"
     | "/api/auth/password-reset"
-    | "/api/auth/password-reset/confirm",
+    | "/api/auth/password-reset/confirm"
+    | "/api/admin/auth/recovery"
+    | "/api/admin/auth/recovery/confirm",
   body: unknown,
+  invitationFingerprint?: string,
 ): Promise<T> {
-  return withSessionLock(() =>
-    request<T>(
+  const expected = displayedSession;
+  return withSessionLock(async () => {
+    const headers = new Headers({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    });
+    if (
+      expected?.authenticated &&
+      (path.startsWith("/api/admin/auth/") ||
+        path.startsWith("/api/auth/first-access") ||
+        path === "/api/auth/team-register" ||
+        path === "/api/auth/verify-email")
+    )
+      headers.set("X-CSRF-Token", await confirmedSession(expected, headers));
+    if (path === "/api/auth/team-register") {
+      if (
+        !invitationFingerprint ||
+        !/^[0-9a-f]{64}$/.test(invitationFingerprint)
+      )
+        throw new ApiError(
+          409,
+          "Abra novamente o link de convite recebido.",
+          "invitation_context_changed",
+        );
+      headers.set("X-Invitation-Fingerprint", invitationFingerprint);
+    }
+    return request<T>(
       path,
       {
         method: "POST",
-        headers: new Headers({
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        }),
+        headers,
         body: JSON.stringify(body),
       },
-      path === "/api/auth/password-reset"
+      path === "/api/auth/password-reset" || path === "/api/auth/team-register"
         ? 202
         : path === "/api/auth/password-reset/confirm"
           ? 204
           : undefined,
-    ),
-  );
+    );
+  });
 }
 
 export async function api<T>(

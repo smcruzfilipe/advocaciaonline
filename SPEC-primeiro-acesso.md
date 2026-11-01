@@ -1,6 +1,6 @@
 # Especificação proposta: primeiro acesso controlado
 
-**Estado:** base funcional e plano aprovados; recomendações escolhidas por delegação expressa do solicitante, conforme [Decisões de PA00](#decisões-de-pa00). PA00 concluída documentalmente após revisão independente e validação de consistência; não é implementação nem prova de execução. PA01–PA15 continuam não implementadas e esta etapa não autoriza código, testes da aplicação, deploy ou infraestrutura. O contrato futuro fica neste artefato, separado do comportamento atual. Referências: [identidade](SPEC-identidade.md), [plano](tasks/plan-primeiro-acesso.md) e [tarefas](tasks/todo-primeiro-acesso.md).
+**Estado:** implementação integrada na branch, autorizada na [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16). O solicitante aprovou globalmente a continuidade one-shot e as revisões intermediárias; aceites técnicos permanecem verificáveis nas [tarefas](tasks/todo-primeiro-acesso.md) e no README. Decisões vinculantes em [Decisões de PA00](#decisões-de-pa00). Nenhum deploy ou uso de dados persistentes autorizado.
 
 ## Objetivo
 

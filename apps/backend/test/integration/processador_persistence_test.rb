@@ -32,9 +32,9 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
       @migrator => "advocacia_migrator", @despachante => "advocacia_despachante" }.each do |connection, role|
       assert_equal role, connection.exec("SELECT current_user").getvalue(0, 0)
     end
-    @session_a, = authenticated_session
+    @session_a, = authenticated_session(owner: true)
     @lawyer_a = LawyerOnboarding.call(token: @session_a, input: profile_payload.merge("full_name" => LAWYER_NAME))
-    @session_b, = authenticated_session
+    @session_b, = authenticated_session(owner: true)
     @lawyer_b = LawyerOnboarding.call(token: @session_b, input: profile_payload.merge("full_name" => "Outro Advogado"))
     @date = @despachante.exec("SELECT (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date::text").getvalue(0, 0)
     @run_id = create_run(@date, 1)

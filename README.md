@@ -24,7 +24,7 @@ A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha 
 
 ## Escopo funcional
 
-- Login para advogado e equipe com senha e aplicativo autenticador (TOTP) obrigatório; o cadastro requer confirmação do e-mail.
+- Login comum com senha e TOTP; painel administrativo em `/admin/convites` para convidar advogados por e-mail ou copiar o link. Cadastro de advogado exclusivamente por convite, sem confirmação adicional de caixa postal; equipe exige convite e confirmação real do e-mail.
 - Isolamento por tenant do advogado, autorização por grupos e tribunal, monitoramentos de advogados/partes/processos e consulta de comunicações.
 - Duas coletas diárias do DJEN, somente Diário Eletrônico (`D`), sem editais (`E`): cadernos e fallback paginado na primeira execução, API paginada diretamente na segunda e deduplicação pela combinação de `id` e `hash`.
 - Dashboard e registros append-only do fluxo de coleta.
@@ -57,7 +57,7 @@ O script gera segredos aleatórios uma única vez em `.local/compose.env`, arqui
 
 Para cadastro, redefinição de senha e convites, forneça as cinco variáveis `SMTP_*` documentadas abaixo em `.local/integrations.env`. Proteja o arquivo com `chmod 600 .local/integrations.env`; não versione nem publique seus valores. Sem SMTP, a confirmação do e-mail, a recuperação de senha e o envio de convites não funcionam.
 
-O link de confirmação deve ser aberto no mesmo navegador usado para iniciar o cadastro. Senhas podem ser redefinidas por **Esqueci minha senha**, em `/reset-password`: o link enviado por e-mail expira em 30 minutos, é de uso único e uma nova solicitação invalida o anterior. A confirmação encerra sessões e desafios de login anteriores; não cria sessão nem modifica o autenticador. Ainda não há recuperação do aplicativo autenticador. A perda de `SECRET_KEY_BASE` impede decifrar os segredos dos autenticadores já cadastrados; preserve esse segredo fora do repositório.
+O link de confirmação deve ser aberto no mesmo navegador usado para iniciar o cadastro. Senhas podem ser redefinidas por **Esqueci minha senha**, em `/reset-password`: o link enviado por e-mail expira em 30 minutos, é de uso único e uma nova solicitação invalida o anterior. A confirmação encerra sessões e desafios de login anteriores; não cria sessão nem modifica o autenticador. A recuperação do autenticador administrativo está no login comum, em **Perdi meu autenticador administrativo**, usando a API descrita abaixo; não há recuperação do autenticador de contas comuns. A perda de `SECRET_KEY_BASE` impede decifrar os segredos dos autenticadores já cadastrados; preserve esse segredo fora do repositório.
 
 ```bash
 # Recriar a API após fornecer/alterar as integrações:
@@ -103,7 +103,7 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | Variável | Default | Obrigatória? | Finalidade |
 |---|---|---|---|
 | `DATABASE_URL` | Nenhum | Sim, para API e testes | Conexão PostgreSQL com a role `advocacia_runtime`, sem propriedade das tabelas nem bypass de RLS. |
-| `MIGRATION_DATABASE_URL` | Nenhum | Sim, para migration e teste administrativo de sessão; não fornecer à API web | Conexão com `advocacia_migrator`, separada da role de execução. |
+| `MIGRATION_DATABASE_URL` | Nenhum | Sim, para migrations e testes PostgreSQL protegidos; não fornecer à API web | Conexão com `advocacia_migrator`, separada da role de execução. |
 | `DESPACHANTE_DATABASE_URL` | Nenhum | Sim, no despachante e nos testes do despachante; não fornecer à API web | Conexão PostgreSQL isolada com a role `advocacia_despachante`, exclusiva do processo confiável de planejamento; fornecer externamente por ambiente protegido ou gerenciador de segredos. |
 | `PROCESSADOR_DATABASE_URL` | Nenhum | Sim, no processador e nos testes de fronteira do Escrevente; não fornecer à API nem ao despachante | Conexão PostgreSQL exclusiva com a role `advocacia_processador`, provisionada administrativamente por `apps/backend/db/provision_processador.sql` antes da migration do Escrevente. Fornecer credencial e URL externamente por ambiente protegido ou gerenciador de segredos, sem registrar segredo no repositório. |
 | `POSTGRES_DB` | `POSTGRES_USER` da imagem PostgreSQL; `postgres` quando este não é definido; `advocacia_local` no Compose local | Não na imagem; Compose e CI fornecem um nome | Banco criado na primeira inicialização do PostgreSQL local/descartável; o CI usa `advocacia_test`. Não configura o banco de deploy. |
@@ -128,7 +128,7 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | `SMTP_USERNAME` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Usuário de autenticação SMTP; fornecer pela configuração protegida do ambiente. |
 | `SMTP_PASSWORD` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Senha de autenticação SMTP; fornecer por gerenciador de segredos, sem versioná-la. |
 | `SMTP_FROM` | Nenhum | Sim, para cadastro, recuperação de senha e convites | Endereço remetente autorizado no servidor SMTP; fornecer pela configuração protegida do ambiente. |
-| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails usado para proteção de tentativas e segredos de autenticação; gerar e fornecer externamente. Preservar entre reinícios. |
+| `SECRET_KEY_BASE` | Nenhum | Sim, para API, migration e testes Rails; não é usada pelo despachante | Segredo Rails para proteção de tentativas, fatores de autenticação e cópia cifrada dos convites de primeiro acesso com derivação/propósito próprios; gerar e fornecer externamente. Preservar entre reinícios. |
 | `RAILS_ENV` | `production` na imagem runtime; `test` na imagem de testes | Não | Seleciona o ambiente Rails. |
 | `RAILS_LOG_LEVEL` | `info` | Não | Nível de logging. |
 | `PORT` | `3000` nas imagens API e web | Não | Porta interna do servidor Puma ou Next.js; a publicação HTTPS local é controlada por `LOCAL_HTTPS_PORT`. |
@@ -222,12 +222,107 @@ O histórico da consolidação anterior registra 276 testes e 7.678 assertions, 
 
 As decisões de transação e privilégios seguem as referências oficiais de [funções PostgreSQL seguras](https://www.postgresql.org/docs/18/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY), [RLS](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) e [travas de advisory](https://www.postgresql.org/docs/18/explicit-locking.html#ADVISORY-LOCKS). O transporte usa o [SMTP da biblioteca Mail](https://github.com/mikel/mail/blob/2.9.1/lib/mail/network/delivery_methods/smtp.rb).
 
+### Provisionamento protegido da administradora
+
+A capacidade administrativa da plataforma é única e distinta da titularidade de um tenant. Sua criação usa exclusivamente uma conexão `advocacia_migrator` em processo operacional protegido, nunca a credencial da API. O operador fornece e-mail e senha reais sem defaults; não colocar entradas em argumentos, histórico, arquivos, logs ou sessões gravadas. O primeiro login permanece no mecanismo comum, com senha e confirmação inicial do autenticador.
+
+Em um terminal protegido, use `ruby bin/rails runner` para executar o bloco abaixo como uma única unidade, não colando expressões individuais em IRB/console Rails (que pode imprimir seus resultados). Configure `DATABASE_URL` exclusivamente com a conexão migrator, `APP_ORIGIN` e `SECRET_KEY_BASE` legítimos pelo ambiente protegido; desative gravação do terminal. Não há nova variável ou executável. Para validação, usar somente banco descartável e endereço sintético; isto não autoriza operação em produção.
+
+```ruby
+begin
+require "io/console"
+ActiveRecord::Base.logger = nil
+console = IO.console or abort "Terminal protegido obrigatório"
+db = ApplicationRecord.connection
+abort "Role incorreta" unless db.select_value("SELECT current_user") == "advocacia_migrator"
+console.print "E-mail: "
+email = console.noecho(&:gets)&.chomp
+console.puts
+console.print "Senha: "
+password = console.noecho(&:gets)&.chomp
+console.puts
+email = TeamInvitationMailer.normalize_recipient!(email)
+abort "Senha inválida" unless password.is_a?(String) && password.valid_encoding? &&
+  password.length.between?(12, 128) && password.bytesize <= 512
+codes = PasswordAuthentication.new_recovery_codes
+db.transaction do
+  db.execute("SELECT 1")
+  pg = db.raw_connection
+  identity = pg.exec_params(
+    "INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [email]
+  ).getvalue(0, 0)
+  pg.exec_params(
+    "INSERT INTO app_private.password_credentials(identity_id,password_hash,totp_secret) VALUES ($1,$2,$3)",
+    [identity, PasswordAuthentication.password_hash(password),
+      PasswordAuthentication.encrypt(PasswordAuthentication.new_secret)]
+  )
+  pg.exec_params("INSERT INTO app_private.platform_administrator(identity_id) VALUES ($1)", [identity])
+  codes.each do |code|
+    pg.exec_params(
+      "INSERT INTO app_private.platform_recovery_codes(identity_id,code_hash) VALUES ($1,$2)",
+      [identity, PasswordAuthentication.recovery_code_hash(code)]
+    )
+  end
+end
+console.puts "Guarde os códigos fora da plataforma; esta é sua única exibição:"
+codes.each { |code| console.puts code }
+rescue StandardError
+  abort "Provisionamento não concluído; confira somente o estado sanitizado."
+end
+```
+
+A transação é materializada antes das chamadas PostgreSQL parametrizadas: erro ou segunda administradora fazem rollback integral, sem substituir a conta existente. Não imprimir exceções ou seus parâmetros; consultar somente o estado sanitizado. Os códigos só são exibidos após commit e persistidos como hashes. Guarde-os fora da plataforma e preserve `SECRET_KEY_BASE`.
+
+Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. A administradora entra pelo login comum e usa `/admin/convites` para emitir, enviar, copiar e reemitir links.
+
+### Recuperação administrativa e sessão comum
+
+| Método e caminho | Entrada JSON | Resposta de sucesso |
+|---|---|---|
+| `POST /api/admin/auth/recovery` | `email`, `password`, `recovery_code` | `200`: `challenge`, `secret`, `otpauth_uri` para preparar o novo autenticador; invalida sessões e desafios de login anteriores. |
+| `POST /api/admin/auth/recovery/confirm` | `token` com o challenge recebido, `code` com o novo TOTP | `200`: `recovery_codes` exibidos somente após commit; substitui o fator e os códigos antigos. |
+
+Essas respostas não criam sessão nem cookie; após a confirmação, entrar pelo login comum com senha e novo TOTP. O desafio expira em dez minutos e não pode ser reutilizado. Fatores ausentes, malformados, incorretos, vencidos ou repetidos retornam o mesmo envelope `422`, com `error.code=admin_recovery_invalid`, sem identificar o fator recusado.
+
+As duas rotas exigem JSON, `Origin` igual a `APP_ORIGIN` e o ingresso/IP confiáveis já usados no login. A limitação compartilhada permanece em 20 tentativas por 15 minutos, por IP e, quando aplicável, conta/desafio; `429` traz `Retry-After: 900`. Se houver sessão válida, também é obrigatório seu `X-CSRF-Token`; cookie antigo inválido não equivale a sessão autenticada. Origem, ingresso ou CSRF inválidos retornam `403`. `token`, `code`, `recovery_code`, senha e segredo usam a filtragem existente; consumidores não devem registrar requisições ou respostas sensíveis.
+
+O login concluído por `POST /api/auth/totp` e a consulta autenticada `GET /api/session` incluem `platform_admin` booleano, resolvido no servidor a cada consulta. A capacidade não depende de tenant nem dos papéis owner/member e não pode ser concedida por campos enviados pelo cliente. A consulta anônima mantém `authenticated: false` e `onboarded: false`. Para proteger uma operação administrativa, usar `require_platform_administration` e, nas mutações, `verify_csrf`, revalidando com `authorize_platform_administration!` junto da operação. A guarda usa a sessão comum: sessão ausente/inválida recebe `401`, identidade sem capacidade recebe `403`. Não há segundo cookie, sessão administrativa separada ou nova variável de ambiente.
+
+No login comum, **Perdi meu autenticador administrativo** pede e-mail, senha e um código de recuperação; a etapa seguinte confirma o novo TOTP e exibe os novos códigos para guarda fora da plataforma. Senha, chave, desafio e códigos permanecem somente na memória da tela, nunca em URL ou armazenamento do navegador. O sucesso não entra na conta: depois de guardar os códigos, é necessário novo login com senha e autenticador. Os códigos continuam visíveis até a confirmação de guarda, mesmo se outra aba trocar a conta ou a revalidação da sessão falhar; atualizar/fechar a página descarta essa memória.
+
+A administradora entra por `/login` e segue a `/admin`, sem precisar de tenant. A própria página consulta a sessão real no servidor antes de renderizar; o relay não concede capacidade. Não depender de layout como fronteira de autorização: [layouts Next não revalidam em toda navegação nem impedem a execução/RSC dos filhos](https://nextjs.org/docs/app/guides/authentication#layouts-and-auth-checks). A leitura server-side usa [`cookies()` assíncrono](https://nextjs.org/docs/app/api-reference/functions/cookies), sem outro cookie/provider. Controles de troca de tenant ficam fora do ambiente administrativo; quem também tem vínculo profissional pode acessar seu ambiente existente, sem perder a capacidade administrativa. O provider não trata fragmentos em `/admin` como convites de equipe.
+
+**Verificação PA03:** 44 testes Node aprovados; tipos, lint sem warnings, formatação e build Next de produção aprovados. `npm audit --omit=dev` retornou zero vulnerabilidades; a instalação completa apontou 15 moderadas já presentes na árvore de desenvolvimento, sem atualização forçada. HTTP real verificou origem/ingresso/método, negação a owner/member, CSRF e ausência de CSRF no RSC. Chromium 149 **headless**, em container descartável não root e HTTPS local, verificou login/recuperação, fatores inválidos, expiração, cookie revogado, preservação dos códigos entre contas/erro de rede e navegação de conta com papel duplo. Menu, teclado e foco conferidos a 320 px; ausência de overflow conferida a 320, 768, 1024 e 1440 px. Eventos de foco foram controlados no headless, sem janela gráfica. Não houve SMTP, conta real, deploy ou alteração de dependências/env. Web standalone: 303.629.026 bytes; ingresso existente: 72.190.907 bytes; ambos observados como UID/GID 1000:1000.
+
+### Convites administrativos de primeiro acesso
+
+| Método e caminho | Entrada | Resposta de sucesso |
+|---|---|---|
+| `GET /api/admin/invitations` | Sessão comum autorizada | `200 { invitations: [{ id, email, created_at, expires_at }] }`, somente ativos e sem segredo. |
+| `POST /api/admin/invitations` | JSON com `email` | `201 { id, email, created_at, expires_at }`; normaliza o e-mail, não cria tenant nem substitui convite ativo. |
+| `GET /api/admin/invitations/:id/link` | Identificador do convite ativo | `200 { link, expires_at }`; link opaco em `/primeiro-acesso#token=...`, sem renovar o prazo. |
+| `POST /api/admin/invitations/:id/reissue` | JSON `{}` | `201` com novos metadados; substitui convite/preparação anteriores atomicamente e reinicia as 24 horas. |
+| `POST /api/admin/invitations/:id/email` | JSON `{}` | `200 { accepted, message }` significa aceitação pelo SMTP, não entrega na caixa postal; reenvia o mesmo link sem prorrogar. Falha `503` mantém o convite copiável; timeout informa resultado desconhecido. |
+
+Todas revalidam sessão e capacidade administrativa no PostgreSQL; owner/member comuns não são administradores. Mutações exigem JSON, `Origin` igual a `APP_ORIGIN` e CSRF da sessão atual. Leituras aceitam essa origem ou, sem `Origin`, `Sec-Fetch-Site: same-origin`; origem explícita indevida sempre é recusada. Não há cookie, dependência ou variável nova. Respostas usam `no-store`; não registrar seus corpos sensíveis. Sessão ausente/revogada retorna `401`; falta de capacidade, origem ou CSRF retorna `403`; duplicidade ou identidade desativada/titular com tenant retorna `409`; e-mail inválido retorna `422`; identificador sem convite ativo retorna `404`.
+
+Há no máximo um convite ativo por e-mail, com prazo absoluto de 24 horas. Cópia retorna sempre o mesmo token e prazo; somente reemissão explícita substitui ambos. O banco guarda digest e cópia cifrada autenticada, nunca o token em claro. Consumo, substituição e expurgo removem convite e preparação; a liberação consumida permanece vinculada à identidade. Listar/emitir/copiar/resgatar executam expurgo oportunista, sem tarefa agendada: sem atividade, não há promessa de prazo físico de remoção.
+
+Em `/primeiro-acesso#token=...`, o formulário captura o segredo apenas em memória e remove o fragmento. Preparar senha/autenticador não cria identidade, sessão, reset ou liberação. A confirmação inicial de TOTP conclui conta, liberação, consumo e sessão comum numa transação, seguindo diretamente ao perfil sem novo login/TOTP. Conta existente usa sua sessão MFA do mesmo e-mail sem alterar credenciais. Perfil/tenant são outra transação; falha nessa etapa não reabre convite consumido. A capacidade server-side `can_create_tenant` permite retomar `/onboarding`, inclusive quando já há vínculo de equipe, e nunca substitui a guarda SQL.
+
+**Restore:** antes de reabrir o tráfego, a operação protegida deve executar `DELETE FROM app_private.first_access_invitations` na instância restaurada com a role de migration. Isso invalida todos os convites restaurados e elimina suas preparações por FK; não apagar identidades nem `app_private.first_access_grants`. A role da API não pode executar esse DELETE; não existe endpoint ou função runtime de manutenção. Preserve `SECRET_KEY_BASE`; não tentar recuperar links antigos com outra chave.
+
+**Verificação PA04/PA05:** foco com 27 testes e 288 assertions e suíte Rails completa com 536 testes e 11.710 assertions, sem falhas, erros ou skips, em PostgreSQL Docker descartável com roles segregadas. `zeitwerk:check` aprovado. HTTP real em Puma de produção não root comprovou senha/TOTP comuns, emissão/cópia/duplicidade/reemissão e negações; o instante de 24 horas devolveu `404` e removeu o segredo. Consumo via store exigiu a sessão MFA da mesma identidade; restore protegido eliminou os convites/preparações e preservou a liberação consumida. Isso não antecipa a prova do cadastro público de conta nova, prevista em PA09, nem SMTP/UI de convites.
+
 ### API de onboarding
 
 | Método e caminho | Comportamento |
 |---|---|
-| `POST /api/auth/register` | Solicita cadastro com e-mail e senha; a confirmação é enviada por e-mail. |
-| `POST /api/auth/verify-email` | Confirma o e-mail usando token de uso único. |
+| `POST /api/auth/first-access/inspect` | JSON com `token`; consulta e-mail fixado, expiração e necessidade de login, sem consumir. |
+| `POST /api/auth/first-access` | Token e senha/`password_confirmation` preparam conta nova; retorna challenge, segredo TOTP e URI, sem sessão. Conta existente autenticada resgata com token e CSRF, sem alterar credenciais. |
+| `POST /api/auth/first-access/confirm` | Token, challenge e `code` confirmam primeiro TOTP e criam sessão comum somente após commit. |
+| `POST /api/auth/team-register` | Convite de equipe no token, e-mail correspondente e senha iniciam confirmação real; não concedem titularidade. Conta existente autenticada pode confirmar seu e-mail nesse contexto sem redefinir credenciais. |
+| `POST /api/auth/verify-email` | Confirmação vinculada ao convite de equipe e ao navegador; não há cadastro público genérico nem alias de `/api/auth/register`. |
 | `POST /api/auth/login` | Valida senha e inicia o desafio TOTP, sem criar sessão. |
 | `POST /api/auth/totp` | Valida o código do autenticador e cria sessão somente após sucesso. |
 | `POST /api/auth/password-reset` | Recebe `email` e responde `202` genérico após o envio das instruções; não revela existência da conta. |
@@ -422,3 +517,13 @@ As evidências abaixo foram registradas antes da renomeação dos componentes e 
 - Os testes focados de catálogo e projeção do advogado passaram com 24 testes; partes, com 47; processos, com 63. Um smoke HTTP na imagem runtime consultou o catálogo DJEN real e criou, leu, editou e desativou ambos os tipos em dois tenants, negando acesso cruzado. As sessões desse smoke foram preparadas para teste, sem login Google real.
 - Em 28/10/2026, o catálogo real retornou 93 códigos validados. A [OpenAPI do DJEN](https://comunicaapi.pje.jus.br/swagger/djen.yml) descreve uma lista plana, enquanto a resposta observada agrupa instituições por UF; o cliente aceita ambos os formatos e rejeita resposta parcial inválida.
 - Antes da renomeação, em banco local separado, o processo de planejamento da imagem final então vigente consultou o DJEN real e gerou os dois slots do dia. A API confirmou, para dois tenants, trabalhos de advogado, parte e processo com meios `D`/`E`, critérios fixados e isolamento cruzado. Os processos web e de planejamento executaram como UID 1000 e o PostgreSQL como UID 70. Isso verificou planejamento, não execução da coleta nem a imagem renomeada.
+
+## Primeiro acesso controlado — verificação integrada
+
+Entrega no [PR #17](https://github.com/smcruzfilipe/advocaciaonline/pull/17), sem deploy. O CI do backend executou **560 testes/11.949 assertions**, e o processador **135 testes/1.253 assertions**, sem falhas, erros ou skips; o smoke da imagem final do despachante persistiu dois planos distintos e idempotentes. Web: **47 testes** e gates de tipos, lint, formatação, build e auditoria de produção aprovados.
+
+Chromium headless, em HTTPS local e PostgreSQL Docker descartável, exercitou emissão/SMTP STARTTLS/cópia/reemissão, clipboard permitido/negado e cópia após indisponibilidade SMTP. O advogado preparou senha/TOTP sem conta ativa, confirmou primeiro TOTP e concluiu perfil/tenant sem segundo login; o e-mail permaneceu sem falsa prova de caixa. A equipe criou conta sob convite, confirmou o e-mail recebido pelo SMTP e autenticou/aceitou; não conseguiu administrar ou criar tenant sem grant. Após liberação administrativa, um membro retomou o perfil interrompido sem query ou novo convite e preservou seu vínculo anterior. Painel e dashboard foram conferidos a 320 px sem overflow e com foco de teclado.
+
+Instalação vazia e upgrade desde a imagem anterior foram ensaiados: credenciais, sessões e titulares preservados; identidade sem tenant não recebeu grant; pendência pública invalidada. Restore protegido removeu todos os convites/preparações, inclusive ativos, preservando identidades, liberações e tenants. Uma mutação temporária que invertia o fator TOTP foi detectada pelo teste consumidor; produção ficou intacta.
+
+API, web e ingresso executaram de fato com UID1000; PostgreSQL com UID70. Imagens finais: API **263.103.711 bytes**, web **303.898.522 bytes**, ingresso **72.190.907 bytes**. Bases Ruby4.0.9-Alpine3.23 e Node24.22.1-Alpine já vigentes, multi-stage, sem ferramentas de build/testes nos runtimes. SMTP sintético autenticado com TLS não comprova recebimento externo. Nenhum segredo real, dado persistente, novo job, dependência ou variável foi necessário.

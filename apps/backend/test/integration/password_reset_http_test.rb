@@ -13,10 +13,7 @@ class PasswordResetHttpTest < ActionDispatch::IntegrationTest
     @email = "reset-http-#{SecureRandom.hex(12)}@example.test"
     @password = "senha longa anterior"
     @new_password = "senha nova escolhida"
-    verification = IdentityStore.digest(SecureRandom.urlsafe_base64(32))
-    IdentityStore.call("register_password", verification, verification, @email,
-      PasswordAuthentication.password_hash(@password), PasswordAuthentication.encrypt(PasswordAuthentication.new_secret))
-    assert IdentityStore.call("verify_password_email", verification, verification).fetch("verified")
+    fixture_identity(email: @email, password: @password, secret: PasswordAuthentication.new_secret, verified: true)
   end
 
   teardown do

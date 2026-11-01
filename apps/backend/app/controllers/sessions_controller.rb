@@ -14,7 +14,8 @@ class SessionsController < ApplicationController
       csrf_token: context.fetch("csrf_token"), membership_id: selected&.fetch("membership_id"),
       tenant_id: selected&.fetch("tenant_id"), role: selected&.fetch("role"),
       selection_required: memberships.any? && selected&.fetch("tenant_id").blank?,
-      memberships: memberships }
+      memberships: memberships, platform_admin: IdentityStore.platform_admin?(session_token),
+      can_create_tenant: IdentityStore.can_create_tenant?(session_token) }
   end
 
   def update

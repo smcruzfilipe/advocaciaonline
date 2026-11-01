@@ -5,7 +5,7 @@ class TeamInvitationsTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
   setup do
-    @owner, = authenticated_session
+    @owner, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: @owner, input: profile_payload)
     @email = "invited-#{SecureRandom.hex(6)}@example.test"
     @sent_tokens = []

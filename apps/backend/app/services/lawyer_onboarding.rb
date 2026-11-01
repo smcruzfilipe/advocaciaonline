@@ -8,6 +8,7 @@ class LawyerOnboarding
   end
   class AlreadyOnboarded < StandardError; end
   class Unauthenticated < StandardError; end
+  class NotAuthorized < StandardError; end
 
   def self.call(token:, input:)
     profile = OnboardingProfile.new(input)
@@ -19,6 +20,7 @@ class LawyerOnboarding
       # Locks the identity row, so concurrent requests cannot create two tenants.
       claim = IdentityStore.call("claim_tenant", IdentityStore.digest(token))
       raise Unauthenticated unless claim
+      raise NotAuthorized unless claim.fetch("tenant_id")
       raise AlreadyOnboarded unless claim.fetch("claimed")
       tenant = Tenant.create!(id: claim.fetch("tenant_id"))
       lawyer = Lawyer.create!(tenant: tenant, full_name: profile.full_name, office_name: profile.office_name)

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-import { api, ApiError, setDisplayedSession } from "./api.ts";
+import {
+  api,
+  authRequest,
+  ApiError,
+  setDisplayedSession,
+  withSessionLock,
+} from "./api.ts";
 
 const originalFetch = globalThis.fetch;
 const originalNavigator = Object.getOwnPropertyDescriptor(
@@ -207,4 +213,126 @@ test("writes fail closed when cross-tab locking is unavailable", async () => {
       error instanceof ApiError && error.code === "browser_not_supported",
   );
   assert.equal(count, 0);
+});
+
+test("administrative recovery never consumes a code prepared for an account replaced in another tab", async () => {
+  let recoveryStarted = false;
+  globalThis.fetch = async (path) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "csrf-another-account",
+        membership_id: null,
+      });
+    recoveryStarted = true;
+    return Response.json({});
+  };
+  await assert.rejects(
+    authRequest("/api/admin/auth/recovery", {
+      email: "synthetic@example.test",
+      password: "synthetic password",
+      recovery_code: "synthetic recovery code",
+    }),
+    (error) =>
+      error instanceof ApiError && error.code === "session_context_changed",
+  );
+  assert.equal(recoveryStarted, false);
+});
+
+test("queued administrative recovery retains the identity shown when it was prepared", async () => {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  let recoveryStarted = false;
+  globalThis.fetch = async (path) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "csrf-b",
+        membership_id: "b",
+      });
+    recoveryStarted = true;
+    return Response.json({});
+  };
+  const holding = withSessionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const recovering = authRequest("/api/admin/auth/recovery", {});
+  setDisplayedSession({
+    authenticated: true,
+    csrf_token: "csrf-b",
+    membership_id: "b",
+  });
+  release.resolve();
+  await holding;
+  await assert.rejects(
+    recovering,
+    (error) =>
+      error instanceof ApiError && error.code === "session_context_changed",
+  );
+  assert.equal(recoveryStarted, false);
+});
+
+test("first access redemption uses the displayed authenticated session and CSRF", async () => {
+  let sent;
+  globalThis.fetch = async (path, options) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "csrf-a",
+        membership_id: "a",
+      });
+    sent = { path, options };
+    return Response.json({ authenticated: true });
+  };
+  await authRequest("/api/auth/first-access", { token: "invitation" });
+  assert.equal(sent.path, "/api/auth/first-access");
+  assert.equal(sent.options.headers.get("X-CSRF-Token"), "csrf-a");
+  assert.deepEqual(JSON.parse(sent.options.body), { token: "invitation" });
+});
+
+test("team registration requires the fingerprint of the invitation opened in this tab", async () => {
+  setDisplayedSession(null);
+  let sent;
+  globalThis.fetch = async (path, options) => {
+    sent = { path, options };
+    return Response.json({ message: "accepted" }, { status: 202 });
+  };
+  await assert.rejects(
+    authRequest("/api/auth/team-register", { email: "person@example.test" }),
+    (error) =>
+      error instanceof ApiError && error.code === "invitation_context_changed",
+  );
+  assert.equal(sent, undefined);
+  await authRequest(
+    "/api/auth/team-register",
+    { email: "person@example.test" },
+    "a".repeat(64),
+  );
+  assert.equal(
+    sent.options.headers.get("X-Invitation-Fingerprint"),
+    "a".repeat(64),
+  );
+  assert.equal(JSON.parse(sent.options.body).token, undefined);
+});
+
+test("a replaced session cannot redeem a first-access invitation", async () => {
+  let redemptionSent = false;
+  globalThis.fetch = async (path) => {
+    if (path === "/api/session")
+      return Response.json({
+        authenticated: true,
+        csrf_token: "other",
+        membership_id: "a",
+      });
+    redemptionSent = true;
+    return Response.json({});
+  };
+  await assert.rejects(
+    authRequest("/api/auth/first-access", { token: "invitation" }),
+    (error) =>
+      error instanceof ApiError && error.code === "session_context_changed",
+  );
+  assert.equal(redemptionSent, false);
 });

@@ -1,7 +1,10 @@
 require "test_helper"
+require "mail"
 
 class PasswordResetMailerTest < ActiveSupport::TestCase
   setup do
+    # Initialize Mail's lazy default transport before replacing the SMTP factory.
+    Mail.new
     @smtp = { "host" => "smtp.example.test", "port" => 587, "username" => "user",
       "password" => "smtp-secret", "from" => "service@example.test" }
   end

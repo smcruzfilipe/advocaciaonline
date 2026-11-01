@@ -62,7 +62,7 @@ class AuthorizationGroupsHttpTest < ActionDispatch::IntegrationTest
     delete "/api/authorization/groups/#{group.fetch('id')}/memberships/#{pending}", headers: write_headers(csrf)
     assert_response :ok
     assert_empty response.parsed_body.fetch("membership_ids")
-    other_token, = authenticated_session
+    other_token, = authenticated_session(owner: true)
     other_lawyer = LawyerOnboarding.call(token: other_token, input: profile_payload)
     foreign_membership = pending_membership(other_lawyer.tenant_id)
     put "/api/authorization/groups/#{group.fetch('id')}/memberships/#{foreign_membership}", headers: write_headers(csrf)
@@ -161,7 +161,7 @@ class AuthorizationGroupsHttpTest < ActionDispatch::IntegrationTest
   private
 
   def sign_in_owner
-    token, csrf = authenticated_session
+    token, csrf = authenticated_session(owner: true)
     lawyer = LawyerOnboarding.call(token: token, input: profile_payload)
     cookies[ApplicationController::SESSION_COOKIE] = token
     [token, csrf, lawyer]

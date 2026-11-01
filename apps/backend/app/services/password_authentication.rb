@@ -2,6 +2,8 @@ require "openssl"
 require "base64"
 require "uri"
 require "active_support/security_utils"
+require "digest"
+require "json"
 
 class PasswordAuthentication
   ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".freeze
@@ -68,4 +70,48 @@ class PasswordAuthentication
     label = URI.encode_www_form_component("Advocacia Online:#{email}").gsub("+", "%20")
     "otpauth://totp/#{label}?#{URI.encode_www_form(secret: secret, issuer: 'Advocacia Online', algorithm: 'SHA1', digits: 6, period: 30)}"
   end
+
+  # Each independently generated code has 256 bits of entropy; SHA-256 is
+  # appropriate for lookup because these are not human-chosen passwords.
+  def self.new_recovery_codes
+    Array.new(10) { SecureRandom.urlsafe_base64(32) }
+  end
+
+  def self.recovery_code_hash(code)
+    Digest::SHA256.hexdigest(code)
+  end
+
+  def self.begin_platform_recovery(email:, password:, recovery_code:)
+    return unless email.is_a?(String) && password.is_a?(String) &&
+      recovery_code.is_a?(String) && recovery_code.match?(/\A[A-Za-z0-9_-]{43}\z/)
+    if ApplicationRecord.connection.transaction_open?
+      raise ActiveRecord::ActiveRecordError, "Recovery requires a top-level transaction"
+    end
+    row = IdentityStore.call("password_lookup", email)
+    valid = valid_password?(password, row && row.fetch("password_hash"))
+    return unless row && valid
+    secret = new_secret
+    token = SecureRandom.urlsafe_base64(32)
+    result = IdentityStore.call("platform_recovery_begin", email, row.fetch("password_hash"),
+      recovery_code_hash(recovery_code), IdentityStore.digest(token), encrypt(secret))
+    return unless result && result.fetch("started")
+    { challenge: token, secret: secret, otpauth_uri: uri(email, secret) }
+  end
+
+  def self.confirm_platform_recovery(challenge:, code:)
+    return unless challenge.is_a?(String) && challenge.match?(/\A[A-Za-z0-9_-]{43}\z/)
+    connection = ApplicationRecord.connection
+    raise ActiveRecord::ActiveRecordError, "Recovery confirmation requires a top-level transaction" if connection.transaction_open?
+    row = IdentityStore.call("platform_recovery_secret", IdentityStore.digest(challenge))
+    return unless row
+    encrypted_secret = row.fetch("totp_secret")
+    step = matching_step(decrypt(encrypted_secret), code)
+    return unless step
+    codes = new_recovery_codes
+    hashes = codes.map { |value| recovery_code_hash(value) }
+    result = IdentityStore.call("platform_recovery_finish", IdentityStore.digest(challenge),
+      encrypted_secret, step.to_s, JSON.generate(hashes))
+    codes if result && result.fetch("changed")
+  end
+
 end

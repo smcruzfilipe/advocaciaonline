@@ -2,8 +2,8 @@ require "test_helper"
 
 class LawyerOnboardingTest < ActiveSupport::TestCase
   test "persists complete profile and derives separate tenants despite same office" do
-    first_token, = authenticated_session
-    second_token, = authenticated_session
+    first_token, = authenticated_session(owner: true)
+    second_token, = authenticated_session(owner: true)
     first = LawyerOnboarding.call(token: first_token, input: profile_payload)
     second = LawyerOnboarding.call(token: second_token, input: profile_payload.except("secondary_oabs"))
     assert_not_equal first.tenant_id, second.tenant_id
@@ -18,7 +18,7 @@ class LawyerOnboardingTest < ActiveSupport::TestCase
   end
 
   test "validation failure creates no tenant profile or identity association" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     input = profile_payload.merge("secondary_oabs" => [{ "number" => "001234-A", "uf" => "SP" }])
     assert_raises(LawyerOnboarding::InvalidProfile) { LawyerOnboarding.call(token: token, input: input) }
     assert_nil IdentityStore.context(token).fetch("tenant_id")
@@ -26,7 +26,7 @@ class LawyerOnboardingTest < ActiveSupport::TestCase
   end
 
   test "database failure rolls back tenant claim and all profile rows" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     OabRegistration.stub(:create!, ->(*) { raise ActiveRecord::RecordInvalid.new(OabRegistration.new) }) do
       assert_raises(ActiveRecord::RecordInvalid) { LawyerOnboarding.call(token: token, input: profile_payload) }
     end
@@ -35,14 +35,14 @@ class LawyerOnboardingTest < ActiveSupport::TestCase
   end
 
   test "second onboarding conflicts without replacing profile" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     LawyerOnboarding.call(token: token, input: profile_payload)
     assert_raises(LawyerOnboarding::AlreadyOnboarded) { LawyerOnboarding.call(token: token, input: profile_payload) }
     DatabaseContext.with_session(token) { assert_equal 1, Lawyer.count }
   end
 
   test "client identity and tenant cannot replace session proof" do
-    token, = authenticated_session
+    token, = authenticated_session(owner: true)
     assert_raises(LawyerOnboarding::InvalidProfile) do
       LawyerOnboarding.call(token: token, input: profile_payload.merge("tenant_id" => SecureRandom.uuid))
     end
