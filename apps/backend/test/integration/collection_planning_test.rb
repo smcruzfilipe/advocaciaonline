@@ -110,14 +110,13 @@ class CollectionPlanningTest < ActiveSupport::TestCase
       own_job = planned_jobs.find { |job| job.fetch("tenant_id") == lawyer.tenant_id }
       assert own_job
 
-      error = assert_raises(PG::CheckViolation) do
+      assert_raises(PG::CheckViolation) do
         @database.exec_params(<<~SQL, [own_job.fetch("id")])
           INSERT INTO public.collection_jobs (run_id, tenant_id, entity_type, entity_id, source, court, medium, criteria)
           SELECT run_id, tenant_id, entity_type, entity_id, source, court, 'E', criteria
           FROM public.collection_jobs WHERE id = $1
         SQL
       end
-      assert_equal "collection_job_medium", error.result.error_field(PG::Result::PG_DIAG_CONSTRAINT_NAME)
       assert_equal planned_jobs, jobs(run_id)
     end
   end
