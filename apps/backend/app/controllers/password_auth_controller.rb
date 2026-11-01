@@ -5,6 +5,7 @@ class PasswordAuthController < ApplicationController
 
   before_action :check_origin_and_ingress
   before_action :limit_ip
+  before_action :verify_recovery_csrf, only: [:admin_recovery, :confirm_admin_recovery]
 
   def register
     email = normalized_email
@@ -66,6 +67,27 @@ class PasswordAuthController < ApplicationController
     head :no_content
   end
 
+  def admin_recovery
+    email = normalized_email
+    password = valid_password_input
+    return recovery_invalid unless email && password
+    return unless limit("account:#{email}")
+    pending = PasswordAuthentication.begin_platform_recovery(email: email, password: password,
+      recovery_code: request.request_parameters["recovery_code"])
+    return recovery_invalid unless pending
+    render json: pending
+  end
+
+  def confirm_admin_recovery
+    token = request.request_parameters["token"]
+    return recovery_invalid unless valid_token?(token)
+    return unless limit("challenge:#{IdentityStore.digest(token)}")
+    codes = PasswordAuthentication.confirm_platform_recovery(challenge: token,
+      code: request.request_parameters["code"])
+    return recovery_invalid unless codes
+    render json: { recovery_codes: codes }
+  end
+
   def login
     email = normalized_email
     password = valid_password_input
@@ -108,10 +130,23 @@ class PasswordAuthController < ApplicationController
     render json: { authenticated: true, onboarded: selected&.fetch("tenant_id").present?,
       csrf_token: context.fetch("csrf_token"), membership_id: selected&.fetch("membership_id"),
       tenant_id: selected&.fetch("tenant_id"), role: selected&.fetch("role"),
-      selection_required: memberships.any? && selected&.fetch("tenant_id").blank?, memberships: memberships }
+      selection_required: memberships.any? && selected&.fetch("tenant_id").blank?, memberships: memberships,
+      platform_admin: IdentityStore.platform_admin?(token) }
   end
 
   private
+
+  def verify_recovery_csrf
+    identity = IdentityStore.session_identity(session_token)
+    return unless identity
+    @authenticated_context = identity
+    verify_csrf
+  end
+
+  def recovery_invalid
+    api_error("admin_recovery_invalid", "Não foi possível recuperar o autenticador. Confira os dados e tente novamente.",
+      :unprocessable_entity)
+  end
 
   def check_origin_and_ingress
     unless request.headers["Origin"] == AppSettings.origin && request.media_type == "application/json"

@@ -42,6 +42,20 @@ class ApplicationController < ActionController::API
     api_error("invalid_csrf", "Sua sessão mudou. Atualize a página e tente novamente.", :forbidden)
   end
 
+  def require_platform_administration
+    @authenticated_context = IdentityStore.require_platform_admin!(session_token)
+  rescue IdentityStore::AuthenticationRejected
+    api_error("authentication_required", "Entre na sua conta para continuar.", :unauthorized)
+  rescue IdentityStore::AccessDenied
+    api_error("permission_denied", "Você não tem permissão para realizar esta operação.", :forbidden)
+  end
+
+  def authorize_platform_administration!
+    IdentityStore.require_platform_admin!(session_token)
+  rescue IdentityStore::AuthenticationRejected, IdentityStore::AccessDenied
+    raise AuthorizationDenied, cause: nil
+  end
+
   # Call only inside DatabaseContext.with_session, next to the protected query.
   # Authentication/CSRF callbacks may have observed a now-revoked membership.
   def authorize_session!(*operations, owner_only: false, court_scoped: false)

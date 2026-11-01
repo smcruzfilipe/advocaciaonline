@@ -1,12 +1,12 @@
 # Tarefas: primeiro acesso controlado
 
-**Estado:** plano e implementação autorizados na issue #16. PA00/R01 concluídas documentalmente; PA01.A–B implementadas e verificadas na branch interna, aguardando revisão humana R02. PA02–PA15 não concluídas. A [spec](../SPEC-primeiro-acesso.md#decisões-de-pa00) é a fonte normativa; deploy permanece não autorizado.
+**Estado:** plano e implementação autorizados na issue #16. PA00/R01 concluídas documentalmente; PA01.A–B implementadas, verificadas e aprovadas expressamente pelo solicitante em R02. PA02.A/B1/B2 tecnicamente concluídas, aguardando revisão humana R03 e checkpoint após PA00–PA02; PA03–PA15 não concluídas. A [spec](../SPEC-primeiro-acesso.md#decisões-de-pa00) é a fonte normativa; deploy permanece não autorizado.
 
 ## Execução autorizada — issue #16
 
 O solicitante autorizou implementação e criação da [issue #16](https://github.com/smcruzfilipe/advocaciaonline/issues/16), com [plano/handoff publicado](https://github.com/smcruzfilipe/advocaciaonline/issues/16#issuecomment-6554202739). As quatro fases e a exceção de publicação draft após PA12 constam no [plano](plan-primeiro-acesso.md#autorização-de-implementação-e-pipeline). As menções históricas a planejamento sem execução descrevem PA00; não cancelam a autorização atual. R02–R18 e checkpoints humanos permanecem obrigatórios.
 
-Primeiro grupo implementado: PA01.A e PA01.B; nenhum grupo posterior está liberado antes da revisão humana R02. Nomes ratificados conforme PA01, com propriedade única de migration/criptografia/teste de autorização e integração separada de teste de provisionamento/README. A atualização de estado em `SPEC-primeiro-acesso.md` integra PA01.A: quatro funcionais mais rastreio. Nenhuma mudança de contrato de registro, proveniência ou titularidade foi antecipada.
+PA01.A–B foi aprovada expressamente pelo solicitante (“pa01 a-b ta aprovado”), concluindo R02 e liberando somente o próximo grupo PA02. Nenhuma aprovação de R03 ou dos checkpoints posteriores é presumida. A branch continua interna, sem PR antes de PA12.
 
 PA01.B inclui também `apps/backend/test/services/password_reset_mailer_test.rb`: a regressão agregada encontrou dependência de ordem no carregamento lazy de Mail e interceptação da inicialização padrão pelo stub SMTP. A folha passa a três arquivos funcionais (teste de provisionamento, teste de mailer, README) mais rastreio. Corrigir isolamento de carregamento sem mudar validação/TLS/assertions; verificar mailer isolado e suíte agregada.
 
@@ -85,8 +85,8 @@ Para UI sem teste automatizado existente, o teste focado é um cenário de naveg
 Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e smokes das **folhas nomeadas**, antes da próxima linha. Os checkpoints de PA/agregadores permanecem adicionais e **não substituem** estas revisões a cada duas ou três folhas. Se o inventário acrescentar ou subdividir folhas condicionais, registrar a sequência exata e recompor seus grupos de duas ou três antes de executar; não acumular folhas até o checkpoint do pai.
 
 - [x] R01: PA00.A–B — integração e revisão documental concluídas por delegação; sem liberação de execução da aplicação.
-- [ ] R02: PA01.A–B — duas folhas.
-- [ ] R03: PA02.A–B — duas folhas.
+- [x] R02: PA01.A–B — aprovadas expressamente pelo solicitante após apresentação do código e das evidências de PA01.
+- [ ] R03: PA02.A e PA02.B1–B2 — três folhas; sessão/recuperação HTTP, capacidade server-side e documentação atualizada.
 - [ ] R04: PA03.A–C — três folhas.
 - [ ] R05: PA04 e PA05.A–B — três folhas.
 - [ ] R06: PA06.A–B e PA07 — três folhas.
@@ -133,7 +133,7 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 ## PA01 — Provisionamento e autorização da administradora
 
-- [x] Concluir PA01 tecnicamente; revisão humana R02 permanece pendente.
+- [x] Concluir PA01; revisão humana R02 aprovada expressamente pelo solicitante.
 
 **Descrição:** provisionar a única conta administrativa por procedimento protegido no mecanismo existente de identidade, sem cadastro público, conta demo, senha padrão ou autoelevação de titular/equipe. Estender senha/TOTP e recuperação atuais; não criar autenticação paralela, comando novo só para encaminhamento ou configuração desnecessária.
 
@@ -154,19 +154,19 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 
 **Smoke PA01:** runner Rails com PostgreSQL real e identidade sintética executou transação protegida de provisionamento, HTTP senha/primeiro TOTP, negação de sessão antes do fator, revogação da sessão ao iniciar reinscrição, recusa de replay/código incorreto e confirmação do novo TOTP com rotação de códigos sem sessão automática; processo Rails UID 1000 e PostgreSQL UID 70. Fixture removida pelo próprio cenário; nenhum destinatário/credencial real, SMTP, UI administrativa ou endpoint de recuperação futuro foi declarado validado. Receita operacional: `ruby -c` retornou `Syntax OK`. Imagem de teste medida em 372.984.208 bytes (Ruby Alpine existente, dependências de testes separadas do runtime); PostgreSQL oficial em 429.615.951 bytes, iniciado efetivamente não root. O resultado integral e o pedido de R02 são registrados na issue #16.
 
-**Falhas tratadas:** revisão corrigiu bloqueio permanente por recovery vencido/reset, reinscrição inicial e risco de eco no console. A primeira agregação encontrou inicialização lazy de Mail interceptada por stub; setup corrigido sem enfraquecer assertions/TLS/validação. Reexecução em banco já usado acumulou vínculos da fixture fixa de equipe (esperado 2, observado 4): resultado recusado; nova execução usou banco vazio, como o CI, sem alterar assertion nem contrato. A suite em banco vazio acima é a evidência válida. R02 não está aprovada por esses resultados existirem.
+**Falhas tratadas:** revisão corrigiu bloqueio permanente por recovery vencido/reset, reinscrição inicial e risco de eco no console. A primeira agregação encontrou inicialização lazy de Mail interceptada por stub; setup corrigido sem enfraquecer assertions/TLS/validação. Reexecução em banco já usado acumulou vínculos da fixture fixa de equipe (esperado 2, observado 4): resultado recusado; nova execução usou banco vazio, como o CI, sem alterar assertion nem contrato. A suíte em banco vazio acima é a evidência válida; a aprovação humana R02 foi registrada separadamente na autorização desta execução.
 
 
 ## PA02 — Sessão comum e proteção administrativa
 
-- [ ] Concluir PA02.
+- [x] Concluir PA02 tecnicamente; revisão humana R03 e checkpoint após PA00–PA02 permanecem pendentes.
 
 **Descrição:** reusar login, TOTP, consulta de sessão, saída e reset existentes; transportar capacidade administrativa reconhecida e exigida pelo servidor. A recuperação de MFA administrativa é extensão restrita à reinscrição, não outro login/cookie/sistema de sessão.
 
 **Critérios verificáveis:**
-- [ ] A sessão comum só nasce após senha/TOTP; expiração, revogação/logout e reset preservam o contrato atual. Senha+código não concedem sessão administrativa nem emissão de convites antes da validação do novo TOTP.
-- [ ] Toda operação administrativa exige sessão válida + capacidade server-side + proteção de origem/CSRF/ingresso e limitação existentes; negar anônimo, titular/membro sem capacidade, sessão vencida/revogada e origem/CSRF indevidos, inclusive por API direta.
-- [ ] HTTP e respostas mínimas seguem as Decisões de PA00 e o envelope existente; recuperação/reinscrição não vira bypass de fatores. Não introduzir limites arbitrários, sessão paralela ou confiança em flag de cliente/relay.
+- [x] A sessão comum só nasce após senha/TOTP; expiração, revogação/logout e reset preservam o contrato atual. Senha+código não concedem sessão administrativa nem emissão de convites antes da validação do novo TOTP.
+- [x] Toda operação administrativa exige sessão válida + capacidade server-side + proteção de origem/CSRF/ingresso e limitação existentes; negar anônimo, titular/membro sem capacidade, sessão vencida/revogada e origem/CSRF indevidos, inclusive por API direta.
+- [x] HTTP e respostas mínimas seguem as Decisões de PA00 e o envelope existente; recuperação/reinscrição não vira bypass de fatores. Não introduzir limites arbitrários, sessão paralela ou confiança em flag de cliente/relay.
 
 **Dependências:** PA01. **Rastreio:** Q1; C1, C8; segurança da spec.
 **Teste focado:** `B test/integration/platform_admin_sessions_http_test.rb`, condicionado.
@@ -175,6 +175,19 @@ Cada linha abaixo exige revisão técnica e humana dos aceites, testes focados e
 **Folhas; B depende de A:**
 - **A — Extensão do protocolo de autenticação existente:** `apps/backend/app/controllers/password_auth_controller.rb`; `apps/backend/app/services/password_authentication.rb`; `apps/backend/config/routes.rb`; `apps/backend/test/integration/platform_admin_sessions_http_test.rb` (**novo proposto**). Aceite/teste/smoke: login/sessão/reset comuns e recuperação administrativa limitada conforme critérios acima; não criar controlador/stack paralelo de sessões. **Tamanho M: 4 + rastreio = 5.**
 - **B — Capacidade nas fronteiras existentes:** `apps/backend/app/controllers/application_controller.rb`; `apps/backend/app/services/identity_store.rb`; `apps/backend/test/integration/platform_admin_authorization_test.rb` (**proposto em PA01**). Aceite: servidor resolve/exige capacidade com sessão comum sem classe base administrativa, helper genérico ou configuração nova. Teste: `B test/integration/platform_admin_authorization_test.rb test/integration/platform_admin_sessions_http_test.rb`; smoke: chamadas diretas com/sem capacidade e proteção de segredos. **Tamanho M: 3 + rastreio = 4.**
+
+**Ratificação antes de PA02:** A mantém seus quatro arquivos funcionais. B é agregador subdividido: **B1** usa `application_controller.rb`, `identity_store.rb`, `platform_admin_authorization_test.rb` e `sessions_controller.rb` (quatro funcionais mais checklist) para guarda administrativa e capacidade consultável na sessão comum; **B2** usa `README.md` e `SPEC-primeiro-acesso.md` (dois funcionais mais checklist) para contratos HTTP e estado realmente implementados. Propriedade única dos arquivos compartilhados; teste HTTP novo pertence a A. R03 revisa as três folhas antes do checkpoint C1 e de PA03.
+
+**Contrato PA02 ratificado:** recuperação `POST /api/admin/auth/recovery` recebe `email`, `password`, `recovery_code` e retorna `challenge`, `secret`, `otpauth_uri` sem sessão; confirmação `POST /api/admin/auth/recovery/confirm` recebe `token` (o challenge retornado) e `code`, retornando `recovery_codes` somente após commit, sem sessão. O nome HTTP `token` reutiliza a filtragem de segredos vigente, sem expor challenge nos logs. Entrada inválida/fatores incorretos usam a mesma indisponibilidade pública `422`. Reusar origem/JSON/ingresso e limites IP/conta/challenge; com sessão válida, exigir também CSRF. `platform_admin` boolean é resolvido no servidor para login TOTP/sessão comum, nunca aceito como concessão do cliente. `IdentityStore.platform_admin?`/`require_platform_admin!` e `ApplicationController.require_platform_administration`/`authorize_platform_administration!` são as fronteiras mínimas para operações futuras de PA05, sem rota administrativa fictícia, cookie ou base de controller nova. Teste usa rota de prova apenas no ambiente de teste para exercitar a guarda.
+
+**Evidência PA02.A/B1/B2:** `docker build --target test -t advocacia-pa02:test apps/backend` concluiu. Na imagem anterior, os novos cenários produziram **28 testes, 154 assertions, 6 falhas e 12 erros**, demonstrando ausência das rotas, capacidade e guarda. Após implementação, foco em sessão/guarda/provisionamento/reset: `ruby bin/rails test test/integration/platform_admin_sessions_http_test.rb test/integration/platform_admin_authorization_test.rb test/integration/platform_admin_provisioning_test.rb test/integration/password_reset_test.rb test/integration/password_reset_http_test.rb`, **48 testes, 805 assertions**, sem falhas/erros/skips. Removida depois uma assertion incidental de coleção não vazia; a árvore final foi verificada por `ruby bin/rails test` em banco novo `advocacia_pa02_final`: **511 testes, 11.433 assertions, zero falhas, erros ou skips**. `ruby bin/migrate` aplicado pela role migrator; API e suíte com runtime segregada, PostgreSQL descartável.
+
+**Smoke PA02:** servidor Puma real na rede Docker interna, identidade sintética e HTTP por socket verificaram primeiro login senha/TOTP, capacidade administrativa sem tenant, negação de CSRF, recuperação/reinscrição sem sessão, TOTP incorreto e replay recusados, novo login, logout/cookie antigo e recusa de promoção por payload cliente. Runner UID 1000; API recebeu somente a URL runtime, sem a credencial migrator. O ingresso HTTPS foi representado pelo cabeçalho encaminhado em uma rede isolada; não se afirma teste de TLS, navegador, SMTP ou UI administrativa. A prova inicial usou o segredo anterior ao setup e omitiu o protocolo HTTPS encaminhado: o Rails corretamente não emitiu cookie Secure e retornou `401`; o cenário foi corrigido, sem enfraquecer cookie/TOTP, e passou integralmente.
+
+**Revisão PA02 e mutação:** duas revisões independentes de segurança e fronteiras não identificaram achados concretos. Inverter temporariamente a condição de capacidade em `IdentityStore.require_platform_admin!` fez `ruby bin/rails test test/integration/platform_admin_authorization_test.rb --include /tenant_owner_and_member_roles/` falhar (**1 teste, 11 assertions, 1 falha**: autorização indevida detectada). Condição restaurada: **1 teste, 18 assertions, zero falhas/erros/skips**. A guarda foi exercitada em rota exclusiva da suíte; não existe endpoint fictício de administração em produção. Convites e superfícies web seguem pertencendo a PA03/PA05 e posteriores; os consumidores web atuais ignoram campos adicionais da sessão e permanecem intencionalmente inalterados. Nenhuma dependência ou variável de ambiente foi criada/alterada.
+
+**Handoff R03:** revisar PA02.A/B1/B2 e o checkpoint após PA00–PA02 com as evidências acima. A aprovação R02 não libera PA03; aguardar decisão humana explícita sobre R03 e esse checkpoint. Branch interna sem push/PR; publicação somente após PA12 conforme autorização da issue #16.
+
 
 ### Checkpoint — após PA00–PA02
 
@@ -474,4 +487,4 @@ A enumeração mantém todos os consumidores conhecidos de `authenticated_sessio
 
 ## Limites do estado registrado
 
-O registro original de PA00 foi exclusivamente documental. A execução posterior autorizada implementou/verificou somente PA01.A–B conforme evidência acima; R02 humana e PA02–PA15 permanecem pendentes. Comandos e critérios dos demais PAs continuam propostas, não provas executadas. Nenhum deploy foi autorizado.
+O registro original de PA00 foi exclusivamente documental. A execução autorizada implementou/verificou PA01.A–B e PA02.A/B1/B2 conforme evidências acima; R02 foi aprovada expressamente, mas R03 e o checkpoint após PA00–PA02 permanecem pendentes. PA03–PA15 e a feature integral não estão concluídos. Comandos e critérios dos demais PAs continuam propostas, não provas executadas. Nenhum deploy foi autorizado.

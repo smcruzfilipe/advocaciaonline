@@ -11,6 +11,7 @@ class IdentityStore
   UUID = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
   FUNCTIONS = %w[auth_limit register_password verify_password_email password_lookup
     request_password_reset cancel_password_reset confirm_password_reset
+    platform_admin_for_session platform_recovery_begin platform_recovery_secret platform_recovery_finish
     create_password_challenge password_challenge finish_password_challenge session_identity session_context
     claim_tenant revoke_session require_owner available_memberships select_membership
     list_team_credentials create_team_credential change_credential_validity renew_team_credential
@@ -58,6 +59,17 @@ class IdentityStore
   def self.session_identity(token)
     call("session_identity", digest(token)) if token.present?
   end
+  def self.platform_admin?(token)
+    token.present? && call("platform_admin_for_session", digest(token)).fetch("authorized") == true
+  end
+
+  def self.require_platform_admin!(token)
+    identity = session_identity(token)
+    raise AuthenticationRejected, "Authentication required" unless identity
+    raise AccessDenied, "Platform administration required" unless platform_admin?(token)
+    identity
+  end
+
 
   def self.memberships(token)
     DatabaseContext.with_session(token) { call_all("available_memberships") }

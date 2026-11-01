@@ -92,9 +92,9 @@ class PasswordAuthentication
     return unless row && valid
     secret = new_secret
     token = SecureRandom.urlsafe_base64(32)
-    result = platform_recovery_query("platform_recovery_begin", email, row.fetch("password_hash"),
+    result = IdentityStore.call("platform_recovery_begin", email, row.fetch("password_hash"),
       recovery_code_hash(recovery_code), IdentityStore.digest(token), encrypt(secret))
-    return unless result && [true, "t"].include?(result.fetch("started"))
+    return unless result && result.fetch("started")
     { challenge: token, secret: secret, otpauth_uri: uri(email, secret) }
   end
 
@@ -102,23 +102,16 @@ class PasswordAuthentication
     return unless challenge.is_a?(String) && challenge.match?(/\A[A-Za-z0-9_-]{43}\z/)
     connection = ApplicationRecord.connection
     raise ActiveRecord::ActiveRecordError, "Recovery confirmation requires a top-level transaction" if connection.transaction_open?
-    row = platform_recovery_query("platform_recovery_secret", IdentityStore.digest(challenge))
+    row = IdentityStore.call("platform_recovery_secret", IdentityStore.digest(challenge))
     return unless row
     encrypted_secret = row.fetch("totp_secret")
     step = matching_step(decrypt(encrypted_secret), code)
     return unless step
     codes = new_recovery_codes
     hashes = codes.map { |value| recovery_code_hash(value) }
-    result = platform_recovery_query("platform_recovery_finish", IdentityStore.digest(challenge),
+    result = IdentityStore.call("platform_recovery_finish", IdentityStore.digest(challenge),
       encrypted_secret, step.to_s, JSON.generate(hashes))
-    codes if result && [true, "t"].include?(result.fetch("changed"))
+    codes if result && result.fetch("changed")
   end
 
-  def self.platform_recovery_query(function, *values)
-    connection = ApplicationRecord.connection
-    DatabaseContext.assert_runtime!(connection)
-    placeholders = values.each_index.map { |index| "$#{index + 1}::text" }.join(", ")
-    connection.raw_connection.exec_params("SELECT * FROM app_private.#{function}(#{placeholders})", values).first
-  end
-  private_class_method :platform_recovery_query
 end

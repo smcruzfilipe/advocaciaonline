@@ -5,6 +5,8 @@ Rails.application.routes.draw do
   post "/api/auth/totp", to: "password_auth#totp", defaults: { format: :json }
   post "/api/auth/password-reset", to: "password_auth#password_reset", defaults: { format: :json }
   post "/api/auth/password-reset/confirm", to: "password_auth#confirm_password_reset", defaults: { format: :json }
+  post "/api/admin/auth/recovery", to: "password_auth#admin_recovery", defaults: { format: :json }
+  post "/api/admin/auth/recovery/confirm", to: "password_auth#confirm_admin_recovery", defaults: { format: :json }
   get "/api/session", to: "sessions#show", defaults: { format: :json }
   patch "/api/session/membership", to: "sessions#update", defaults: { format: :json }
   delete "/api/session", to: "sessions#destroy", defaults: { format: :json }

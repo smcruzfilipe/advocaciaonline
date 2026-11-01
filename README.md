@@ -57,7 +57,7 @@ O script gera segredos aleatórios uma única vez em `.local/compose.env`, arqui
 
 Para cadastro, redefinição de senha e convites, forneça as cinco variáveis `SMTP_*` documentadas abaixo em `.local/integrations.env`. Proteja o arquivo com `chmod 600 .local/integrations.env`; não versione nem publique seus valores. Sem SMTP, a confirmação do e-mail, a recuperação de senha e o envio de convites não funcionam.
 
-O link de confirmação deve ser aberto no mesmo navegador usado para iniciar o cadastro. Senhas podem ser redefinidas por **Esqueci minha senha**, em `/reset-password`: o link enviado por e-mail expira em 30 minutos, é de uso único e uma nova solicitação invalida o anterior. A confirmação encerra sessões e desafios de login anteriores; não cria sessão nem modifica o autenticador. Ainda não há recuperação do aplicativo autenticador. A perda de `SECRET_KEY_BASE` impede decifrar os segredos dos autenticadores já cadastrados; preserve esse segredo fora do repositório.
+O link de confirmação deve ser aberto no mesmo navegador usado para iniciar o cadastro. Senhas podem ser redefinidas por **Esqueci minha senha**, em `/reset-password`: o link enviado por e-mail expira em 30 minutos, é de uso único e uma nova solicitação invalida o anterior. A confirmação encerra sessões e desafios de login anteriores; não cria sessão nem modifica o autenticador. A recuperação do autenticador administrativo está disponível pela API descrita abaixo, ainda sem tela; não há recuperação do autenticador de contas comuns. A perda de `SECRET_KEY_BASE` impede decifrar os segredos dos autenticadores já cadastrados; preserve esse segredo fora do repositório.
 
 ```bash
 # Recriar a API após fornecer/alterar as integrações:
@@ -273,7 +273,20 @@ end
 
 A transação é materializada antes das chamadas PostgreSQL parametrizadas: erro ou segunda administradora fazem rollback integral, sem substituir a conta existente. Não imprimir exceções ou seus parâmetros; consultar somente o estado sanitizado. Os códigos só são exibidos após commit e persistidos como hashes. Guarde-os fora da plataforma e preserve `SECRET_KEY_BASE`.
 
-Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha por e-mail mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. As rotas e telas administrativas pertencem às próximas folhas; esta capacidade de persistência não declara esses fluxos HTTP implementados.
+Senha e código de recuperação consumido uma única vez habilitam apenas reinscrição do autenticador; não criam sessão nem autorizam convites. Confirmar o novo TOTP precede o acesso; sessões, desafios e códigos antigos são invalidados. Redefinição de senha por e-mail mantém TOTP e não autentica automaticamente. Sem autenticador e sem códigos, não há recuperação por e-mail, suporte ou bypass operacional. As telas administrativas e os endpoints de convites ainda não estão implementados.
+
+### Recuperação administrativa e sessão comum
+
+| Método e caminho | Entrada JSON | Resposta de sucesso |
+|---|---|---|
+| `POST /api/admin/auth/recovery` | `email`, `password`, `recovery_code` | `200`: `challenge`, `secret`, `otpauth_uri` para preparar o novo autenticador; invalida sessões e desafios de login anteriores. |
+| `POST /api/admin/auth/recovery/confirm` | `token` com o challenge recebido, `code` com o novo TOTP | `200`: `recovery_codes` exibidos somente após commit; substitui o fator e os códigos antigos. |
+
+Essas respostas não criam sessão nem cookie; após a confirmação, entrar pelo login comum com senha e novo TOTP. O desafio expira em dez minutos e não pode ser reutilizado. Fatores ausentes, malformados, incorretos, vencidos ou repetidos retornam o mesmo envelope `422`, com `error.code=admin_recovery_invalid`, sem identificar o fator recusado.
+
+As duas rotas exigem JSON, `Origin` igual a `APP_ORIGIN` e o ingresso/IP confiáveis já usados no login. A limitação compartilhada permanece em 20 tentativas por 15 minutos, por IP e, quando aplicável, conta/desafio; `429` traz `Retry-After: 900`. Se houver sessão válida, também é obrigatório seu `X-CSRF-Token`; cookie antigo inválido não equivale a sessão autenticada. Origem, ingresso ou CSRF inválidos retornam `403`. `token`, `code`, `recovery_code`, senha e segredo usam a filtragem existente; consumidores não devem registrar requisições ou respostas sensíveis.
+
+O login concluído por `POST /api/auth/totp` e a consulta autenticada `GET /api/session` incluem `platform_admin` booleano, resolvido no servidor a cada consulta. A capacidade não depende de tenant nem dos papéis owner/member e não pode ser concedida por campos enviados pelo cliente. A consulta anônima mantém `authenticated: false` e `onboarded: false`. Para proteger uma operação administrativa, usar `require_platform_administration` e, nas mutações, `verify_csrf`, revalidando com `authorize_platform_administration!` junto da operação. A guarda usa a sessão comum: sessão ausente/inválida recebe `401`, identidade sem capacidade recebe `403`. Não há segundo cookie, sessão administrativa separada ou nova variável de ambiente.
 
 ### API de onboarding
 

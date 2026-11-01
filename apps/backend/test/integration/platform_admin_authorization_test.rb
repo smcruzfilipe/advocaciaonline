@@ -1,5 +1,21 @@
 require "test_helper"
 
+class PlatformAdministrationProbeController < ApplicationController
+  before_action :require_platform_administration
+  before_action :verify_csrf, only: :write
+
+  def read
+    authorize_platform_administration!
+    render json: authenticated_context.slice("identity_id", "csrf_token", "tenant_id")
+  end
+
+  def write
+    IdentityStore.revoke(session_token) if params[:revoke_before_operation]
+    authorize_platform_administration!
+    render json: { permitted: true }
+  end
+end
+
 class PlatformAdminAuthorizationTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
@@ -14,6 +30,7 @@ class PlatformAdminAuthorizationTest < ActiveSupport::TestCase
     @secret = PasswordAuthentication.new_secret
     @codes = PasswordAuthentication.new_recovery_codes
     @identities = []
+    @tenants = []
     @admin.transaction do |db|
       @id = insert_identity(db, @email)
       db.exec_params("INSERT INTO app_private.password_credentials(identity_id, password_hash, totp_secret, totp_confirmed) VALUES ($1, $2, $3, true)",
@@ -28,6 +45,14 @@ class PlatformAdminAuthorizationTest < ActiveSupport::TestCase
 
   teardown do
     if @admin
+      @tenants&.each do |tenant_id, token|
+        @admin.transaction do |db|
+          db.exec_params("SELECT set_config('app.session_hash', $1, true)", [IdentityStore.digest(token)])
+          db.exec_params("DELETE FROM public.tenants WHERE id = $1", [tenant_id])
+          db.exec_params("UPDATE app_private.sessions SET selected_membership_id = NULL WHERE selected_membership_id IN (SELECT id FROM app_private.tenant_memberships WHERE tenant_id = $1)", [tenant_id])
+          db.exec_params("DELETE FROM app_private.tenant_memberships WHERE tenant_id = $1", [tenant_id])
+        end
+      end
       @identities&.each do |id|
         %w[platform_recovery_challenges platform_recovery_codes platform_administrator password_resets password_challenges sessions password_credentials].each do |table|
           @admin.exec_params("DELETE FROM app_private.#{table} WHERE identity_id = $1", [id])
@@ -176,7 +201,184 @@ class PlatformAdminAuthorizationTest < ActiveSupport::TestCase
     assert_equal "0", @admin.exec_params("SELECT count(*) FROM app_private.sessions WHERE identity_id=$1", [@id]).getvalue(0, 0)
   end
 
+  test "platform administration requires a current confirmed administrator session" do
+    token = login_session
+    identity = IdentityStore.session_identity(token)
+    assert IdentityStore.platform_admin?(token)
+    result = IdentityStore.require_platform_admin!(token)
+    assert_equal @id, result.fetch("identity_id")
+    assert_equal identity.fetch("csrf_token"), result.fetch("csrf_token")
+    assert_nil IdentityStore.context(token).fetch("tenant_id")
+
+    [nil, "", SecureRandom.urlsafe_base64(32)].each do |invalid|
+      assert_not IdentityStore.platform_admin?(invalid)
+      assert_raises(IdentityStore::AuthenticationRejected) { IdentityStore.require_platform_admin!(invalid) }
+    end
+
+    ordinary = ordinary_session
+    assert_not IdentityStore.platform_admin?(ordinary)
+    assert_raises(IdentityStore::AccessDenied) { IdentityStore.require_platform_admin!(ordinary) }
+    @admin.exec_params("UPDATE app_private.password_credentials SET totp_confirmed = false WHERE identity_id = $1", [@id])
+    assert_not IdentityStore.platform_admin?(token)
+    assert_raises(IdentityStore::AccessDenied) { IdentityStore.require_platform_admin!(token) }
+  end
+
+  test "revoked expired and disabled sessions lose platform administration immediately" do
+    token = login_session
+    assert IdentityStore.platform_admin?(token)
+    IdentityStore.require_platform_admin!(token)
+    IdentityStore.revoke(token)
+    assert_not IdentityStore.platform_admin?(token)
+    assert_raises(IdentityStore::AuthenticationRejected) { IdentityStore.require_platform_admin!(token) }
+
+    token = login_session(step: Time.now.to_i / 30 + 1)
+    @admin.exec_params("UPDATE app_private.sessions SET expires_at = clock_timestamp() WHERE session_hash = $1", [IdentityStore.digest(token)])
+    assert_not IdentityStore.platform_admin?(token)
+    assert_raises(IdentityStore::AuthenticationRejected) { IdentityStore.require_platform_admin!(token) }
+
+    token = login_session(step: Time.now.to_i / 30 + 2)
+    @admin.exec_params("UPDATE app_private.identities SET disabled_at = clock_timestamp() WHERE id = $1", [@id])
+    assert_not IdentityStore.platform_admin?(token)
+    assert_raises(IdentityStore::AuthenticationRejected) { IdentityStore.require_platform_admin!(token) }
+  end
+
+  test "the test-only HTTP guard requires an administrator and identity CSRF without a tenant" do
+    browser = probe_session
+    browser.get "/platform-probe", params: { platform_admin: true, role: "owner", tenant_id: SecureRandom.uuid }
+    assert_equal 401, browser.response.status
+    browser.post "/platform-probe", params: { platform_admin: true, role: "owner" }, as: :json,
+      headers: { "Origin" => AppSettings.origin, "X-CSRF-Token" => "forged" }
+    assert_equal 401, browser.response.status
+
+    ordinary = ordinary_session
+    browser.cookies[ApplicationController::SESSION_COOKIE] = ordinary
+    browser.get "/platform-probe", params: { platform_admin: true, role: "owner" }
+    assert_equal 403, browser.response.status
+    browser.post "/platform-probe", params: { platform_admin: true, role: "owner" }, as: :json,
+      headers: { "Origin" => AppSettings.origin, "X-CSRF-Token" => IdentityStore.session_identity(ordinary).fetch("csrf_token") }
+    assert_equal 403, browser.response.status
+
+    token = login_session
+    csrf = IdentityStore.session_identity(token).fetch("csrf_token")
+    browser.cookies[ApplicationController::SESSION_COOKIE] = token
+    browser.get "/platform-probe"
+    assert_equal 200, browser.response.status
+    assert_equal @id, browser.response.parsed_body.fetch("identity_id")
+    assert_equal csrf, browser.response.parsed_body.fetch("csrf_token")
+    assert_nil browser.response.parsed_body["tenant_id"]
+    browser.post "/platform-probe", as: :json, headers: { "Origin" => AppSettings.origin }
+    assert_equal 403, browser.response.status
+    browser.post "/platform-probe", as: :json, headers: { "X-CSRF-Token" => csrf }
+    assert_equal 403, browser.response.status
+    browser.post "/platform-probe", as: :json, headers: { "Origin" => "https://attacker.example", "X-CSRF-Token" => csrf }
+    assert_equal 403, browser.response.status
+    browser.post "/platform-probe", as: :json, headers: { "Origin" => AppSettings.origin, "X-CSRF-Token" => "wrong" }
+    assert_equal 403, browser.response.status
+    browser.post "/platform-probe", as: :json, headers: { "Origin" => AppSettings.origin, "X-CSRF-Token" => csrf }
+    assert_equal 200, browser.response.status
+    assert_equal true, browser.response.parsed_body.fetch("permitted")
+  end
+
+  test "tenant owner and member roles and client claims never grant platform administration" do
+    owner = ordinary_session
+    member = ordinary_session
+    tenant_id = create_test_tenant(owner)
+    member_id = IdentityStore.session_identity(member).fetch("identity_id")
+    membership = @admin.exec_params(<<~SQL, [tenant_id, member_id, "#{member_id}@example.test"]).getvalue(0, 0)
+      INSERT INTO app_private.tenant_memberships(tenant_id, identity_id, role, invited_email, accepted_at)
+      VALUES ($1, $2, 'member', $3, clock_timestamp()) RETURNING id
+    SQL
+    @admin.exec_params("UPDATE app_private.sessions SET selected_membership_id = $1 WHERE session_hash = $2", [membership, IdentityStore.digest(member)])
+    browser = probe_session
+    { owner => "owner", member => "member" }.each do |token, role|
+      assert_equal role, IdentityStore.context(token).fetch("role")
+      assert_not IdentityStore.platform_admin?(token)
+      assert_raises(IdentityStore::AccessDenied) { IdentityStore.require_platform_admin!(token) }
+      browser.cookies[ApplicationController::SESSION_COOKIE] = token
+      browser.get "/platform-probe", params: { platform_admin: true, role: "owner", tenant_id: tenant_id }
+      assert_equal 403, browser.response.status
+      browser.post "/platform-probe", params: { platform_admin: true, role: "owner", tenant_id: tenant_id },
+        as: :json, headers: { "Origin" => AppSettings.origin, "X-CSRF-Token" => IdentityStore.session_identity(token).fetch("csrf_token") }
+      assert_equal 403, browser.response.status
+    end
+  end
+
+  test "HTTP guard denies revoked expired and disabled administrator sessions" do
+    browser = probe_session
+    token = login_session
+    browser.cookies[ApplicationController::SESSION_COOKIE] = token
+    browser.get "/platform-probe"
+    assert_equal 200, browser.response.status
+    IdentityStore.revoke(token)
+    browser.post "/platform-probe", as: :json
+    assert_equal 401, browser.response.status
+    browser.get "/platform-probe"
+    assert_equal 401, browser.response.status
+
+    token = login_session(step: Time.now.to_i / 30 + 1)
+    browser.cookies[ApplicationController::SESSION_COOKIE] = token
+    @admin.exec_params("UPDATE app_private.sessions SET expires_at = clock_timestamp() WHERE session_hash = $1", [IdentityStore.digest(token)])
+    browser.get "/platform-probe"
+    assert_equal 401, browser.response.status
+
+    token = login_session(step: Time.now.to_i / 30 + 2)
+    browser.cookies[ApplicationController::SESSION_COOKIE] = token
+    @admin.exec_params("UPDATE app_private.identities SET disabled_at = clock_timestamp() WHERE id = $1", [@id])
+    browser.get "/platform-probe"
+    assert_equal 401, browser.response.status
+  end
+
+  test "operation authorization revalidates after the guard when the session is revoked" do
+    token = login_session
+    csrf = IdentityStore.session_identity(token).fetch("csrf_token")
+    browser = probe_session
+    browser.cookies[ApplicationController::SESSION_COOKIE] = token
+    browser.post "/platform-probe", params: { revoke_before_operation: true }, as: :json,
+      headers: { "Origin" => AppSettings.origin, "X-CSRF-Token" => csrf }
+    assert_equal 403, browser.response.status
+    assert_equal "permission_denied", browser.response.parsed_body.fetch("error").fetch("code")
+    assert_not IdentityStore.platform_admin?(token)
+  end
+
   private
+
+  def probe_session
+    routes = ActionDispatch::Routing::RouteSet.new
+    routes.draw do
+      get "/platform-probe", to: PlatformAdministrationProbeController.action(:read)
+      post "/platform-probe", to: PlatformAdministrationProbeController.action(:write)
+    end
+    ActionDispatch::Integration::Session.new(ActionDispatch::Cookies.new(routes)).tap do |browser|
+      browser.https!
+      browser.host! URI(AppSettings.origin).host
+    end
+  end
+
+  def ordinary_session
+    identity = insert_identity(@admin, "#{SecureRandom.uuid}@example.test")
+    secret = PasswordAuthentication.new_secret
+    hash = PasswordAuthentication.password_hash(@password)
+    @admin.exec_params("INSERT INTO app_private.password_credentials(identity_id, password_hash, totp_secret, totp_confirmed) VALUES ($1, $2, $3, true)",
+      [identity, hash, PasswordAuthentication.encrypt(secret)])
+    login_session(secret: secret, identity: identity, password_hash: hash)
+  end
+
+  def create_test_tenant(owner)
+    tenant_id = SecureRandom.uuid
+    identity = IdentityStore.session_identity(owner).fetch("identity_id")
+    @admin.transaction do |db|
+      membership = db.exec_params(<<~SQL, [tenant_id, identity]).getvalue(0, 0)
+        INSERT INTO app_private.tenant_memberships(tenant_id, identity_id, role, accepted_at)
+        VALUES ($1, $2, 'owner', clock_timestamp()) RETURNING id
+      SQL
+      db.exec_params("UPDATE app_private.sessions SET selected_membership_id = $1 WHERE session_hash = $2",
+        [membership, IdentityStore.digest(owner)])
+      db.exec_params("SELECT set_config('app.session_hash', $1, true)", [IdentityStore.digest(owner)])
+      db.exec_params("INSERT INTO public.tenants(id, created_at, updated_at) VALUES ($1, clock_timestamp(), clock_timestamp())", [tenant_id])
+    end
+    @tenants << [tenant_id, owner]
+    tenant_id
+  end
 
   def insert_identity(db, email)
     id = db.exec_params("INSERT INTO app_private.identities(verified_email) VALUES ($1) RETURNING id", [email]).getvalue(0, 0)
@@ -193,9 +395,9 @@ class PlatformAdminAuthorizationTest < ActiveSupport::TestCase
     IdentityStore.digest(SecureRandom.urlsafe_base64(32))
   end
 
-  def login_session(secret: @secret, step: Time.now.to_i / 30)
+  def login_session(secret: @secret, step: Time.now.to_i / 30, identity: @id, password_hash: @password_hash)
     challenge = digest_random
-    assert_equal "t", call("create_password_challenge", @id, challenge, @password_hash).fetch("created")
+    assert_equal "t", call("create_password_challenge", identity, challenge, password_hash).fetch("created")
     token = SecureRandom.urlsafe_base64(32)
     code = PasswordAuthentication.code(secret, step)
     assert_equal step, PasswordAuthentication.matching_step(secret, code, now: step * 30)
