@@ -60,10 +60,45 @@ Executar as fatias em ordem de dependência. IDs são os principais do checklist
 
 **Checkpoint após 10–12:** verificar os contratos propostos de planejamento, persistência e deduplicação. Confirmar somente Diário Eletrônico (`D`), sem editais (`E`): cadernos DJEN ZIP/JSON e fallback paginado no primeiro slot, API paginada diretamente no segundo, sem caderno, somente para o dia corrente e na mesma fonte lógica. Sanitizar apenas texto da API, não do caderno; a deduplicação por `id` e `hash` conjuntamente preserva vínculos e a primeira versão, que pode conter HTML e exige escape pelo consumidor.
 
+#### Plano da branch 13a–13b — execução e recuperação
+
+**Objetivo:** ligar os trabalhos duráveis já planejados ao processo `apps/etl/`, sem mover o processamento para a API Rails nem alterar as regras de fonte, identidade ou tenant. `apps/backend/despachante/run.rb` planeja slots; `apps/etl/bin/processador` consome a fila e também aceita um UUID específico.
+
+1. **Contrato de seleção:** `app_private.processor_next(limite)` seleciona e concede trabalho por transação, usando `FOR UPDATE SKIP LOCKED`; expõe apenas UUID, estado e token à role do processador. Instâncias concorrentes não obtêm a mesma concessão, retomam trabalho após expiração e ignoram datas futuras e estados terminais. Trabalho antigo só é concedido para registrar interrupção, sem acesso à fonte.
+2. **13a — Execução:** integrar os slots planejados à execução dos trabalhos, reutilizando as tentativas, esperas, limites, fallback e estados persistentes do processador. Preservar separação de processos e diferenciar falha, pendência e sucesso vazio por execução/tribunal.
+3. **13b — Recuperação:** retomar pendências do mesmo dia após interrupção e executar cada slot devido uma vez; não repetir trabalho concluído. Uma segunda execução pode recuperar o resultado da primeira, preservando sua falha, deduplicação e vínculos. Na virada local, não consultar datas anteriores; manter a interrupção identificável.
+4. **Verificação:** cenários controlados em PostgreSQL com dois slots e processos reais: concorrência e reinício; falha após tentativas e sucesso vazio; recuperação no segundo slot; virada de data; isolamento de tenants e preservação de identidade. Exercitar a entrada de execução definitiva e registrar comandos e resultados. Qualquer variável introduzida ou alterada deve ser registrada no README.
+
+**Fronteiras:** somente Diário Eletrônico `D`, sem editais; primeiro slot por caderno com fallback, segundo pela API; sem coleta retroativa, telas, dashboard ou nova instância PostgreSQL de deploy. O processador é um processo supervisionado separado; a espera ociosa é de cinco segundos e não requer configuração adicional.
+
 ### Fase 4 — Consulta e dashboard
 
 - **ID 14:** consulta independente de comunicações, após IDs 6 e 12.
 - **ID 15:** dashboard numérica e sua UI, avisos e restrição de acesso, após IDs 2, 13 e 14. O ID 6 estabelece a política de autorização e escopo que a dashboard aplica; a interface e as volumetrias pertencem somente ao ID 15.
+
+#### Branch 14a–15b — backend de consulta e dashboard
+
+O escopo desta branch é o backend: as interfaces e a aprovação dos checkpoints permanecem pendentes. Os endpoints de consulta e dashboard reutilizam a sessão autenticada, o bloqueio de autorização e as políticas RLS existentes; o tenant nunca é aceito do cliente.
+
+1. **Consulta:** `apps/backend/app/controllers/communications_controller.rb` e eventuais serviços específicos consultam comunicações e vínculos preservados pela coleta, aplicando a autorização por tribunal à lista e ao detalhe. As comunicações permanecem independentes; pendências de identidade mantêm o aviso. O conteúdo da fonte é não confiável e a futura interface deve escapá-lo.
+2. **Dashboard:** `apps/backend/app/controllers/dashboard_controller.rb` e eventuais serviços específicos calculam as duas métricas e as três janelas aprovadas, com recorte por tribunais autorizados e estados operacionais. Negação da dashboard devolve `*` sem disponibilizar o valor protegido; falha, ausência de conclusão e zero permanecem distintos.
+3. **Integração:** `apps/backend/config/routes.rb` expõe os endpoints; testes HTTP próprios em `apps/backend/test/integration/` verificam tenants, grupos, tribunais, pendências, janelas, falhas e recuperação. O README registra os contratos HTTP e suas limitações. Não há frontend nem alteração das fontes de coleta.
+4. **Verificação:** executar testes focados e suíte existente usando PostgreSQL descartável com roles reais; exercitar o caminho HTTP definitivo com dados controlados, inclusive negação e estado terminal. As tarefas 14a e 15b só serão encerradas integralmente quando a interface também for entregue.
+
+#### Branch frontend-web — implementação da interface
+
+**Escopo:** implementar em `apps/web/` as telas de identidade, monitoramentos, consulta, dashboard, equipe, grupos e histórico operacional de [SPEC-web.md](../apps/web/SPEC-web.md), integradas à API existente. Na refatoração `refactor/frontend`, a exportação `docs/banani/byZqYk7YE568/` é o contrato visual vigente; o solicitante aprovou sua integração com dados/estados reais e a preservação de senha/TOTP, sem alterar o backend. O [design system](../docs/design-system.md) registra as adaptações funcionais.
+
+1. **Base e identidade:** Next.js App Router, TypeScript e npm com dependências fixadas; manter sessão, cookies seguros, Origin e CSRF da API Rails. O acesso atual usa senha e TOTP obrigatórios, com verificação prévia do e-mail. Aceite de convite deve preservar o fragmento sem expor segredo.
+2. **Fatias independentes:** monitoramentos de advogado, partes e processos; consulta/dashboard e histórico; equipe e grupos. Todas usam o mesmo cliente HTTP, respostas reais e estados de erro, sem dados fictícios, cache compartilhado, editais ou funcionalidades de agenda.
+3. **Integração:** verificar autorização, dados de dois tenants, texto da fonte como texto inerte, falha/zero/máscara e formulários no navegador headless, com API Rails e PostgreSQL descartável. Entrega de confirmação de e-mail depende de SMTP externo configurado.
+4. **Entrega:** executar build, verificações focadas e CI; documentar comandos, configurações e limitações. Nenhuma aprovação humana de checkpoint ou deploy é presumida. Imagens devem respeitar as regras de usuário não root e gates de containerização.
+
+#### Execução local conteinerizada pela Tailscale
+
+O solicitante autorizou concluir a containerização e publicar o frontend em `0.0.0.0` para validação por outra máquina da tailnet. `compose.yaml` e `bin/local-up` iniciam imagens separadas de frontend, API, PostgreSQL exclusivamente local e ingresso HTTPS; migrations executam em processo separado, com credencial própria. Não alteram a instância PostgreSQL de deploy nem iniciam coletas automáticas.
+
+O ingresso publica `0.0.0.0:3001`, com certificado Tailscale para `apps-contabo.tail519952.ts.net`; API e banco não publicam portas. Builds, HTTP/HTTPS, conexão pela role runtime, usuários reais dos processos e persistência após reinício foram verificados na execução anterior; resultados, tamanhos, variáveis e comandos estão no README. A entrega SMTP depende de configuração externa; esta execução não encerra checkpoints funcionais nem presume aprovação humana dos resultados.
 
 **Checkpoint após 13–15:** rever o estado de falhas por tribunal, a aplicação da autorização nas respostas e os critérios de volumetria acordados.
 

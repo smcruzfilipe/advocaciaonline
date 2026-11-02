@@ -20,20 +20,21 @@ jobs:
       PROCESSADOR_DATABASE_URL: postgresql://advocacia_processador@advocacia-ci-db/advocacia_test
       PROCESSADOR_TEST_ADMIN_DATABASE_URL: postgresql://postgres@advocacia-ci-db/advocacia_test
       APP_ORIGIN: https://example.test
-      GOOGLE_CLIENT_ID: test-client
-      GOOGLE_CLIENT_SECRET: test-secret
+      AUTH_INGRESS_SECRET: test-only-ingress-secret-01234567890123456789
       SECRET_KEY_BASE: test-only-secret-key-base-0123456789012345678901234567890123456789
       RAILS_LOG_LEVEL: fatal
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - name: Build backend, despachante and processador images
+      - name: Build backend, despachante, DJEN and STF images
         run: |
-          docker build --target test -t advocacia-ci:test backend
-          docker build --target despachante -t advocacia-ci:despachante backend
-          docker build --target test -t advocacia-ci:processador-test etl
-          docker build --target runtime -t advocacia-ci:processador etl
+          docker build --target test -t advocacia-ci:test apps/backend
+          docker build --target despachante -t advocacia-ci:despachante apps/backend
+          docker build --target test -t advocacia-ci:processador-test apps/etl
+          docker build --target runtime -t advocacia-ci:processador apps/etl
+          docker build --target test -t advocacia-ci:stf-test apps/stf
+          docker build --target runtime -t advocacia-ci:stf apps/stf
       - name: Start isolated PostgreSQL as non-root
         run: |
           docker network create --internal advocacia-ci
@@ -45,7 +46,7 @@ jobs:
       - name: Provision isolated roles
         run: |
           for file in provision.sql provision_despachante.sql provision_processador.sql; do
-            docker exec -i advocacia-ci-db psql -v ON_ERROR_STOP=1 -U postgres -d advocacia_test < "backend/db/$file"
+            docker exec -i advocacia-ci-db psql -v ON_ERROR_STOP=1 -U postgres -d advocacia_test < "apps/backend/db/$file"
           done
       - name: Apply migrations
         run: |
@@ -56,21 +57,53 @@ jobs:
         run: |
           docker run --rm --network advocacia-ci \
             -e RAILS_ENV -e DATABASE_URL -e MIGRATION_DATABASE_URL -e DESPACHANTE_DATABASE_URL \
-            -e PROCESSADOR_DATABASE_URL -e APP_ORIGIN -e GOOGLE_CLIENT_ID -e GOOGLE_CLIENT_SECRET \
+            -e PROCESSADOR_DATABASE_URL -e APP_ORIGIN -e AUTH_INGRESS_SECRET \
             -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL advocacia-ci:test ruby bin/rails test
       - name: Run processador suite
         run: |
           docker run --rm --network advocacia-ci \
             -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL advocacia-ci:processador-test
+      - name: Run STF collector and processor suite
+        run: |
+          docker run --rm --network advocacia-ci \
+            -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL advocacia-ci:stf-test
+      - name: Smoke final STF runtime
+        run: |
+          docker run --rm --network none advocacia-ci:stf bundle exec ruby -e '
+            require "./lib/stf/worker"
+            raise "STF must run non-root" if Process.uid.zero?
+            raise "test files in runtime" if File.directory?("/app/test")
+            raise "compiler in runtime" if File.executable?("/usr/bin/gcc")
+            raise "gem cache in runtime" unless Dir["/bundle/ruby/*/cache/*"].empty?
+            puts "STF runtime loaded without network; UID=#{Process.uid}"
+          '
       - name: Smoke final despachante image
         run: |
           docker run --rm --network advocacia-ci \
-            -e RAILS_ENV -e DATABASE_URL -e APP_ORIGIN -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL \
+            -e RAILS_ENV -e DATABASE_URL -e MIGRATION_DATABASE_URL -e APP_ORIGIN -e SECRET_KEY_BASE -e RAILS_LOG_LEVEL \
             advocacia-ci:test ruby bin/rails runner '
               require "securerandom"
+              secret = PasswordAuthentication.new_secret
+              PG.connect(ENV.fetch("MIGRATION_DATABASE_URL")) do |db|
+                raise "expected isolated test database" unless db.db == "advocacia_test"
+                db.transaction do
+                  id = db.exec_params("INSERT INTO app_private.identities(verified_email,email_verified_at) VALUES ($1,clock_timestamp()) RETURNING id", ["ci@example.test"]).getvalue(0, 0)
+                  db.exec_params("INSERT INTO app_private.password_credentials(identity_id,password_hash,totp_secret) VALUES ($1,$2,$3)",
+                    [id, PasswordAuthentication.password_hash("ci-test-password"), PasswordAuthentication.encrypt(secret)])
+                  db.exec_params("INSERT INTO app_private.first_access_grants(identity_id) VALUES ($1)", [id])
+                end
+              end
+              credential = IdentityStore.call("password_lookup", "ci@example.test")
+              raise "password authentication failed" unless PasswordAuthentication.valid_password?("ci-test-password", credential.fetch("password_hash"))
+              stored_secret = PasswordAuthentication.decrypt(credential.fetch("totp_secret"))
+              step = PasswordAuthentication.matching_step(stored_secret, PasswordAuthentication.code(stored_secret, Time.now.to_i / 30))
+              raise "TOTP authentication failed" unless step
+              challenge = IdentityStore.digest(SecureRandom.urlsafe_base64(32))
+              IdentityStore.call("create_password_challenge", credential.fetch("identity_id"), challenge,
+                credential.fetch("password_hash"))
               token = SecureRandom.urlsafe_base64(32)
-              IdentityStore.authenticate(subject: SecureRandom.uuid, email: "ci@example.test",
-                token: token, csrf: SecureRandom.urlsafe_base64(32))
+              raise "authentication failed" unless IdentityStore.call("finish_password_challenge", challenge,
+                step.to_s, IdentityStore.digest(token), SecureRandom.urlsafe_base64(32), "").fetch("created")
               LawyerOnboarding.call(token: token, input: {
                 "full_name" => "CI Despachante Runtime",
                 "primary_oab" => { "number" => "12345", "uf" => "SP" }, "secondary_oabs" => []
@@ -84,7 +117,11 @@ jobs:
               CourtCatalog.define_singleton_method(:fetch) { [{ code: "TJAC" }, { code: "TRF1" }] }
               runner = DespachanteRunner.new(despachante_url: ENV.fetch("DESPACHANTE_DATABASE_URL"),
                 first: "04:00", second: "16:00")
-              now = Time.utc(2200, 1, 1, 20)
+              # Earlier suites retain global runs; avoid reusing one created before this fixture.
+              date = PG.connect(ENV.fetch("DESPACHANTE_DATABASE_URL")) do |db|
+                Date.iso8601(db.exec("SELECT (COALESCE(MAX(collection_date), current_date) + 1)::text FROM public.collection_runs").getvalue(0, 0))
+              end
+              now = Time.utc(date.year, date.month, date.day, 20)
               ids = runner.run_once(now: now)
               raise "slots are not distinct or idempotent" unless ids.length == 2 && ids.uniq.length == 2 &&
                 runner.run_once(now: now) == ids

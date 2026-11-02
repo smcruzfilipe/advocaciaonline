@@ -16,7 +16,7 @@
 
 ## Verificação comum da execução futura
 
-Backend usa Rails/Minitest e PostgreSQL real. Executar com diretório de trabalho `backend/`, Ruby/gems do lockfile e variáveis protegidas do README. A suíte existente é `RAILS_ENV=test ruby bin/rails test`; API real para smoke: `bundle exec puma -C config/puma.rb`. Migration autorizada em teste usa `RAILS_ENV=test ruby bin/migrate`, nunca a role web. Da raiz, build existente: `docker build --target runtime -t advocacia-backend:local backend`. São comandos documentados, **não executados agora**.
+Backend usa Rails/Minitest e PostgreSQL real. Executar com diretório de trabalho `apps/backend/`, Ruby/gems do lockfile e variáveis protegidas do README. A suíte existente é `RAILS_ENV=test ruby bin/rails test`; API real para smoke: `bundle exec puma -C config/puma.rb`. Migration autorizada em teste usa `RAILS_ENV=test ruby bin/migrate`, nunca a role web. Da raiz, build existente: `docker build --target runtime -t advocacia-backend:local apps/backend`. São comandos documentados, **não executados agora**.
 
 Banco de teste deve estar separado, provisionado/migrado e acessível como `advocacia_runtime`; migrator só para procedimento/fixture administrativa. A suíte completa também usa as URLs específicas registradas no README. Não instalar PostgreSQL no deploy nem iniciar containers ou etapas privilegiadas por inferência deste checklist.
 
@@ -170,12 +170,12 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Bloqueio/gate:** C0 aprovado; migration somente em banco de teste autorizado, por migrator.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_persistence_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_persistence_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - No banco de teste autorizado, preparar fixtures administrativas e verificar integridade, políticas/grants e recusa de acesso direto do runtime. Ações funcionais runtime passam por funções em AG07; não usar migrator para executá-las ou alegar projeção ainda inexistente.
 
 **Arquivos previstos:**
-- `backend/db/migrate/<timestamp>_create_agendas_and_agenda_windows.rb`
-- `backend/test/integration/agenda_persistence_test.rb`
+- `apps/backend/db/migrate/<timestamp>_create_agendas_and_agenda_windows.rb`
+- `apps/backend/test/integration/agenda_persistence_test.rb`
 
 **Escopo:** 2 arquivos listados, 3 incluindo rastreio. Sem models ActiveRecord novos que só serviriam a DML direto vedado pelo contrato.
 **Rastreio:** critérios 4, 6, 11 de SPEC-agenda.md; fase P1 do plano.
@@ -194,12 +194,12 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG05.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/services/agenda_configuration_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/services/agenda_configuration_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Invocar validação com dados válidos, zeros permitidos, valores no limite e logo fora dele; observar dados aceitos e erros por campo.
 
 **Arquivos previstos:**
-- `backend/app/services/agenda_configuration.rb`
-- `backend/test/services/agenda_configuration_test.rb`
+- `apps/backend/app/services/agenda_configuration.rb`
+- `apps/backend/test/services/agenda_configuration_test.rb`
 
 **Escopo:** 2 arquivo(s) listado(s), 3 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 1, 2, 3, 4 de SPEC-agenda.md; fase P1 do plano.
@@ -223,14 +223,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG06.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_configuration_persistence_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_configuration_persistence_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Salvar/reler configuração, tentar substituição inválida e duas primeiras configurações concorrentes; conferir unicidade, rollback integral e negação à equipe real.
 
 **Arquivos previstos:**
-- `backend/db/migrate/<timestamp>_add_agenda_configuration_functions.rb`
-- `backend/app/services/agenda_store.rb`
-- `backend/app/services/agenda_operations.rb`
-- `backend/test/integration/agenda_configuration_persistence_test.rb`
+- `apps/backend/db/migrate/<timestamp>_add_agenda_configuration_functions.rb`
+- `apps/backend/app/services/agenda_store.rb`
+- `apps/backend/app/services/agenda_operations.rb`
+- `apps/backend/test/integration/agenda_configuration_persistence_test.rb`
 
 **Escopo:** 4 arquivo(s) listado(s), 5 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 4, 8, 9, 11 de SPEC-agenda.md; fase P1 do plano.
@@ -249,14 +249,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG06, AG07.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/services/agenda_availability_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/services/agenda_availability_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Com instantes explícitos, verificar início/fim de janela, antecedência e intervalo zero/positivo. Até AG12 há apenas cálculo determinístico; desconto de ocupações persistidas será integrado e provado lá.
 
 **Arquivos previstos:**
-- `backend/db/migrate/<timestamp>_add_agenda_availability_functions.rb`
-- `backend/app/services/agenda_store.rb`
-- `backend/app/services/agenda_availability.rb`
-- `backend/test/services/agenda_availability_test.rb`
+- `apps/backend/db/migrate/<timestamp>_add_agenda_availability_functions.rb`
+- `apps/backend/app/services/agenda_store.rb`
+- `apps/backend/app/services/agenda_availability.rb`
+- `apps/backend/test/services/agenda_availability_test.rb`
 
 **Escopo:** 4 arquivos listados, 5 incluindo rastreio. Cálculo autoritativo SQL; Ruby apenas valida/parsa a fronteira e apresenta resultado, sem segunda regra de confirmação.
 **Rastreio:** critérios 1, 2, 3, 4 de SPEC-agenda.md; fase P1 do plano.
@@ -280,14 +280,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG08.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_configuration_http_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_configuration_http_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - API servida: titular configura e consulta, erro conserva dados, equipe e outro tenant são recusados; inspecionar respostas sem simular sucesso de fornecedor.
 
 **Arquivos previstos:**
-- `backend/app/controllers/agenda_configurations_controller.rb`
-- `backend/app/controllers/agenda_availabilities_controller.rb`
-- `backend/config/routes.rb`
-- `backend/test/integration/agenda_configuration_http_test.rb`
+- `apps/backend/app/controllers/agenda_configurations_controller.rb`
+- `apps/backend/app/controllers/agenda_availabilities_controller.rb`
+- `apps/backend/config/routes.rb`
+- `apps/backend/test/integration/agenda_configuration_http_test.rb`
 
 **Escopo:** 4 arquivo(s) listado(s), 5 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 4, 9, 11 de SPEC-agenda.md; fase P1 do plano.
@@ -342,12 +342,12 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Bloqueio/gate:** C1 completo, inclusive UI/equipe; migration sequencial e autorizada.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_persistence_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_persistence_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Preparar fixtures administrativas e conferir integridade/recusa de acesso direto entre agendas/participantes. A prova funcional de confirmação runtime segue em AG12, sem confundir preparação de fixture com execução da ação.
 
 **Arquivos previstos:**
-- `backend/db/migrate/<timestamp>_create_appointments_and_appointment_participants.rb`
-- `backend/test/integration/agenda_persistence_test.rb`
+- `apps/backend/db/migrate/<timestamp>_create_appointments_and_appointment_participants.rb`
+- `apps/backend/test/integration/agenda_persistence_test.rb`
 
 **Escopo:** 2 arquivos listados, 3 incluindo rastreio. Não criar models apenas para DML que o runtime não poderá executar.
 **Rastreio:** critérios 1, 6, 10, 11 de SPEC-agenda.md; fase P2 do plano.
@@ -391,12 +391,12 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Bloqueio/gate:** C0 completo e ABIs reais; não criar função stub ou contexto fictício para testar.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_confirmation_persistence_test.rb` — em `backend/`, após criação.
+- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_confirmation_persistence_test.rb` — em `apps/backend/`, após criação.
 - Invocar entradas SQL concedidas com runtime real e parâmetros bindados sob contextos válidos distintos; confirmar, reler disponibilidade autorizada e provocar recusa. Preparação administrativa não executa a ação em teste.
 
 **Arquivos previstos:**
-- `backend/db/migrate/<timestamp>_add_appointment_confirmation_functions.rb`
-- `backend/test/integration/appointment_confirmation_persistence_test.rb`
+- `apps/backend/db/migrate/<timestamp>_add_appointment_confirmation_functions.rb`
+- `apps/backend/test/integration/appointment_confirmation_persistence_test.rb`
 
 **Escopo:** 2 arquivos listados, 3 incluindo rastreio.
 **Rastreio:** critérios 1, 2, 3, 5 e 11; subfatia de AG12/P2.
@@ -415,14 +415,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG12a.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/services/appointment_confirmation_test.rb` — em `backend/`, após criação.
+- `RAILS_ENV=test ruby bin/rails test test/services/appointment_confirmation_test.rb` — em `apps/backend/`, após criação.
 - Exercitar consumidores contra PostgreSQL real: confirmação válida, duração divergente, conflito e contexto recusado; verificar ocupação/resultados persistidos, não argumentos repassados ou ecos de mocks. Regras de corrida continuam em AG13.
 
 **Arquivos previstos:**
-- `backend/app/services/agenda_store.rb`
-- `backend/app/services/agenda_operations.rb`
-- `backend/app/services/agenda_availability.rb`
-- `backend/test/services/appointment_confirmation_test.rb`
+- `apps/backend/app/services/agenda_store.rb`
+- `apps/backend/app/services/agenda_operations.rb`
+- `apps/backend/app/services/agenda_availability.rb`
+- `apps/backend/test/services/appointment_confirmation_test.rb`
 
 **Escopo:** 4 arquivos listados, 5 incluindo rastreio.
 **Rastreio:** critérios 1, 2, 3, 5 e 11; subfatia de AG12/P2.
@@ -442,13 +442,13 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG12.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_concurrency_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_concurrency_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Executar corrida coordenada com filas/barreiras, dados commitados, contexto por conexão, cleanup e falhas propagadas. Provar limites do relógio pelo mecanismo determinístico aprovado, sem tempo do cliente nem sleeps como oráculo.
 
 **Arquivos previstos:**
-- `backend/test/integration/agenda_concurrency_test.rb`
-- `backend/app/services/agenda_operations.rb`
-- `backend/app/services/agenda_availability.rb`
+- `apps/backend/test/integration/agenda_concurrency_test.rb`
+- `apps/backend/app/services/agenda_operations.rb`
+- `apps/backend/app/services/agenda_availability.rb`
 
 **Escopo:** 3 arquivo(s) listado(s), 4 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 3, 5, 6 de SPEC-agenda.md; fase P2 do plano.
@@ -472,14 +472,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG13.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/appointments_http_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/appointments_http_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - API servida: criar presencial/online, consultar com permissão, provocar conflito/override/ID alheio; equipe com somente criação conclui a ação sem baixar lista/detalhe.
 
 **Arquivos previstos:**
-- `backend/app/controllers/appointments_controller.rb`
-- `backend/app/controllers/agenda_availabilities_controller.rb`
-- `backend/config/routes.rb`
-- `backend/test/integration/appointments_http_test.rb`
+- `apps/backend/app/controllers/appointments_controller.rb`
+- `apps/backend/app/controllers/agenda_availabilities_controller.rb`
+- `apps/backend/config/routes.rb`
+- `apps/backend/test/integration/appointments_http_test.rb`
 
 **Escopo:** 4 arquivo(s) listado(s), 5 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 1, 2, 3, 5, 9, 11 de SPEC-agenda.md; fase P2 do plano.
@@ -556,14 +556,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Bloqueio/gate:** C2 completo antes de iniciar próxima experiência vertical.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/services/appointment_rescheduling_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/services/appointment_rescheduling_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Invocar domínio com destino ocupado, fora de janela, abaixo da antecedência e válido; conferir origem intacta nas recusas e destino persistido no sucesso.
 
 **Arquivos previstos:**
-- `backend/db/migrate/<timestamp>_add_appointment_rescheduling_function.rb`
-- `backend/app/services/agenda_store.rb`
-- `backend/app/services/agenda_operations.rb`
-- `backend/test/services/appointment_rescheduling_test.rb`
+- `apps/backend/db/migrate/<timestamp>_add_appointment_rescheduling_function.rb`
+- `apps/backend/app/services/agenda_store.rb`
+- `apps/backend/app/services/agenda_operations.rb`
+- `apps/backend/test/services/appointment_rescheduling_test.rb`
 
 **Escopo:** 4 arquivos listados, 5 incluindo rastreio. Função SQL executa a transição; Ruby não mantém implementação concorrente da regra.
 **Rastreio:** critérios 1, 2, 3, 7, 8, 9 de SPEC-agenda.md; fase P3 do plano.
@@ -582,13 +582,13 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG17.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_rescheduling_http_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_rescheduling_http_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - API servida: remarcar para destino ocupado e comprovar origem, depois para destino válido; repetir com equipe sem concessão e tenant adulterado, sem alteração.
 
 **Arquivos previstos:**
-- `backend/app/controllers/appointments_controller.rb`
-- `backend/config/routes.rb`
-- `backend/test/integration/appointment_rescheduling_http_test.rb`
+- `apps/backend/app/controllers/appointments_controller.rb`
+- `apps/backend/config/routes.rb`
+- `apps/backend/test/integration/appointment_rescheduling_http_test.rb`
 
 **Escopo:** 3 arquivo(s) listado(s), 4 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 7, 9, 11 de SPEC-agenda.md; fase P3 do plano.
@@ -636,14 +636,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG19.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/services/appointment_cancellation_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/services/appointment_cancellation_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Cancelar compromisso futuro dentro da antecedência para provar regra distinta; em outro caso ainda elegível para nova reserva, cancelar e confirmar novamente a vaga. Conferir estado persistido.
 
 **Arquivos previstos:**
-- `backend/db/migrate/<timestamp>_add_appointment_cancellation_function.rb`
-- `backend/app/services/agenda_store.rb`
-- `backend/app/services/agenda_operations.rb`
-- `backend/test/services/appointment_cancellation_test.rb`
+- `apps/backend/db/migrate/<timestamp>_add_appointment_cancellation_function.rb`
+- `apps/backend/app/services/agenda_store.rb`
+- `apps/backend/app/services/agenda_operations.rb`
+- `apps/backend/test/services/appointment_cancellation_test.rb`
 
 **Escopo:** 4 arquivos listados, 5 incluindo rastreio. Cancelamento é uma transição SQL protegida, não DML direto do runtime.
 **Rastreio:** critérios 7, 9, 10 de SPEC-agenda.md; fase P3 do plano.
@@ -662,13 +662,13 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG20.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_cancellation_http_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_cancellation_http_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - API servida cancela antes do início, inclusive dentro da antecedência; equipe sem concessão/tenant alheio é recusado. Reconsultar com sessão autorizada e tentar nova reserva elegível.
 
 **Arquivos previstos:**
-- `backend/app/controllers/appointments_controller.rb`
-- `backend/config/routes.rb`
-- `backend/test/integration/appointment_cancellation_http_test.rb`
+- `apps/backend/app/controllers/appointments_controller.rb`
+- `apps/backend/config/routes.rb`
+- `apps/backend/test/integration/appointment_cancellation_http_test.rb`
 
 **Escopo:** 3 arquivo(s) listado(s), 4 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 7, 9, 10, 11 de SPEC-agenda.md; fase P3 do plano.
@@ -716,14 +716,14 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG22.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_configuration_concurrency_test.rb` — em `backend/`, após criação do arquivo previsto.
-- `RAILS_ENV=test ruby bin/rails test test/services/agenda_configuration_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_configuration_concurrency_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/services/agenda_configuration_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - API servida cria compromisso, altera regras e relê legado intacto; cria/remarca outro com regras novas. Testes coordenados verificam os ordenamentos e commits com relógio de teste aprovado.
 
 **Arquivos previstos:**
-- `backend/test/integration/agenda_configuration_concurrency_test.rb`
-- `backend/test/services/agenda_configuration_test.rb`
-- `backend/app/services/agenda_operations.rb`
+- `apps/backend/test/integration/agenda_configuration_concurrency_test.rb`
+- `apps/backend/test/services/agenda_configuration_test.rb`
+- `apps/backend/app/services/agenda_operations.rb`
 
 **Escopo:** 3 arquivo(s) listado(s), 4 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 3, 8 de SPEC-agenda.md; fase P3 do plano.
@@ -742,13 +742,13 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG23.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_transition_concurrency_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/appointment_transition_concurrency_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - Executar os interleavings coordenados com PostgreSQL runtime real, conferir respostas e ocupações finais; API smoke repete origem ocupada e liberação elegível sem transação compartilhada de testes.
 
 **Arquivos previstos:**
-- `backend/test/integration/appointment_transition_concurrency_test.rb`
-- `backend/app/services/agenda_operations.rb`
-- `backend/app/services/agenda_availability.rb`
+- `apps/backend/test/integration/appointment_transition_concurrency_test.rb`
+- `apps/backend/app/services/agenda_operations.rb`
+- `apps/backend/app/services/agenda_availability.rb`
 
 **Escopo:** 3 arquivo(s) listado(s), 4 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 5, 7 de SPEC-agenda.md; fase P3 do plano.
@@ -774,17 +774,17 @@ AG01 e AG02 são independentes; AG03 integra seus contratos. Após C0, AG07 e AG
 **Dependências:** AG24.
 
 **Verificação e smoke (futuros):**
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_authorization_http_test.rb` — em `backend/`, após criação do arquivo previsto.
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_tenant_isolation_test.rb` — em `backend/`, após criação do arquivo previsto.
-- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_isolation_http_test.rb` — em `backend/`, após criação do arquivo previsto.
-- `RAILS_ENV=test ruby bin/rails test test/integration/database_context_test.rb` — em `backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_authorization_http_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_tenant_isolation_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/agenda_isolation_http_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
+- `RAILS_ENV=test ruby bin/rails test test/integration/database_context_test.rb` — em `apps/backend/`, após criação do arquivo previsto.
 - API servida com equipe real: conceder só criação, tentar demais ações, acrescentar negação e revogar/expirar em sessão aberta. Em duas agendas, adulterar IDs e alternar a conexão após rollback; não fabricar equipe em fixture.
 
 **Arquivos previstos:**
-- `backend/test/integration/agenda_authorization_http_test.rb`
-- `backend/test/integration/agenda_tenant_isolation_test.rb`
-- `backend/test/integration/agenda_isolation_http_test.rb`
-- `backend/test/integration/database_context_test.rb`
+- `apps/backend/test/integration/agenda_authorization_http_test.rb`
+- `apps/backend/test/integration/agenda_tenant_isolation_test.rb`
+- `apps/backend/test/integration/agenda_isolation_http_test.rb`
+- `apps/backend/test/integration/database_context_test.rb`
 
 **Escopo:** 4 arquivo(s) listado(s), 5 incluindo rastreio; pequeno/médio conforme a fatia.
 **Rastreio:** critérios 6, 9, 11 de SPEC-agenda.md; fase P4 do plano.

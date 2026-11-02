@@ -170,14 +170,14 @@ Representação temporal de AG01 e contrato técnico de AG03 aprovados pelo soli
 
 ## Stack e estrutura do projeto
 
-Base existente: Ruby **4.0.9**, Rails **8.1.4** API-only, `pg` **1.7.0** e Puma **7.2.1**, conforme `backend/Gemfile`. PostgreSQL com RLS; versão de referência **18.6** em [stack](docs/stack.md). Não introduzir outra infraestrutura para a agenda por presunção.
+Base existente: Ruby **4.0.9**, Rails **8.1.4** API-only, `pg` **1.7.0** e Puma **7.2.1**, conforme `apps/backend/Gemfile`. PostgreSQL com RLS; versão de referência **18.6** em [stack](docs/stack.md). Não introduzir outra infraestrutura para a agenda por presunção.
 
 | Caminho | Uso e estado |
 |---|---|
-| `backend/app/services/`, `backend/app/models/` | Domínio e persistência existentes; futuros elementos de agenda seguem essas áreas |
-| `backend/app/controllers/`, `backend/config/routes.rb` | Fronteira HTTP existente; rotas de agenda aprovadas em AG03, ainda não implementadas |
-| `backend/db/migrate/` | Migrations existentes; schema de agenda aprovado, execução condicionada a AG04/C0 e ambiente autorizado |
-| `backend/test/services/`, `backend/test/integration/` | Testes de regras, HTTP, segurança e banco; testes de agenda ainda inexistentes |
+| `apps/backend/app/services/`, `apps/backend/app/models/` | Domínio e persistência existentes; futuros elementos de agenda seguem essas áreas |
+| `apps/backend/app/controllers/`, `apps/backend/config/routes.rb` | Fronteira HTTP existente; rotas de agenda aprovadas em AG03, ainda não implementadas |
+| `apps/backend/db/migrate/` | Migrations existentes; schema de agenda aprovado, execução condicionada a AG04/C0 e ambiente autorizado |
+| `apps/backend/test/services/`, `apps/backend/test/integration/` | Testes de regras, HTTP, segurança e banco; testes de agenda ainda inexistentes |
 | `frontend/` | Next.js/TypeScript previstos, ainda não criados; sem comando de UI executável nesta etapa |
 | `SPEC-agenda.md`, `CAPABILITIES.md`, `docs/ideas/` | Especificação, índice e origem das decisões |
 
@@ -185,7 +185,7 @@ Não criar serviço de agenda no despachante de coleta nem usar Escrevente como 
 
 ## Comandos
 
-Comandos suportados pela base existente, **não executados nesta etapa documental**. Executar comandos locais com diretório de trabalho `backend/`, Ruby/gems do lockfile disponíveis e ambiente protegido já fornecido:
+Comandos suportados pela base existente, **não executados nesta etapa documental**. Executar comandos locais com diretório de trabalho `apps/backend/`, Ruby/gems do lockfile disponíveis e ambiente protegido já fornecido:
 
 | Finalidade | Comando |
 |---|---|
@@ -194,7 +194,7 @@ Comandos suportados pela base existente, **não executados nesta etapa documenta
 | Servidor API existente | `bundle exec puma -C config/puma.rb` |
 | Migration em banco de teste previamente autorizado | `RAILS_ENV=test ruby bin/migrate` |
 
-Da raiz do monorepo, o build existente da API é `docker build --target runtime -t advocacia-backend:local backend`. Sua documentação não autoriza executar containers ou builds nesta etapa.
+Da raiz do monorepo, o build existente da API é `docker build --target runtime -t advocacia-backend:local apps/backend`. Sua documentação não autoriza executar containers ou builds nesta etapa.
 
 Testes exigem PostgreSQL de teste separado e previamente provisionado/migrado. `DATABASE_URL` deve usar `advocacia_runtime`; a suíte completa também usa `MIGRATION_DATABASE_URL` e `DESPACHANTE_DATABASE_URL` em verificações específicas. Boot exige `APP_ORIGIN` e `SECRET_KEY_BASE`; fornecer valores externamente, conforme [README](README.md#variáveis-de-ambiente). Migration usa exclusivamente o script com `MIGRATION_DATABASE_URL`; nunca executar contra deploy sem procedimento/permissão aprovados. Não fornecer credenciais administrativas ao processo web.
 
@@ -204,7 +204,7 @@ Não há comando específico de agenda, frontend ou lint estabelecido nesta muda
 
 Seguir classes concretas, nomes de classes em CamelCase e métodos em snake_case; dois espaços de indentação e aspas duplas, conforme o backend existente. Validação na fronteira e mensagens de domínio em português. Não introduzir uma hierarquia abstrata de services apenas para esta capacidade.
 
-Trecho real de `backend/app/services/onboarding_profile.rb:15–22`, como referência de estilo, não implementação de agenda:
+Trecho real de `apps/backend/app/services/onboarding_profile.rb:15–22`, como referência de estilo, não implementação de agenda:
 
 ```ruby
   def validate_input
@@ -221,10 +221,10 @@ O trecho termina antes do fechamento do método original. Código novo deve reut
 
 ## Estratégia de testes
 
-- **Framework e locais:** Minitest/Rails, `ActiveSupport::TestCase` e `ActionDispatch::IntegrationTest`; helpers em `backend/test/test_helper.rb`. Manter convenções dos testes existentes.
+- **Framework e locais:** Minitest/Rails, `ActiveSupport::TestCase` e `ActionDispatch::IntegrationTest`; helpers em `apps/backend/test/test_helper.rb`. Manter convenções dos testes existentes.
 - **Regras determinísticas:** testar duração única, configuração ausente/inválida, janelas, intervalo zero/positivo e fronteiras de antecedência com instantes explícitos; não depender de espera real.
 - **HTTP e segurança:** sessões reais de teste, Origin/CSRF, titular, equipe com/sem concessão e acesso cruzado entre dois tenants. Dados não podem vazar por lista, detalhe ou adulteração de IDs.
-- **Persistência e concorrência:** PostgreSQL real e role runtime sem bypass de RLS, conexões independentes e coordenação determinística. Não provar exclusão mútua com mocks de banco nem transação compartilhada que esconda a corrida. Há precedente de threads/conexões em `backend/test/integration/session_validity_test.rb`.
+- **Persistência e concorrência:** PostgreSQL real e role runtime sem bypass de RLS, conexões independentes e coordenação determinística. Não provar exclusão mútua com mocks de banco nem transação compartilhada que esconda a corrida. Há precedente de threads/conexões em `apps/backend/test/integration/session_validity_test.rb`.
 - **Transições:** remarcação recusada conserva origem; cancelamento libera ocupação; disputa entre operações não deixa estado parcial; configuração não altera silenciosamente compromissos existentes conforme a política aprovada.
 - **Fronteiras externas:** demonstrar, por consumidores de teste isolados, que falha de integração não modifica a verdade local. Não transformar testes de simples encaminhamento em prova de entrega Google/e-mail ou de funcionamento Jitsi.
 - **Cobertura:** cobrir os critérios observáveis abaixo; não introduzir percentual arbitrário nem enfraquecer a suíte existente.

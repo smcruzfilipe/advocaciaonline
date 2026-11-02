@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "plugins": {
+    "37signals@plugins": [
+      {
+        "scope": "project",
+        "installPath": "/home/filipe/.omp/plugins/cache/plugins/plugins___37signals___0.1.0",
+        "version": "0.1.0",
+        "installedAt": "2026-10-29T17:33:12.282Z",
+        "lastUpdated": "2026-10-29T17:33:12.282Z"
+      }
+    ]
+  }
+}

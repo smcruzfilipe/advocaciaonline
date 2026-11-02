@@ -11,7 +11,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 - Não escolher stack, comandos, ferramentas, estruturas, formatos ou transportes antes das decisões 3a–3b. Resultados efetivos e verificações pendentes devem ser distinguidos nas respectivas tarefas.
 - Fonte lógica DJEN, somente Diário Eletrônico (`D`), sem coleta de editais (`E`): no primeiro slot, cadernos ZIP/JSON com fallback API paginada; no segundo, API paginada diretamente, sem caderno; ambos usam exclusivamente a data corrente. Sanitizar apenas `texto` da API, não do caderno. Preservar a primeira versão deduplicada, que pode conter HTML e exige escape pelo consumidor. Não revalidar retroativamente a premissa aceita de estabilidade de `id`/`hash`, nem iniciar recuperação histórica.
 - Implementação futura parte de `dev`; o branch atual de documentação não é base de feature. Convite de equipe por e-mail está no escopo aprovado; relatórios e avisos por e-mail e outras fontes ficam fora da primeira entrega.
-- **Schema inicial consolidado:** para banco inicial vazio, as migrations criam diretamente o estado final, sem alterações intermediárias ou backfills históricos. `backend/db/migrate/20261028000003_create_collection_planning.rb` integra as antigas migrations 04–06; `backend/db/migrate/20261028000004_create_escrevente.rb` substitui a antiga 07. Não há rollback destrutivo nem upgrade automático de banco pré-existente.
+- **Schema inicial consolidado:** para banco inicial vazio, as migrations criam diretamente o estado final, sem alterações intermediárias ou backfills históricos. `apps/backend/db/migrate/20261028000003_create_collection_planning.rb` integra as antigas migrations 04–06; `apps/backend/db/migrate/20261028000004_create_escrevente.rb` substitui a antiga 07. Não há rollback destrutivo nem upgrade automático de banco pré-existente.
 - **Verificação da consolidação:** PostgreSQL isolado criou o schema novo; comparação com a sequência anterior confirmou 86 colunas, 138 constraints, 36 índices, 27 políticas, 15 funções e RLS/grants de 14 tabelas. Suíte: 276 testes, 7.678 assertions, sem falhas; smoke de onboarding e leitura autenticada passou. Evidências anteriores continuam históricas.
 
 ## Decisões bloqueantes — tarefas 1–3
@@ -134,17 +134,17 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 **Implementação backend de identidade, equipe e autorização — branch `feature/identidade-equipe-autorizacao`:** manter frontend fora desta entrega. Para banco inicial vazio, o contexto de identidade será consolidado na migration inicial; não há upgrade automático de banco preexistente.
 
-- Identidade/schema: `backend/db/migrate/20261028000000_create_identity_and_lawyer_profiles.rb`, `backend/db/migrate/20261028000005_create_team_credentials.rb`. Vínculos por tenant, sessão selecionada e credenciais com validade/revogação.
-- Sessões: `backend/app/services/identity_store.rb`, `backend/app/controllers/sessions_controller.rb`, `backend/app/controllers/google_sessions_controller.rb`, `backend/config/routes.rb`, `backend/test/integration/tenant_memberships_test.rb`.
-- Credenciais: `backend/app/controllers/team_credentials_controller.rb`, `backend/test/integration/team_credentials_http_test.rb`, `backend/test/integration/team_credential_lifecycle_test.rb`.
-- Convites: `backend/app/controllers/team_invitations_controller.rb`, `backend/test/integration/team_invitations_test.rb`; token em fragmento de URL e aceite por POST autenticado, sem registrar token ou conteúdo do convite.
-- Correio: `backend/app/services/team_invitation_mailer.rb`, `backend/test/services/team_invitation_mailer_test.rb`; configuração SMTP e variáveis serão registradas no README antes de concluir a entrega.
-- Política de autorização: `backend/app/services/authorization_policy.rb`, `backend/test/services/authorization_policy_test.rb`. Grupos, administração, integração com operações existentes e verificações serão detalhados antes de seu fechamento.
-- Configuração SMTP: `backend/app/services/app_settings.rb`, `backend/test/services/app_settings_test.rb`, `README.md`. Credenciais externas, porta explícita e transporte seguro; nenhuma configuração no corpo da requisição.
-- Grupos: `backend/db/migrate/20261028000006_create_authorization_groups.rb`, `backend/app/services/authorization_group_store.rb`, `backend/app/controllers/authorization_groups_controller.rb`, `backend/test/integration/authorization_groups_test.rb`, `backend/test/integration/authorization_groups_http_test.rb`.
-- Fronteira das permissões: `backend/app/controllers/application_controller.rb`, `backend/test/integration/monitoring_authorization_http_test.rb`.
-- Monitoramentos: `backend/app/controllers/party_monitorings_controller.rb`, `backend/app/controllers/process_monitorings_controller.rb`, `backend/app/controllers/lawyer_monitorings_controller.rb`.
-- Consultas auxiliares: `backend/app/controllers/court_catalogs_controller.rb`, `backend/app/controllers/collection_runs_controller.rb`, `backend/app/controllers/escrevente_controller.rb`, `backend/app/controllers/onboardings_controller.rb`. O Escrevente e os dados administrativos de coleta permanecem exclusivos do titular.
+- Identidade/schema: `apps/backend/db/migrate/20261028000000_create_identity_and_lawyer_profiles.rb`, `apps/backend/db/migrate/20261028000005_create_team_credentials.rb`. Vínculos por tenant, sessão selecionada e credenciais com validade/revogação.
+- Sessões: `apps/backend/app/services/identity_store.rb`, `apps/backend/app/controllers/sessions_controller.rb`, `apps/backend/app/controllers/google_sessions_controller.rb`, `apps/backend/config/routes.rb`, `apps/backend/test/integration/tenant_memberships_test.rb`.
+- Credenciais: `apps/backend/app/controllers/team_credentials_controller.rb`, `apps/backend/test/integration/team_credentials_http_test.rb`, `apps/backend/test/integration/team_credential_lifecycle_test.rb`.
+- Convites: `apps/backend/app/controllers/team_invitations_controller.rb`, `apps/backend/test/integration/team_invitations_test.rb`; token em fragmento de URL e aceite por POST autenticado, sem registrar token ou conteúdo do convite.
+- Correio: `apps/backend/app/services/team_invitation_mailer.rb`, `apps/backend/test/services/team_invitation_mailer_test.rb`; configuração SMTP e variáveis serão registradas no README antes de concluir a entrega.
+- Política de autorização: `apps/backend/app/services/authorization_policy.rb`, `apps/backend/test/services/authorization_policy_test.rb`. Grupos, administração, integração com operações existentes e verificações serão detalhados antes de seu fechamento.
+- Configuração SMTP: `apps/backend/app/services/app_settings.rb`, `apps/backend/test/services/app_settings_test.rb`, `README.md`. Credenciais externas, porta explícita e transporte seguro; nenhuma configuração no corpo da requisição.
+- Grupos: `apps/backend/db/migrate/20261028000006_create_authorization_groups.rb`, `apps/backend/app/services/authorization_group_store.rb`, `apps/backend/app/controllers/authorization_groups_controller.rb`, `apps/backend/test/integration/authorization_groups_test.rb`, `apps/backend/test/integration/authorization_groups_http_test.rb`.
+- Fronteira das permissões: `apps/backend/app/controllers/application_controller.rb`, `apps/backend/test/integration/monitoring_authorization_http_test.rb`.
+- Monitoramentos: `apps/backend/app/controllers/party_monitorings_controller.rb`, `apps/backend/app/controllers/process_monitorings_controller.rb`, `apps/backend/app/controllers/lawyer_monitorings_controller.rb`.
+- Consultas auxiliares: `apps/backend/app/controllers/court_catalogs_controller.rb`, `apps/backend/app/controllers/collection_runs_controller.rb`, `apps/backend/app/controllers/escrevente_controller.rb`, `apps/backend/app/controllers/onboardings_controller.rb`. O Escrevente e os dados administrativos de coleta permanecem exclusivos do titular.
 
 - [x] **5a — Aplicar validade às credenciais e sessões.**
   **Aceite:** (1) permitir validade sem expiração ou em dias conforme política aprovada; (2) após vencimento, negar operação protegida no servidor mesmo se a sessão já estava ativa; (3) aplicar renovação/alteração/revogação conforme a decisão 2a.
@@ -182,7 +182,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 6a, 4b, 2b. **Escopo:** decisão de acesso aplicada em cada operação.
   **Áreas previstas (≤5):** autorização; política de operações; filtros de dados.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos).
-  **Estado:** política por operação/tribunal implementada, testada e aplicada aos consumidores de monitoramento existentes. A consulta de comunicações e suas respostas por tribunal ainda não existem; a verificação de 6b nessas superfícies permanece pendente.
+  **Estado:** política por operação/tribunal implementada e aplicada aos monitoramentos e às APIs de comunicações e dashboard. Testes HTTP verificaram equipes sem grupos, escopo TJSP, composição e negação explícita; o checkpoint 2 e a interface administrativa permanecem pendentes.
 
 - [ ] **6c — Aplicar a decisão de autorização da dashboard.**
   **Aceite:** (1) decidir o acesso à dashboard conforme política aprovada, tenant e escopo de tribunal; (2) aplicar a decisão no servidor e não retornar valores protegidos quando negada, sem definir sua representação visual.
@@ -191,7 +191,7 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
   **Dep.:** 6b, 2b–2c. **Escopo:** decisão e aplicação server-side da autorização da dashboard.
   **Áreas previstas (≤5):** autorização; consulta/agregação; filtros server-side.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Contratos lógicos](../SPEC-autorizacao.md#contratos-lógicos); [SPEC-consulta.md — Requisitos](../SPEC-consulta.md#requisitos-e-critérios-observáveis).
-  **Estado:** a decisão `consultar_dashboard` integra o catálogo e a matriz testada; não existe operação real de dashboard/agregação à qual aplicá-la ou submetê-la ao smoke exigido.
+  **Estado:** autorização de dashboard aplicada à API real; testes HTTP cobrem concessão, negação, escopo parcial e ausência de consulta numérica quando negada. Smoke HTTP confirmou `*` para equipe restrita; a interface e o checkpoint 2 permanecem pendentes.
 
 ## Checkpoint 2 — após tarefas 4–6
 - [ ] Onboarding, expiração em sessão ativa, isolamento e regras de autorização demonstrados nos cenários propostos.
@@ -201,8 +201,8 @@ Plano: [plan.md](plan.md). As seis specs, o plano e este checklist foram aprovad
 
 **Primeiras fatias backend, antes de partes/processos e planejamento:**
 
-- Catálogo DJEN: `backend/test/integration/court_catalog_http_test.rb`, `backend/app/services/court_catalog.rb`, `backend/app/controllers/court_catalogs_controller.rb`, `backend/config/routes.rb`. Validar catálogo atual da fonte; indisponibilidade não vira lista vazia nem catálogo inventado. Durante o desenvolvimento, tráfego DJEN sai pelo nó Tailscale `100.118.186.77`; em produção Tailscale não é requisito e usa-se a saída normal da infraestrutura.
-- Advogado monitorado: `backend/test/integration/lawyer_monitoring_http_test.rb`, `backend/app/controllers/lawyer_monitorings_controller.rb`, `backend/config/routes.rb`. Projeção autenticada do perfil existente, incluindo OABs e tenant derivado no servidor; não duplicar o perfil nem liberar acesso de equipe sem autorização.
+- Catálogo DJEN: `apps/backend/test/integration/court_catalog_http_test.rb`, `apps/backend/app/services/court_catalog.rb`, `apps/backend/app/controllers/court_catalogs_controller.rb`, `apps/backend/config/routes.rb`. Validar catálogo atual da fonte; indisponibilidade não vira lista vazia nem catálogo inventado. Durante o desenvolvimento, tráfego DJEN sai pelo nó Tailscale `100.118.186.77`; em produção Tailscale não é requisito e usa-se a saída normal da infraestrutura.
+- Advogado monitorado: `apps/backend/test/integration/lawyer_monitoring_http_test.rb`, `apps/backend/app/controllers/lawyer_monitorings_controller.rb`, `apps/backend/config/routes.rb`. Projeção autenticada do perfil existente, incluindo OABs e tenant derivado no servidor; não duplicar o perfil nem liberar acesso de equipe sem autorização.
 
 Os cadastros de partes/processos e o despachante dependem dessas fronteiras e serão detalhados nas tarefas 7b, 8a e 10; frontend permanece adiado.
 
@@ -222,7 +222,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 7a, 3c, 6b. **Escopo:** cadastro e leitura de partes.
   **Áreas previstas (≤5):** monitoramentos; filtros de tribunal; interface de partes; contrato de coleta.
   **Rastreio:** [SPEC-monitoramentos.md — Escopo e dono dos contratos](../SPEC-monitoramentos.md#escopo-e-dono-dos-contratos); [Requisitos](../SPEC-monitoramentos.md#requisitos); [Questões abertas](../SPEC-monitoramentos.md#questões-abertas).
-  **Arquivos previstos:** `backend/test/integration/party_monitorings_http_test.rb`, `backend/db/migrate/20261028000001_create_party_monitorings.rb`, `backend/app/models/party_monitoring.rb`, `backend/app/controllers/party_monitorings_controller.rb`, `backend/config/routes.rb`. Cadastro, leitura, edição e desativação: tenant de sessão; nome canônico único inclusive desativado; filtro `null` equivale a todos, lista explícita não pode ser vazia e deve ser validada pelo catálogo real.
+  **Arquivos previstos:** `apps/backend/test/integration/party_monitorings_http_test.rb`, `apps/backend/db/migrate/20261028000001_create_party_monitorings.rb`, `apps/backend/app/models/party_monitoring.rb`, `apps/backend/app/controllers/party_monitorings_controller.rb`, `apps/backend/config/routes.rb`. Cadastro, leitura, edição e desativação: tenant de sessão; nome canônico único inclusive desativado; filtro `null` equivale a todos, lista explícita não pode ser vazia e deve ser validada pelo catálogo real.
   **Estado:** cadastro, leitura, edição, desativação e isolamento de dois titulares exercitados por HTTP com catálogo DJEN real; acesso de equipe/autorização 6b e consumo pelo despachante ainda pendentes.
 
 ### 8. Cadastro de processos
@@ -234,7 +234,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 6b, 3b, 3c. **Escopo:** cadastro e leitura de processos.
   **Áreas previstas (≤5):** monitoramentos; filtros de tribunal; interface de processos; contrato de coleta.
   **Rastreio:** [SPEC-monitoramentos.md — Escopo e dono dos contratos](../SPEC-monitoramentos.md#escopo-e-dono-dos-contratos); [Requisitos](../SPEC-monitoramentos.md#requisitos); [Questões abertas](../SPEC-monitoramentos.md#questões-abertas).
-  **Arquivos previstos:** `backend/test/integration/process_monitorings_http_test.rb`, `backend/db/migrate/20261028000002_create_process_monitorings.rb`, `backend/app/models/process_monitoring.rb`, `backend/app/controllers/process_monitorings_controller.rb`, `backend/config/routes.rb`. Cadastro, leitura, edição e desativação: tenant de sessão; CNJ canônico de 20 dígitos único inclusive desativado; filtros seguem as mesmas regras de 7b.
+  **Arquivos previstos:** `apps/backend/test/integration/process_monitorings_http_test.rb`, `apps/backend/db/migrate/20261028000002_create_process_monitorings.rb`, `apps/backend/app/models/process_monitoring.rb`, `apps/backend/app/controllers/process_monitorings_controller.rb`, `apps/backend/config/routes.rb`. Cadastro, leitura, edição e desativação: tenant de sessão; CNJ canônico de 20 dígitos único inclusive desativado; filtros seguem as mesmas regras de 7b.
   **Estado:** cadastro, leitura, edição, desativação e isolamento de dois titulares exercitados por HTTP com catálogo DJEN real; acesso de equipe/autorização 6b e consumo pelo despachante ainda pendentes.
 
 - [ ] **8b — Disponibilizar páginas e navegação autorizadas.**
@@ -278,9 +278,9 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 7a–7b, 8a, 4b, 9a. **Escopo:** trabalho planejado, sem ainda executar a fonte.
   **Áreas previstas (≤5):** despachante; contrato de monitoramentos; contexto de tenant; execução.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
-  **Fatia de persistência e planejamento:** `backend/test/integration/collection_planning_test.rb`, `backend/db/provision_despachante.sql`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `README.md`. Um processo de confiança usa credencial PostgreSQL própria sem `BYPASSRLS`; somente ele pode ler os monitoramentos de todos os tenants para formar planos. Web continua restrito pela sessão. Cada execução por data/slot possui trabalhos imutáveis por tenant, entidade, tribunal e meio exclusivo `D`, com critérios fixados ao planejar; falha não é tratada como trabalho vazio.
-  **Fatia de integridade:** `backend/test/integration/collection_planning_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`. A integridade antes introduzida pela migration 04 agora faz parte da criação inicial: as referências de advogado, parte e processo dos trabalhos devem pertencer ao mesmo tenant no banco, inclusive para escritas da role despachante.
-  **Fatia de leitura:** `backend/test/integration/collection_runs_http_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `backend/app/controllers/collection_runs_controller.rb`, `backend/config/routes.rb`. A audiência antes criada pela migration 05 agora faz parte da criação inicial: é fixada por tenant mesmo sem trabalhos; respostas limitadas ao tenant autenticado. Documentar contrato no README; autorização de equipe permanece pendente de 6b.
+  **Fatia de persistência e planejamento:** `apps/backend/test/integration/collection_planning_test.rb`, `apps/backend/db/provision_despachante.sql`, `apps/backend/db/migrate/20261028000003_create_collection_planning.rb`, `apps/backend/despachante/collection_despachante.rb`, `README.md`. Um processo de confiança usa credencial PostgreSQL própria sem `BYPASSRLS`; somente ele pode ler os monitoramentos de todos os tenants para formar planos. Web continua restrito pela sessão. Cada execução por data/slot possui trabalhos imutáveis por tenant, entidade, tribunal e meio exclusivo `D`, com critérios fixados ao planejar; falha não é tratada como trabalho vazio.
+  **Fatia de integridade:** `apps/backend/test/integration/collection_planning_test.rb`, `apps/backend/db/migrate/20261028000003_create_collection_planning.rb`. A integridade antes introduzida pela migration 04 agora faz parte da criação inicial: as referências de advogado, parte e processo dos trabalhos devem pertencer ao mesmo tenant no banco, inclusive para escritas da role despachante.
+  **Fatia de leitura:** `apps/backend/test/integration/collection_runs_http_test.rb`, `apps/backend/db/migrate/20261028000003_create_collection_planning.rb`, `apps/backend/despachante/collection_despachante.rb`, `apps/backend/app/controllers/collection_runs_controller.rb`, `apps/backend/config/routes.rb`. A audiência antes criada pela migration 05 agora faz parte da criação inicial: é fixada por tenant mesmo sem trabalhos; respostas limitadas ao tenant autenticado. Documentar contrato no README; autorização de equipe permanece pendente de 6b.
   **Evidência histórica, anterior à restrição ao meio D:** migrations então vigentes exercitadas em PostgreSQL 18.6 isolado, com roles reais. Os testes focados de planejamento, agenda e leitura HTTP passaram com 72 testes e 1.248 assertions; incluem dois tenants, os três tipos de entidade, filtros, RLS, vínculos cruzados negados e critérios congelados. O teste de perfil sem OAB principal demonstrou falha integral e retomada da mesma execução após restauração do perfil. Um smoke na imagem final então vigente com catálogo controlado gerou dois slots `planned`: cada um continha advogado, parte e processo em dois tenants, com seis trabalhos por tenant para TJAC/D e TJAC/E, critérios e identificadores conferidos; a repetição manteve os slots. Esse smoke preserva o comportamento antigo, não autoriza E nem verifica a restrição vigente. O smoke anterior com DJEN real também é histórico; a autorização de equipe (6b) e as dependências desta tarefa permanecem pendentes.
   **Verificação atual:** testes focados Rails de planejamento, agenda, leitura e persistência: 94 testes e 1.649 assertions, sem falhas, erros ou skips. Em PostgreSQL descartável, o despachante planejou dois slots para dois tenants, cada qual com advogado, parte e processo no TJAC/D: 12 trabalhos com entidade e tenant associados.
 
@@ -291,9 +291,9 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 10a, 1c, 3a–3b. **Escopo:** planejamento da agenda; execução completa da coleta em 13a, após 11.
   **Áreas previstas (≤5):** despachante; contrato de acionamento do ETL; execução; configuração da agenda.
   **Rastreio:** [CAPABILITIES.md — Mapa de capacidades: monitoramento jurídico](../CAPABILITIES.md#mapa-de-capacidades-monitoramento-jurídico); [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
-  **Fatia de agenda:** `backend/test/services/collection_schedule_test.rb`, `backend/despachante/collection_schedule.rb`, `README.md`. Validar horários sem defaults e calcular slots devidos em `America/Sao_Paulo`. Execução independente: `backend/test/integration/despachante_execution_test.rb`, `backend/despachante/run.rb`, `backend/Dockerfile`, `README.md`, `tasks/todo.md`; não executar ETL nesta etapa.
-  **Fatia de virada de data:** `backend/test/integration/despachante_execution_test.rb`, `backend/db/migrate/20261028000003_create_collection_planning.rb`, `backend/despachante/collection_despachante.rb`, `backend/despachante/run.rb`, `README.md`. O estado `interrupted`, antes acrescentado pela migration 06, agora faz parte da criação inicial. Não publicar nem retomar trabalhos de dia anterior após uma espera externa; identificar a interrupção sem executar coleta retroativa.
-  **Fatia da imagem mínima:** `backend/despachante/Gemfile`, `backend/despachante/Gemfile.lock`, `backend/despachante/run.rb`, `backend/Dockerfile`, `README.md`. Instalar apenas as gems usadas pelo processo de planejamento, manter build em estágio separado e verificar a imagem final em execução como usuário não root.
+  **Fatia de agenda:** `apps/backend/test/services/collection_schedule_test.rb`, `apps/backend/despachante/collection_schedule.rb`, `README.md`. Validar horários sem defaults e calcular slots devidos em `America/Sao_Paulo`. Execução independente: `apps/backend/test/integration/despachante_execution_test.rb`, `apps/backend/despachante/run.rb`, `apps/backend/Dockerfile`, `README.md`, `tasks/todo.md`; não executar ETL nesta etapa.
+  **Fatia de virada de data:** `apps/backend/test/integration/despachante_execution_test.rb`, `apps/backend/db/migrate/20261028000003_create_collection_planning.rb`, `apps/backend/despachante/collection_despachante.rb`, `apps/backend/despachante/run.rb`, `README.md`. O estado `interrupted`, antes acrescentado pela migration 06, agora faz parte da criação inicial. Não publicar nem retomar trabalhos de dia anterior após uma espera externa; identificar a interrupção sem executar coleta retroativa.
+  **Fatia da imagem mínima:** `apps/backend/despachante/Gemfile`, `apps/backend/despachante/Gemfile.lock`, `apps/backend/despachante/run.rb`, `apps/backend/Dockerfile`, `README.md`. Instalar apenas as gems usadas pelo processo de planejamento, manter build em estágio separado e verificar a imagem final em execução como usuário não root.
   **Evidência histórica, anterior à restrição ao meio D:** testes focados passaram com 72 testes e 1.248 assertions, cobrindo slots, retomada, concorrência, 429 e virada de data. A imagem final do despachante então vigente foi construída; smoke com catálogo controlado persistiu dois slots `planned` distintos e idempotentes, executando com UID/GID 1000:1000. Isso não comprova a restrição vigente ao meio D, conectividade DJEN real nem execução de ETL. Execução dos jobs e interrupção de jobs já planejados ao mudar o dia pertencem à tarefa 13.
   **Verificação atual:** os testes focados acima abrangem horários, retomada e virada de data. O processo da imagem final do despachante retornou dois slots distintos e idempotentes com UID 1000; a seleção e execução automática dos trabalhos continuam na tarefa 13.
 
@@ -352,21 +352,23 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
 
 ### 13. Agenda e falhas
 
-- [ ] **13a — Executar agenda e registrar tentativas e falha por execução/tribunal.**
+- [x] **13a — Executar agenda e registrar tentativas e falha por execução/tribunal.**
   **Aceite:** (1) executar, com o ETL de 11, os acionamentos definidos em 10b; (2) aplicar tentativas, backoff, parada e fallback conforme limites aprovados; (3) estado final identifica falha por tribunal e execução, sem confundi-la com zero publicações nem registrar detalhes técnicos no Escrevente.
   **Verificação comportamental:** fazer a fonte falhar até esgotar tentativas e depois responder; verificar contagem/estado dentro dos limites decididos.
   **Smoke específico:** executar os acionamentos planejados com resultado controlado e conferir a execução/estado de cada um, incluindo falha de tribunal distinta de sucesso sem publicações.
   **Dep.:** 10b, 11a–11c, 1c, 9b. **Escopo:** execução da agenda, tentativas e estado operacional.
   **Áreas previstas (≤5):** execução; política de retries; estado por tribunal; consulta de falhas.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-coleta.md#questões-abertas-e-bloqueios).
+  **Implementação e evidência:** seleção e concessão atômicas no PostgreSQL, worker contínuo e retomada por lease. Testes focados: Rails, 58 testes e 1.493 assertions; ETL, 64 testes e 457 assertions, sem falhas, erros ou skips. No smoke com fonte controlada, o despachante planejou dois slots TJAC/D e o primeiro terminou com `source_unavailable`, distinto de sucesso vazio.
 
-- [ ] **13b — Recuperar no mesmo dia sem retroatividade.**
+- [x] **13b — Recuperar no mesmo dia sem retroatividade.**
   **Aceite:** (1) execução posterior no mesmo dia pode persistir publicações após falha anterior; (2) deduplicação preserva chave/vínculos entre as execuções; (3) nenhuma execução busca automaticamente data anterior.
   **Verificação comportamental:** primeira execução falha e a seguinte tem sucesso na mesma data; comparar registros, estado e data enviada.
   **Smoke específico:** repetir coleta do dia corrente após falha e confirmar recuperação sem duplicar publicação e sem consulta histórica.
   **Dep.:** 13a, 12a–12b, 1c. **Escopo:** recuperação pela execução posterior, não reprocessamento retroativo.
   **Áreas previstas (≤5):** execução; persistência; deduplicação; política de datas.
   **Rastreio:** [SPEC-coleta.md — Escopo e contratos lógicos](../SPEC-coleta.md#escopo-e-contratos-lógicos); [Deduplicação e vínculos](../SPEC-coleta.md#deduplicação-e-vínculos); [Requisitos e critérios observáveis](../SPEC-coleta.md#requisitos-e-critérios-observáveis).
+  **Implementação e evidência:** no mesmo smoke, o segundo slot recuperou uma comunicação e um vínculo para o mesmo advogado, usando API paginada na data corrente, sem caderno nem editais. Os testes também cobrem tentativas esgotadas, reingresso concorrente, retomada, data anterior sem requisição e preservação da primeira versão e dos vínculos.
 
 ### 14. Consulta de comunicações
 
@@ -377,6 +379,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 12b, 11c, 6b. **Escopo:** leitura, agrupamento visual e detalhe.
   **Áreas previstas (≤5):** consulta; interface de resultados; detalhe; projeção de dados de origem.
   **Rastreio:** [SPEC-consulta.md — Escopo e contratos lógicos](../SPEC-consulta.md#escopo-e-contratos-lógicos); [Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis).
+  **Estado:** backend implementado em `apps/backend/app/controllers/communications_controller.rb` e `apps/backend/app/services/communication_query.rb`. No Chromium headless com build de produção, Rails e PostgreSQL descartável, três publicações do mesmo processo permaneceram independentes; o detalhe exibiu o HTML preservado literalmente, sem elementos `script` ou `img`. O fechamento formal permanece condicionado às dependências e checkpoints anteriores.
 
 - [ ] **14b — Autorizar lista, detalhe e agregações.**
   **Aceite:** (1) filtrar cada resposta no servidor pelo tenant autenticado e tribunais permitidos; (2) não permitir acesso cruzado por ID/tenant enviado pelo cliente; (3) aplicar restrição também a detalhes e agregações, não apenas à lista/UI.
@@ -385,6 +388,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 14a, 4b, 6b–6c, 12b. **Escopo:** autorização de todas as superfícies de consulta.
   **Áreas previstas (≤5):** consulta; filtros de autorização; detalhes; agregações.
   **Rastreio:** [SPEC-consulta.md — Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Fronteiras](../SPEC-consulta.md#fronteiras).
+  **Estado:** backend implementado e testado em lista, detalhe e agregações com sessão, RLS e autorização por tribunal. No smoke da interface, tanto ID de outro tenant quanto comunicação de tribunal sem permissão retornaram não encontrado sem expor conteúdo. O fechamento formal aguarda as dependências e checkpoints anteriores.
 
 ### 15. Dashboard e restrição
 
@@ -395,6 +399,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 14b, 2c, 12a–12b, 13a. **Escopo:** agregações da dashboard, sem notificação por e-mail.
   **Áreas previstas (≤5):** consulta/agregação; critérios de métricas; autorização; interface da dashboard.
   **Rastreio:** [SPEC-consulta.md — Objetivo](../SPEC-consulta.md#objetivo); [Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Questões abertas e bloqueios](../SPEC-consulta.md#questões-abertas-e-bloqueios); [Critérios de sucesso](../SPEC-consulta.md#critérios-de-sucesso).
+  **Estado:** agregações implementadas em `apps/backend/app/services/dashboard_snapshot.rb`, com janelas de Brasília, primeira persistência e processos CNJ distintos. No smoke controlado, a interface apresentou 1 comunicação hoje, 2 na semana e 1 processo distinto; o fechamento formal aguarda 14b.
 
 - [ ] **15b — Exibir `*` e avisos de falha sem vazamento.**
   **Aceite:** (1) exibir `*` para valores numericamente negados e nunca entregar os valores protegidos por rota/aggregate alternativo; (2) avisar tribunal com falha persistente e distingui-la de sucesso com zero publicações; (3) manter acesso a cada aviso/métrica dentro de tenant e tribunal autorizados.
@@ -403,6 +408,7 @@ Os cadastros de partes/processos e o despachante dependem dessas fronteiras e se
   **Dep.:** 15a, 6c, 13a, 14b. **Escopo:** apresentação protegida e estado operacional.
   **Áreas previstas (≤5):** dashboard; aviso por tribunal; autorização; consulta de estado.
   **Rastreio:** [SPEC-autorizacao.md — Requisitos](../SPEC-autorizacao.md#requisitos); [Fronteiras](../SPEC-autorizacao.md#fronteiras); [SPEC-consulta.md — Requisitos e critérios observáveis](../SPEC-consulta.md#requisitos-e-critérios-observáveis); [Fronteiras](../SPEC-consulta.md#fronteiras).
+  **Estado:** backend retorna `*` sem consultar métricas quando negado e identifica falhas por tribunal legível. No Chromium headless, a interface distinguiu zero, estado parcial e falha sintética de tribunal; membro restrito viu seis `*`, sem números subjacentes na resposta. O fechamento formal aguarda as dependências e checkpoints anteriores.
 
 ## Checkpoint 5 — após tarefas 13–15
 - [ ] Recuperação no mesmo dia, consulta, volumetrias, `*`, isolamento e diferença entre falha/zero demonstrados nos cenários propostos.

@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+require "bundler/setup"
+require "json"
+require_relative "../lib/stf/worker"
+
+begin
+  raise ArgumentError, "usage: processador [--once|JOB_UUID]" if ARGV.length > 1
+  argument = ARGV.first
+  unless argument.nil? || argument == "--once" || argument.match?(/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i)
+    raise ArgumentError, "usage: processador [--once|JOB_UUID]"
+  end
+
+  database_url = ENV.fetch("PROCESSADOR_DATABASE_URL")
+  processor = STF::Processor.new(database_url: database_url)
+  if argument.nil?
+    STF::Worker.new(database_url: database_url, processor: processor).run
+  elsif argument == "--once"
+    result = STF::Worker.new(database_url: database_url, processor: processor).run_once
+    exit(result.nil? || result.fetch("state") == "succeeded" ? 0 : 1)
+  else
+    result = processor.call(argument)
+    puts JSON.generate(result)
+    exit(result.fetch("state") == "succeeded" ? 0 : 1)
+  end
+rescue KeyError, ArgumentError => error
+  warn error.message
+  exit 1
+rescue StandardError => error
+  warn "processing failed (#{error.class})"
+  exit 1
+end

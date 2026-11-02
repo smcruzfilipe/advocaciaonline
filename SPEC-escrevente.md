@@ -1,6 +1,6 @@
 # Especificação: Escrevente (`escrevente`)
 
-**Estado:** base funcional aprovada pelo solicitante e implementada no backend Rails com interface SQL controlada para o processador. A fronteira renomeada foi verificada em PostgreSQL isolado com roles reais; o processo em `etl/` executa trabalhos já planejados. **ID:** `escrevente`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [stack da aplicação central](docs/stack.md).
+**Estado:** base funcional aprovada pelo solicitante e implementada no backend Rails com interface SQL controlada para o processador. A fronteira renomeada foi verificada em PostgreSQL isolado com roles reais; o processo em `apps/etl/` executa trabalhos já planejados. **ID:** `escrevente`. Referências: [mapa](CAPABILITIES.md), [especificação geral](docs/especificacao.md), [intenção](docs/intent/monitoramento-juridico.md), [stack da aplicação central](docs/stack.md).
 
 ## Objetivo
 
@@ -27,10 +27,10 @@ Manter um registro imutável e consultável do fluxo de coleta, com os marcos de
 
 ## Comandos, estrutura e estilo
 
-- **Build e testes:** o backend e seus comandos estão no [README](README.md#implementação-e-verificações). Os testes de fronteira estão em `backend/test/integration/escrevente_processor_test.rb` e `backend/test/integration/escrevente_http_test.rb`. Historicamente, a suíte completa passou com roles reais após a consolidação das migrations, antes desta renomeação; esse resultado não comprova a configuração renomeada.
-- **Estrutura física:** o Escrevente fica dentro do backend Rails, não como componente independente. A migration `backend/db/migrate/20261028000004_create_escrevente.rb` define `collection_events` e `collection_job_executions`, substituindo a antiga `07_create_escrevente`; `backend/app/controllers/escrevente_controller.rb` oferece leitura autenticada por tenant. O processador em `etl/` é separado da API e do despachante.
-- **Schema inicial:** as migrations consolidadas criam diretamente o estado final em banco inicial vazio, sem upgrade automático de banco pré-existente nem rollback destrutivo. O planejamento e as antigas migrations 04–06 ficam em `backend/db/migrate/20261028000003_create_collection_planning.rb`; um banco descartável criado pela sequência anterior precisa ser recriado explicitamente antes de receber a sequência consolidada.
-- **Estilo de código:** seguir os serviços e testes existentes em `backend/app/` e `backend/test/`; as funções SQL controladas ficam no schema `app_private`.
+- **Build e testes:** o backend e seus comandos estão no [README](README.md#implementação-e-verificações). Os testes de fronteira estão em `apps/backend/test/integration/escrevente_processor_test.rb` e `apps/backend/test/integration/escrevente_http_test.rb`. Historicamente, a suíte completa passou com roles reais após a consolidação das migrations, antes desta renomeação; esse resultado não comprova a configuração renomeada.
+- **Estrutura física:** o Escrevente fica dentro do backend Rails, não como componente independente. A migration `apps/backend/db/migrate/20261028000004_create_escrevente.rb` define `collection_events` e `collection_job_executions`, substituindo a antiga `07_create_escrevente`; `apps/backend/app/controllers/escrevente_controller.rb` oferece leitura autenticada por tenant. O processador em `apps/etl/` é separado da API e do despachante.
+- **Schema inicial:** as migrations consolidadas criam diretamente o estado final em banco inicial vazio, sem upgrade automático de banco pré-existente nem rollback destrutivo. O planejamento e as antigas migrations 04–06 ficam em `apps/backend/db/migrate/20261028000003_create_collection_planning.rb`; um banco descartável criado pela sequência anterior precisa ser recriado explicitamente antes de receber a sequência consolidada.
+- **Estilo de código:** seguir os serviços e testes existentes em `apps/backend/app/` e `apps/backend/test/`; as funções SQL controladas ficam no schema `app_private`.
 
 ## Estratégia de testes comportamentais
 
@@ -107,7 +107,7 @@ Execução visível sem trabalhos retorna listas vazias, não sucesso ou términ
 
 ### Pré-requisitos e verificação
 
-- Em banco novo de desenvolvimento, antes das migrations consolidadas, um administrador deve seguir a ordem `backend/db/provision.sql`, `backend/db/provision_despachante.sql` e `backend/db/provision_processador.sql` indicada no README. Esse provisionamento não é procedimento de upgrade de um banco pré-existente. A role `advocacia_processador` usa credencial SCRAM exclusiva, configurada externamente, sem segredo versionado.
+- Em banco novo de desenvolvimento, antes das migrations consolidadas, um administrador deve seguir a ordem `apps/backend/db/provision.sql`, `apps/backend/db/provision_despachante.sql` e `apps/backend/db/provision_processador.sql` indicada no README. Esse provisionamento não é procedimento de upgrade de um banco pré-existente. A role `advocacia_processador` usa credencial SCRAM exclusiva, configurada externamente, sem segredo versionado.
 - `PROCESSADOR_DATABASE_URL` não tem default (`Nenhum`) e é obrigatória para o processador e os testes de fronteira. Fornecer a URL externamente por ambiente protegido ou gerenciador de segredos; nunca entregá-la à API ou ao despachante. A variável está registrada na tabela de ambiente do README.
 - **Evidência histórica anterior à consolidação:** a dependência 4b foi verificada em PostgreSQL isolado, com testes de sessão/tenant e smoke HTTP com tenant adulterado; os resultados estão em `tasks/todo.md`. Login OAuth real é verificação independente.
 - **Evidência histórica anterior à consolidação:** os testes específicos passaram com 29 testes e 813 assertions, incluindo duas sessões/tenants, claims inválidas, leases, concorrência, falha sem término, imutabilidade e atomicidade. A suíte completa passou com 276 testes e 7.678 assertions. Smoke HTTP e SQL na imagem final confirmou sucesso, falha e negação cruzada; veja [README](README.md#planejamento-de-coleta). Essas verificações históricas não comprovam alterações posteriores.

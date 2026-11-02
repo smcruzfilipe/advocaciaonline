@@ -1,0 +1,58 @@
+# Checklist de integração dos endpoints — web
+
+Fonte: `apps/backend/config/routes.rb`. `[x]` indica integração e comportamento exercitados pela interface ou pelo relay contra Rails e PostgreSQL locais; não implica autorização de deploy. Os convites foram enviados a um SMTP descartável com STARTTLS. A recuperação foi exercitada na URL HTTPS com conta sintética; o pedido para o endereço autorizado pelo Resend foi aceito pelo SMTP real. Cadastro e confirmação de e-mail ainda exigem comprovação visual integrada; o catálogo real retornou 503 após a fonte responder 403 neste ambiente.
+
+- [ ] `POST /api/auth/team-register` — cadastro e verificação contextual vinculados a convite de equipe
+- [ ] `POST /api/auth/verify-email` — confirmação real do e-mail para equipe
+- [ ] `POST /api/auth/first-access/inspect` — inspeção do convite administrativo
+- [ ] `POST /api/auth/first-access` — preparação pendente ou resgate por identidade existente
+- [ ] `POST /api/auth/first-access/confirm` — primeiro TOTP e criação da sessão
+- [ ] `GET /api/admin/invitations` — lista de convites ativos
+- [ ] `POST /api/admin/invitations` — emissão sem envio automático
+- [ ] `GET /api/admin/invitations/:id/link` — recuperação do mesmo link ativo
+- [ ] `POST /api/admin/invitations/:id/email` — envio ou reenvio explícito
+- [ ] `POST /api/admin/invitations/:id/reissue` — reemissão explícita
+- [x] `POST /api/auth/login` — senha nova aceita e senha antiga recusada após redefinição, com conta sintética
+- [x] `POST /api/auth/totp` — segundo fator preservado e sessão criada após senha redefinida
+- [x] `POST /api/auth/password-reset` — solicitação pela interface e aceitação SMTP Resend
+- [x] `POST /api/auth/password-reset/confirm` — nova senha e confirmação pela interface, sem autenticação automática
+- [x] `GET /api/session` — `sessions#show`
+- [x] `PATCH /api/session/membership` — `sessions#update`
+- [x] `DELETE /api/session` — `sessions#destroy`
+- [x] `GET /api/team/credentials` — `team_credentials#index`
+- [x] `POST /api/team/credentials` — `team_credentials#create`; SMTP local com STARTTLS
+- [x] `PATCH /api/team/credentials/:id` — `team_credentials#update`
+- [x] `POST /api/team/credentials/:id/renewal` — `team_credentials#renew`
+- [x] `DELETE /api/team/credentials/:id` — `team_credentials#destroy`
+- [x] `POST /api/team/credentials/:id/invitation` — `team_credentials#reissue`; SMTP local com STARTTLS
+- [x] `POST /api/team/invitations/accept` — `team_invitations#create`; sessão e convite sintéticos no backend real
+- [x] `GET /api/authorization/catalog` — `authorization_groups#catalog`
+- [x] `GET /api/authorization/groups` — `authorization_groups#index`
+- [x] `POST /api/authorization/groups` — `authorization_groups#create`
+- [x] `GET /api/authorization/groups/:id` — `authorization_groups#show`
+- [x] `PATCH /api/authorization/groups/:id` — `authorization_groups#update`
+- [x] `DELETE /api/authorization/groups/:id` — `authorization_groups#destroy`
+- [x] `POST /api/authorization/groups/:id/rules` — `authorization_groups#create_rule`
+- [x] `PATCH /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#update_rule`
+- [x] `DELETE /api/authorization/groups/:id/rules/:rule_id` — `authorization_groups#destroy_rule`
+- [x] `PUT /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#assign_membership`
+- [x] `DELETE /api/authorization/groups/:id/memberships/:membership_id` — `authorization_groups#remove_membership`
+- [x] `GET /api/onboarding` — `onboardings#show`
+- [x] `POST /api/onboarding` — `onboardings#create`
+- [x] `GET /api/monitorings/lawyer` — `lawyer_monitorings#show`
+- [ ] `GET /api/courts` — `court_catalogs#index`; catálogo real indisponível
+- [x] `GET /api/monitorings/parties` — `party_monitorings#index`
+- [x] `POST /api/monitorings/parties` — `party_monitorings#create`
+- [x] `GET /api/monitorings/parties/:id` — `party_monitorings#show`
+- [x] `PATCH /api/monitorings/parties/:id` — `party_monitorings#update`
+- [x] `GET /api/monitorings/processes` — `process_monitorings#index`
+- [x] `POST /api/monitorings/processes` — `process_monitorings#create`
+- [x] `GET /api/monitorings/processes/:id` — `process_monitorings#show`
+- [x] `PATCH /api/monitorings/processes/:id` — `process_monitorings#update`
+- [x] `GET /api/collection-runs` — `collection_runs#index`
+- [x] `GET /api/collection-runs/:id/jobs` — `collection_runs#jobs`
+- [x] `GET /api/collection-runs/:id/events` — `escrevente#events`
+- [x] `GET /api/collection-runs/:id/execution` — `escrevente#execution`
+- [x] `GET /api/communications` — `communications#index`; `organ_name` e `process_number_masked` são strings opcionais, provenientes de `nomeOrgao` e `numeroprocessocommascara` da primeira versão persistida. Campos ausentes/não textuais são omitidos; a lista não expõe o payload integral. `source` continua identificando DJEN; `court` identifica o grupo/accordion com o símbolo do tribunal, sem “Fonte” repetida nos cartões.
+- [x] `GET /api/communications/:id` — `communications#show`; inclui os mesmos metadados opcionais, além do payload e vínculos autorizados. O payload pode conter `texto_parts: {text: string, href?: string}[]` e `texto_plain` derivados pela ingestão: os segmentos devem reproduzir exatamente o texto de apresentação; somente destinos HTTP(S) absolutos, sem credenciais ou controles, viram links. Metadados ausentes/inválidos mantêm o texto original escapado; HTML não é executado.
+- [x] `GET /api/dashboard` — `dashboard#show`

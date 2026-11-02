@@ -14,7 +14,7 @@ Não implementar aqui links de cliente, sala Jitsi, Google Calendar, e-mails, le
 
 | Área | Evidência atual | Consequência para o plano |
 |---|---|---|
-| Rails e persistência | `backend/app/`, `backend/config/routes.rb`, `backend/db/`; Ruby 4.0.9, Rails 8.1.4, PostgreSQL/RLS | Reutilizar stack, contexto e padrões; agenda ainda não tem implementação |
+| Rails e persistência | `apps/backend/app/`, `apps/backend/config/routes.rb`, `apps/backend/db/`; Ruby 4.0.9, Rails 8.1.4, PostgreSQL/RLS | Reutilizar stack, contexto e padrões; agenda ainda não tem implementação |
 | Sessão e contexto | `ApplicationController`, `IdentityStore`, `DatabaseContext.with_session` | Reutilizar cookie, Origin/CSRF, no-store e resolução de tenant por sessão; não substituir por tenant recebido |
 | Equipe e autorização | Provedor real de equipe/grupos ainda ausente; catálogo de agenda incorporado documentalmente por AG02 | Dependência externa de vínculo/validade e decisão por operação; RLS não substitui permissão |
 | Frontend | `frontend/` ainda previsto; arquitetura define Next.js/TypeScript/App Router e proxy de mesma origem | Dependência externa de base compartilhada, sessão/onboarding, proxy e ferramentas reais; manter aceites visuais, sem inventar comandos npm |
@@ -150,7 +150,7 @@ O [checklist de agenda](todo.md) detalha as 29 fatias abaixo e foi aprovado pelo
 
 ### Comandos existentes para a execução futura
 
-Diretório de trabalho `backend/`, Ruby/gems do lockfile e ambiente já fornecido por mecanismo protegido:
+Diretório de trabalho `apps/backend/`, Ruby/gems do lockfile e ambiente já fornecido por mecanismo protegido:
 
 | Finalidade | Comando suportado |
 |---|---|
@@ -159,7 +159,7 @@ Diretório de trabalho `backend/`, Ruby/gems do lockfile e ambiente já fornecid
 | API para smoke autorizado | `bundle exec puma -C config/puma.rb` |
 | Migration em banco de teste previamente autorizado | `RAILS_ENV=test ruby bin/migrate` |
 
-Da raiz, build da API existente: `docker build --target runtime -t advocacia-backend:local backend`. Não executar build, migration, instalação ou container por este documento. A suíte exige banco de teste separado/provisionado/migrado, URLs segregadas por role e variáveis de boot registradas no README. No deploy, usar somente o PostgreSQL já existente; nenhuma nova instância ou inicialização root é autorizada.
+Da raiz, build da API existente: `docker build --target runtime -t advocacia-backend:local apps/backend`. Não executar build, migration, instalação ou container por este documento. A suíte exige banco de teste separado/provisionado/migrado, URLs segregadas por role e variáveis de boot registradas no README. No deploy, usar somente o PostgreSQL já existente; nenhuma nova instância ou inicialização root é autorizada.
 
 Comandos de testes focados da agenda e de build/lint/testes do frontend serão registrados no checklist quando os respectivos arquivos/scripts existirem ou forem explicitamente previstos como criação da fatia. Não anunciar comandos npm, testes ou assets inexistentes como verificados. Qualquer variável criada/alterada na implementação deve ser documentada no README no mesmo conjunto de mudanças.
 
@@ -185,4 +185,4 @@ Comandos de testes focados da agenda e de build/lint/testes do frontend serão r
 
 As aprovações humanas do plano e do checklist foram registradas em turnos posteriores às respectivas elaborações. A implementação só começa após os bloqueios C0 serem resolvidos. As outras quatro capacidades da iniciativa ainda dependem de especificações próprias; estas aprovações não as liberam.
 
-**Verificação desta etapa:** pesquisa documental e de fontes locais, com análises paralelas de backend/concorrência e frontend/verificação. Não foram executados testes, build, lint, migrations, containers ou smoke de aplicação. Nenhum resultado histórico foi promovido a prova atual.
+**Verificação desta etapa:** pesquisa documental e de fontes locais, com análises paralelas de apps/backend/concorrência e frontend/verificação. Não foram executados testes, build, lint, migrations, containers ou smoke de aplicação. Nenhum resultado histórico foi promovido a prova atual.

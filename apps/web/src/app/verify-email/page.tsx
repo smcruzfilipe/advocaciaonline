@@ -1,0 +1,115 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { authRequest } from "@/lib/api";
+import { useSession } from "@/components/session-provider";
+import { AlertBanner } from "@/components/ui";
+
+let verification: Promise<void> | undefined;
+
+function verifyFragment(): Promise<void> {
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  const token = fragment.get("token");
+  if (!token)
+    return (
+      verification ??
+      Promise.reject(
+        new Error(
+          "Link de confirmação ausente. Abra o link recebido por e-mail.",
+        ),
+      )
+    );
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${window.location.search}`,
+  );
+  verification = authRequest<{ verified: boolean }>("/api/auth/verify-email", {
+    token,
+  }).then((result) => {
+    if (!result.verified)
+      throw new Error(
+        "Não foi possível confirmar o e-mail. Solicite um novo link de cadastro.",
+      );
+  });
+  return verification;
+}
+
+export default function VerifyEmailPage() {
+  const { loading } = useSession();
+  const [status, setStatus] = useState<"pending" | "success" | "error">(
+    "pending",
+  );
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (loading) return;
+    let active = true;
+    void verifyFragment()
+      .then(() => {
+        if (active) setStatus("success");
+      })
+      .catch((reason: unknown) => {
+        if (active) {
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Não foi possível confirmar o e-mail.",
+          );
+          setStatus("error");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [loading]);
+
+  return (
+    <section
+      className="mx-auto flex w-full max-w-sm flex-col gap-6 px-4 py-20 text-sm"
+      aria-busy={status === "pending"}
+    >
+      <header>
+        <h1 className="font-headings text-2xl font-semibold text-foreground">
+          Confirmação de e-mail
+        </h1>
+      </header>
+      {status === "pending" ? (
+        <p role="status">Confirmando seu e-mail…</p>
+      ) : status === "success" ? (
+        <div
+          className="flex flex-col gap-4 border border-border p-6"
+          role="status"
+        >
+          <p>
+            E-mail confirmado. Volte à aba em que abriu o convite de equipe ou
+            reabra o link do convite. Se ainda não entrou, use sua senha e o
+            autenticador para concluir o aceite.
+          </p>
+          <Link
+            className="bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground"
+            href="/login"
+          >
+            Ir para o login
+          </Link>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <AlertBanner variant="error">{error}</AlertBanner>
+          <p>
+            O link pode ter expirado ou já ter sido usado. Abra-o no mesmo
+            navegador usado no cadastro; se necessário, solicite novamente o
+            cadastro neste navegador.
+          </p>
+          <Link
+            className="bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground"
+            href="/login"
+          >
+            Ir para o acesso
+          </Link>
+        </div>
+      )}
+    </section>
+  );
+}
