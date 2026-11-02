@@ -94,6 +94,8 @@ Enquanto o container estiver ativo, `docker exec advocacia-web npm run format:ch
 
 Em produção, o Traefik termina TLS e encaminha ao frontend, que aceita conexões somente do proxy configurado em `TRUSTED_PROXY_IP`. O servidor web extrai o último IP de `X-Forwarded-For` recebido desse proxy e substitui os cabeçalhos internos antes de chamar a API. O Traefik deve acrescentar o IP da conexão e não confiar em cabeçalhos encaminhados por clientes; outro balanceador só pode antecedê-lo com uma cadeia de confiança validada. Não publicar a porta da API nem permitir acesso direto ao frontend. O Compose local mantém o ingresso Nginx independente e usa seu nome de serviço como proxy confiável.
 
+No Dokploy, a configuração Traefik do frontend usa `http://tasks.<nome-do-serviço-web>:3000`. A rota pelo VIP `http://<nome-do-serviço-web>:3000` retornou `403`; o endereço direto das tarefas retornou `200`. Ao alterar o domínio no Dokploy, confira a configuração gerada e mantenha esse destino. Se o Traefik for recriado, confirme seu IP na `dokploy-network` e atualize `TRUSTED_PROXY_IP` no frontend antes do redeploy.
+
 Não registrar tokens, senhas, códigos TOTP nem os cabeçalhos internos em logs de ingresso ou observabilidade. A API e o frontend compartilham `APP_ORIGIN`; cookies `Secure` e CSRF exigem HTTPS também no desenvolvimento. Leituras e mutações exigem um navegador com Web Locks em contexto seguro para coordenar sessões e vínculos entre abas. O relay aceita até 1 MiB de corpo por requisição e impõe prazo de 20 segundos; configure também limites de corpo e tempo no ingresso HTTPS. Se uma mutação perder a confirmação, consulte o estado antes de repeti-la.
 
 ## Swagger UI e acesso à documentação
