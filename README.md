@@ -583,7 +583,7 @@ Chromium headless acessou API e PostgreSQL reais por HTTPS: lista/detalhe, marca
 
 O catálogo preserva se STF veio também da fonte DJEN, sem criar trabalho DJEN fictício para a entrada exclusiva do portal nem remover DJEN realmente oferecido. A integração mantém a falha explícita do catálogo compartilhado: na prova pontual deste ambiente o provedor DJEN respondeu HTTP 403; não foi comprovado agendamento recorrente com a fonte real disponível nem se alterou a rota de rede do servidor.
 
-Na revisão final, o transporte passou a conservar a URL validada após redirecionamentos como origem da coleta e base dos links relativos. CNJ informado deve ser confirmado: resultado restrito sem identidade comprovada falha explicitamente, sem consultar outra parte para sobrepor a restrição. As regressões falharam antes e passaram após as correções. A entrada CLI final, sem preload ou código montado, preservou o resultado 2 movimentos/1 processo e as quatro comunicações antes e depois da remoção dos artefatos de prova.
+O transporte conserva a URL validada após redirecionamentos como origem da coleta e base dos links relativos. CNJ informado deve ser confirmado: resultado restrito sem identidade comprovada falha explicitamente, sem consultar outra parte para sobrepor a restrição. As regressões falharam antes e passaram após as correções. A entrada CLI final, sem preload ou código montado, preservou o resultado 2 movimentos/1 processo e as quatro comunicações antes e depois da remoção dos artefatos de prova.
 
 ### Contratos de consulta
 

@@ -136,7 +136,7 @@ A fase seguinte só começa depois do gate anterior observado e registrado. Pend
 ### STF10.A — Caminho definitivo e pronto integral
 
 - [x] Provar primeiro a entrada definitiva, a persistência e a consulta com a configuração final da feature; não usar somente script auxiliar ou fixture inicial como gate.
-- [ ] Conferir C1–C9, todos os callers e cada item da Definition of Done. Registrar evidência ou justificativa de não aplicação ligada ao escopo, sem encerrar item só por existir comando ou arquivo.
+- [x] Conferir C1–C9, todos os callers e cada item da Definition of Done. Registrar evidência ou justificativa de não aplicação ligada ao escopo, sem encerrar item só por existir comando ou arquivo.
 - [x] Atualizar documentação de operação, fonte, limites, variáveis, segurança e rollback. Remover afirmações históricas que passem a contradizer os contratos alterados, sem reescrever a história de outras features.
 
 **Aceite:** contrato final e smoke aprovados tecnicamente com evidência revisável. **Dependências:** STF09. **Arquivos:** README, contratos afetados, spec e checklist conforme alterações reais. **Verificação:** matriz C1–C9 e pronto transversal, com resultados do ambiente final de prova. **Critérios:** C1–C9.
@@ -150,9 +150,9 @@ A fase seguinte só começa depois do gate anterior observado e registrado. Pend
 
 ### STF10.C — Reviews, CI e PR pronto
 
-- [ ] Resolver todos os achados e threads aplicáveis, esperar reviews e CI em estado terminal; `pending`, cancelado ou thread aberta não equivalem a aprovação.
-- [ ] Confirmar checklist sem item `agora`/`fase posterior`, com todos os concluídos ligados à evidência e todos os não aplicáveis justificados. Não marcar tarefas de outros planos como concluídas.
-- [ ] Atualizar o mesmo PR com evidências e riscos, retirar draft apenas após todos os gates e entregar o link. Não fazer merge/deploy nem parar o ambiente local sem autorização.
+- [x] Resolver todos os achados e threads aplicáveis, esperar reviews e CI em estado terminal; `pending`, cancelado ou thread aberta não equivalem a aprovação.
+- [x] Confirmar checklist sem item `agora`/`fase posterior`, com todos os concluídos ligados à evidência e todos os não aplicáveis justificados. Não marcar tarefas de outros planos como concluídas.
+- [x] Atualizar o mesmo PR com evidências e riscos, retirar draft apenas após todos os gates e entregar o link. Não fazer merge/deploy nem parar o ambiente local sem autorização.
 
 **Aceite:** único PR aberto, fora de draft, CI verde e reviews resolvidas, sem pendência mascarada. **Dependências:** STF10.B. **Arquivos:** checklist/handoff e correções estritamente necessárias aos achados. **Verificação:** estado remoto de checks/reviews/threads e smoke definitivo registrado. **Critério:** C9.
 
@@ -163,9 +163,9 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 | Artefato | Estado |
 |---|---|
 | Spec STF | Criada em `SPEC-stf.md` |
-| Checklist STF | Este documento; itens de execução não realizados permanecem abertos |
+| Checklist STF | Este documento; todas as folhas da entrega concluídas com provas abaixo |
 | Issue e plano/handoff publicado | [#20](https://github.com/smcruzfilipe/advocaciaonline/issues/20), [plano técnico](plan-stf.md); gate documental STF00 concluído |
-| PR STF | [#21](https://github.com/smcruzfilipe/advocaciaonline/pull/21), draft; execução inicial publicada no commit `2e1c8c8` |
+| PR STF | [#21](https://github.com/smcruzfilipe/advocaciaonline/pull/21), aberto e fora de draft após smoke, limpeza, reviews resolvidas e CI verde do código final |
 | Testes/smoke de execução inicial | Aplicativo STF **89 testes/292 assertions**, SQL STF **21 testes/245 assertions**, sem falhas/erros/skips. CLI nominal e por processo reconciliam CNJ e preservam dois eventos distintos com dois alvos cada; leitura autenticada confere datas, URLs e proveniência. |
 | Ativação diária/deploy | Não realizada; depende dos gates e condições de acesso |
 
@@ -211,4 +211,19 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 - Imagem final STF **186.017.830 bytes**, UID 1000. CLI definitiva sem preload/montagem de código retornou `succeeded`, `andamentos`, 2 movimentos/1 processo/2 identidades pendentes antes e depois da limpeza. HTTP autenticado continuou apresentando as mesmas quatro comunicações.
 - Consulta real ao incidente 7728350 manteve os nove eventos idênticos aos nove itens extraídos, sem persistência histórica; CLI de fonte real concluiu 0 movimentos/1 processo elegível. Isso prova vazio real, não movimentos positivos reais de hoje.
 - Removidos scripts, fixtures com sessões e configuração exclusiva de prova; encerrados apenas sete containers e duas redes identificados `workflow=stf-20`, além dos certificados de teste. Os quatro containers preexistentes `advocacia-local-*` permaneceram executando e saudáveis. Testes permanentes e evidências foram preservados.
-- O CI integrado do commit `43244f2` aprovou backend **590/12.294**, DJEN **135/1.253**, STF então **89/292** e web **52**. As correções finais STF estão verificadas localmente com **94/309**; o estado remoto do commit final será registrado antes de retirar draft.
+- CI do código final `ec5a478`: [Backend](https://github.com/smcruzfilipe/advocaciaonline/actions/runs/41374821857) **590 testes/12.294 assertions**, DJEN **135/1.253**, STF **94/309**, zero falhas/erros/skips; [Web](https://github.com/smcruzfilipe/advocaciaonline/actions/runs/41374821893) **52 testes aprovados**, tipos/lint/formatação/build e zero vulnerabilidades de produção. Checks terminaram em sucesso antes de `gh pr ready 21`.
+- PR remoto sem solicitações de review ou threads pendentes; revisões técnicas locais encerradas sem achados materiais restantes. `gh pr ready 21` confirmou retirada de draft. O único item transversal não aplicável à entrega é aprovação humana **antes de merge/deploy**, pois nenhuma dessas ações está autorizada ou foi executada; permanece requisito para essas ações futuras.
+
+### Matriz final C1–C9
+
+| Critério | Evidência observada |
+|---|---|
+| C1 | Planejador real criou nove STF/A no slot 1 e zero no slot 2; fixture criou zero trabalhos. DJEN manteve 135 testes/1.253 assertions aprovados. |
+| C2 | Suíte STF 94/309 cobre paginação completa, nome, atividade e publicidade; JSON inválido não vira sucesso vazio. |
+| C3 | CLI nominal e por processo reconciliou CNJ; restrito sem confirmação falha antes de buscar outra parte. Regressão falhou antes e passou após correção. |
+| C4 | Nove trabalhos antigos terminaram `failed/interrupted` pelo `--once` real, depois fila vazia; quatro comunicações atuais preservadas, sem retroativo. |
+| C5 | Dois itens iguais distintos conservaram PDF/Unicode/originais; comparação real do incidente 7728350 manteve nove eventos e documentos, sem persistir histórico. |
+| C6 | SQL STF 21/245 cobre concorrência, lease, retomada, vínculos e isolamento; replay não aumentou as quatro comunicações, e outro tenant recebeu 404. |
+| C7 | Chromium headless sobre API/PostgreSQL reais verificou marca, datas, links, CNJ opcional e estados zero/falha; sem overflow em quatro larguras nem erros JavaScript. Dashboard DJEN permaneceu intacta. |
+| C8 | Processos separados reais chegaram a oito sucessos/uma falha controlada e fila vazia; fonte real concluiu 0 movimentos/1 processo elegível, sem alegar positividade real. |
+| C9 | Mesmo PR ficou draft nas três primeiras fases; CLI definitiva passou antes/depois da limpeza, documentação/contratos atualizados, reviews resolvidas, CI verde e retirada de draft confirmada. |

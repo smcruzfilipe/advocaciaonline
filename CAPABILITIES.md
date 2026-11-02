@@ -48,7 +48,7 @@ Plano, [checklist](tasks/agenda/todo.md) e [contrato técnico](SPEC-agenda.md#co
 
 ## Acompanhamento de processos do STF
 
-**Estado:** coletor/processador, persistência, planejamento diário, consulta e superfície STF implementados na branch `stf`; provas integradas registradas no README e checklist. Finalização de reviews/CI e PR pronto ainda em andamento. As seis especificações DJEN originais mantêm seus contratos.
+**Estado:** coletor/processador, persistência, planejamento diário, consulta e superfície STF implementados e verificados no [PR #21](https://github.com/smcruzfilipe/advocaciaonline/pull/21), aberto para revisão. Provas integradas, CI e limites operacionais registrados no README e checklist; sem deploy ou ativação recorrente. As seis especificações DJEN originais mantêm seus contratos.
 
 | Módulo | Responsabilidade | Dependências | Fontes |
 |---|---|---|---|
