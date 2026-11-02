@@ -2,6 +2,8 @@
 
 **Estado:** plano de implantação; nenhum recurso de produção criado ou alterado nesta preparação. Validação funcional, aceite e decisão/execução de recuperação pertencem ao solicitante.
 
+**Atualização:** a configuração atual prevê encaminhamento direto do Traefik para o frontend, sem ingresso Nginx de produção; a matriz histórica abaixo descreve a preparação original. O ingresso do Compose local permanece independente.
+
 ## 1. Destino confirmado e limites
 
 - [x] Identificar o control plane pela configuração existente no `.bashrc`, sem imprimir a chave: `https://vmi3631516.contaboserver.net`.
