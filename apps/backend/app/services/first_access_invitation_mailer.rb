@@ -18,8 +18,7 @@ class FirstAccessInvitationMailer
     message.from = settings.fetch(:from)
     message.to = TeamInvitationMailer.normalize_recipient!(email)
     message.subject = "Convite para primeiro acesso ao Advocacia Online"
-    message.content_type = "text/plain; charset=UTF-8"
-    message.body = <<~BODY
+    text = <<~BODY
       Você recebeu um convite para seu primeiro acesso ao Advocacia Online.
 
       Acesse o link abaixo para iniciar seu cadastro:
@@ -29,6 +28,8 @@ class FirstAccessInvitationMailer
       O convite é de uso único e válido por 24 horas a partir da emissão. O reenvio não altera esse prazo.
       Se você não esperava este convite, ignore esta mensagem.
     BODY
+    EmailTemplate.apply(message, text: text, title: "Convite para primeiro acesso",
+      action_label: "Iniciar meu cadastro", action_url: link)
     # Direct transport avoids global Mail callbacks that could log the invitation.
     Mail::SMTP.new(settings.except(:from).merge(domain: URI(origin).host)).deliver!(message)
     nil

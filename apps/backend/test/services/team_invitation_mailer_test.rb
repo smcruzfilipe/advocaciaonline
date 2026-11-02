@@ -65,14 +65,18 @@ class TeamInvitationMailerTest < ActiveSupport::TestCase
     assert_equal ["convites@example.test"], message.from
     assert_equal ["equipe@example.test"], message.to
     assert_equal "Convite para sua equipe no Advocacia Online", message.subject
-    assert_equal "text/plain", message.mime_type
-    assert_equal "UTF-8", message.charset
-    body = message.body.decoded.encode(Encoding::UTF_8, message.charset)
+    assert_equal "multipart/alternative", message.mime_type
+    assert_equal "UTF-8", message.text_part.charset
+    body = message.text_part.decoded.encode(Encoding::UTF_8, message.text_part.charset)
     assert body.valid_encoding?
     assert_includes body, "entre com a conta de equipe@example.test"
     assert_includes body, "uso único"
     assert_includes body, "24 horas"
     assert_includes body, "https://app.example.test/invite/accept#token=#{@token}"
+    html = Nokogiri::HTML(message.html_part.decoded)
+    action = html.css("a").find { |anchor| anchor.text.strip == "Aceitar convite e entrar" }
+    assert_not_nil action
+    assert_equal "https://app.example.test/invite/accept#token=#{@token}", action["href"]
     refute_includes message.header.to_s, @token
     assert_empty logs.string
   end
@@ -97,7 +101,8 @@ class TeamInvitationMailerTest < ActiveSupport::TestCase
     token = "opaque+token/with?query&part=#value%"
     deliver(origin: "https://app.example.test:8443/", token: token, smtp: @smtp.merge("port" => 2525))
 
-    body = Mail.read_from_string(@connection.messages.fetch(0).fetch(:source)).body.decoded
+    message = Mail.read_from_string(@connection.messages.fetch(0).fetch(:source))
+    body = message.text_part.decoded
     link = URI(body.lines.map(&:strip).find { |line| line.start_with?("https://") })
     assert_equal "https", link.scheme
     assert_equal "app.example.test", link.host
@@ -105,6 +110,9 @@ class TeamInvitationMailerTest < ActiveSupport::TestCase
     assert_equal "/invite/accept", link.path
     assert_nil link.query
     assert_equal({ "token" => token }, URI.decode_www_form(link.fragment).to_h)
+    action = Nokogiri::HTML(message.html_part.decoded).css("a").find { |anchor| anchor.text.strip == "Aceitar convite e entrar" }
+    assert_not_nil action
+    assert_equal link.to_s, action["href"]
     refute_includes link.fragment, "&part="
   end
 
