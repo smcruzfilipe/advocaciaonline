@@ -89,6 +89,57 @@ class CollectionScheduleTest < Minitest::Test
     end
   end
 
+  def test_rejects_invalid_weekday_configuration
+    [nil, false, 1, "", " ", "0", "8", "01", "1,1", "1,2,1", "1,", ",1",
+      "1,,2", "1, 2", "1\n", "１", "1;2"].each do |value|
+      assert_raises(ArgumentError, "invalid weekdays must reject #{value.inspect}") do
+        CollectionSchedule.new(first: "04:00", second: "16:00", weekdays: value)
+      end
+    end
+  end
+
+  def test_default_weekdays_include_saturday_and_sunday
+    assert_equal 2, @schedule.due(now: Time.utc(2026, 10, 31, 19)).length
+    assert_equal 2, @schedule.due(now: Time.utc(2026, 11, 1, 19)).length
+  end
+
+  def test_weekday_schedule_respects_both_slots_and_skips_weekends
+    schedule = CollectionSchedule.new(first: "04:00", second: "16:00", weekdays: "1,2,3,4,5")
+    friday = Date.new(2026, 10, 30)
+    first = { slot: 1, date: friday, scheduled_at: Time.utc(2026, 10, 30, 7) }
+    second = { slot: 2, date: friday, scheduled_at: Time.utc(2026, 10, 30, 19) }
+
+    assert_empty schedule.due(now: Time.utc(2026, 10, 30, 6, 59, 59))
+    assert_equal [first], schedule.due(now: Time.utc(2026, 10, 30, 7))
+    assert_equal [first], schedule.due(now: Time.utc(2026, 10, 30, 18, 59, 59))
+    assert_equal [first, second], schedule.due(now: Time.utc(2026, 10, 30, 19))
+    assert_empty schedule.due(now: Time.utc(2026, 10, 31, 19))
+    assert_empty schedule.due(now: Time.utc(2026, 11, 1, 19))
+    assert_equal [{ slot: 1, date: Date.new(2026, 11, 2), scheduled_at: Time.utc(2026, 11, 2, 7) }],
+      schedule.due(now: Time.utc(2026, 11, 2, 7))
+  end
+
+  def test_weekday_and_midnight_are_based_on_sao_paulo_not_input_offset
+    schedule = CollectionSchedule.new(first: "04:00", second: "16:00", weekdays: "1,2,3,4,5")
+    friday = Time.utc(2026, 10, 31, 2, 59, 59)
+
+    assert_equal 2, schedule.due(now: friday).length
+    assert_equal schedule.due(now: friday), schedule.due(now: Time.iso8601("2026-10-30T23:59:59-03:00"))
+    assert_empty schedule.due(now: Time.utc(2026, 10, 31, 3))
+    assert_empty schedule.due(now: Time.utc(2026, 11, 2, 2, 59, 59))
+    assert_empty schedule.due(now: Time.utc(2026, 11, 2, 3))
+  end
+
+  def test_next_slot_skips_disabled_days_including_a_single_enabled_day
+    weekdays = CollectionSchedule.new(first: "04:00", second: "16:00", weekdays: "1,2,3,4,5")
+    assert_equal Time.utc(2026, 10, 30, 19), weekdays.next_at(now: Time.utc(2026, 10, 30, 7))
+    assert_equal Time.utc(2026, 11, 2, 7), weekdays.next_at(now: Time.utc(2026, 10, 30, 19))
+    assert_equal Time.utc(2026, 11, 2, 7), weekdays.next_at(now: Time.utc(2026, 11, 1, 19))
+
+    sunday = CollectionSchedule.new(first: "04:00", second: "16:00", weekdays: "7")
+    assert_equal Time.utc(2026, 11, 8, 7), sunday.next_at(now: Time.utc(2026, 11, 1, 19))
+  end
+
   def test_nothing_is_due_immediately_before_the_first_slot
     now = Time.iso8601("2026-10-28T03:59:59.999999-03:00")
 

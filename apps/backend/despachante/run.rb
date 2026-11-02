@@ -7,8 +7,8 @@ class DespachanteRunner
   RECONCILE_INTERVAL = 60
   CATALOG_RETRY_SECONDS = 60
 
-  def initialize(despachante_url:, first:, second:)
-    @schedule = CollectionSchedule.new(first: first, second: second)
+  def initialize(despachante_url:, first:, second:, weekdays: CollectionSchedule::DEFAULT_WEEKDAYS)
+    @schedule = CollectionSchedule.new(first: first, second: second, weekdays: weekdays)
     unless despachante_url.is_a?(String) && !despachante_url.strip.empty?
       raise ArgumentError, "DESPACHANTE_DATABASE_URL é obrigatória para o processo de planejamento."
     end
@@ -95,7 +95,8 @@ end
 if $PROGRAM_NAME == __FILE__
   begin
     runner = DespachanteRunner.new(despachante_url: ENV.fetch("DESPACHANTE_DATABASE_URL"),
-      first: ENV.fetch("COLETA_HORARIO_1"), second: ENV.fetch("COLETA_HORARIO_2"))
+      first: ENV.fetch("COLETA_HORARIO_1"), second: ENV.fetch("COLETA_HORARIO_2"),
+      weekdays: ENV.fetch("COLETA_DIAS_SEMANA", CollectionSchedule::DEFAULT_WEEKDAYS))
 
     loop do
       reconciled_at = Time.now
