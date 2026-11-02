@@ -135,16 +135,16 @@ A fase seguinte só começa depois do gate anterior observado e registrado. Pend
 
 ### STF10.A — Caminho definitivo e pronto integral
 
-- [ ] Provar primeiro a entrada definitiva, a persistência e a consulta com a configuração final da feature; não usar somente script auxiliar ou fixture inicial como gate.
+- [x] Provar primeiro a entrada definitiva, a persistência e a consulta com a configuração final da feature; não usar somente script auxiliar ou fixture inicial como gate.
 - [ ] Conferir C1–C9, todos os callers e cada item da Definition of Done. Registrar evidência ou justificativa de não aplicação ligada ao escopo, sem encerrar item só por existir comando ou arquivo.
-- [ ] Atualizar documentação de operação, fonte, limites, variáveis, segurança e rollback. Remover afirmações históricas que passem a contradizer os contratos alterados, sem reescrever a história de outras features.
+- [x] Atualizar documentação de operação, fonte, limites, variáveis, segurança e rollback. Remover afirmações históricas que passem a contradizer os contratos alterados, sem reescrever a história de outras features.
 
 **Aceite:** contrato final e smoke aprovados tecnicamente com evidência revisável. **Dependências:** STF09. **Arquivos:** README, contratos afetados, spec e checklist conforme alterações reais. **Verificação:** matriz C1–C9 e pronto transversal, com resultados do ambiente final de prova. **Critérios:** C1–C9.
 
 ### STF10.B — Limpeza após prova definitiva
 
-- [ ] Remover somente fixtures/scripts/configurações usados exclusivamente na prova inicial, depois de STF10.A; preservar testes permanentes de comportamento e dados/artefatos do usuário.
-- [ ] Reexecutar as verificações afetadas pela limpeza e confirmar que a entrada definitiva não dependia desses artefatos.
+- [x] Remover somente fixtures/scripts/configurações usados exclusivamente na prova inicial, depois de STF10.A; preservar testes permanentes de comportamento e dados/artefatos do usuário.
+- [x] Reexecutar as verificações afetadas pela limpeza e confirmar que a entrada definitiva não dependia desses artefatos.
 
 **Aceite:** nenhum artefato exclusivo da prova é necessário ao produto, sem remoção de cobertura útil. **Dependências:** STF10.A. **Arquivos:** somente os comprovadamente exclusivos da prova. **Verificação:** smoke final e checks afetados após limpeza. **Critérios:** C8, C9.
 
@@ -204,3 +204,11 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 - STF **89 testes/292 assertions**, SQL STF **21/245**, DJEN **135/1.253**, web **52 testes**, tipos/lint/formatação/build/auditoria de produção aprovados. Backend: 590 casos, uma fixture reutilizada corrigida sem enfraquecer assertions; reexecução afetada 1/6 aprovada. CI remoto será acompanhado na finalização.
 - ABI de estados migrada para `(uuid,text)` e todos os callers atualizados. Runtime STF 186.017.761 bytes; processos API/web/ingresso/planejador UID 1000, PostgreSQL UID 70. Workflow inclui build/test STF e smoke de runtime; sintaxe YAML validada.
 - Limite operacional observado: catálogo real DJEN retornou HTTP 403; o contrato compartilhado mantém falha explícita, sem inventar catálogo nem alterar a rota do host. Fonte positiva controlada não é alegada como movimento real de hoje. Não houve deploy/ativação recorrente.
+
+### Evidências da finalização
+
+- Revisões de integração e runtime concluídas sem achados materiais restantes. Foram corrigidas confirmação de CNJ em processo restrito e proveniência após redirecionamento; o caso restrito não permite que outra parte sobreponha a evidência. Regressões falharam antes; aplicativo final **94 testes/309 assertions**, zero falhas/erros/skips.
+- Imagem final STF **186.017.830 bytes**, UID 1000. CLI definitiva sem preload/montagem de código retornou `succeeded`, `andamentos`, 2 movimentos/1 processo/2 identidades pendentes antes e depois da limpeza. HTTP autenticado continuou apresentando as mesmas quatro comunicações.
+- Consulta real ao incidente 7728350 manteve os nove eventos idênticos aos nove itens extraídos, sem persistência histórica; CLI de fonte real concluiu 0 movimentos/1 processo elegível. Isso prova vazio real, não movimentos positivos reais de hoje.
+- Removidos scripts, fixtures com sessões e configuração exclusiva de prova; encerrados apenas sete containers e duas redes identificados `workflow=stf-20`, além dos certificados de teste. Os quatro containers preexistentes `advocacia-local-*` permaneceram executando e saudáveis. Testes permanentes e evidências foram preservados.
+- O CI integrado do commit `43244f2` aprovou backend **590/12.294**, DJEN **135/1.253**, STF então **89/292** e web **52**. As correções finais STF estão verificadas localmente com **94/309**; o estado remoto do commit final será registrado antes de retirar draft.

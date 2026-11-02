@@ -2,6 +2,7 @@ require "minitest/autorun"
 require "uri"
 require_relative "../lib/stf/process_lookup"
 require_relative "../lib/stf/discovery"
+require_relative "../lib/stf/http"
 
 class ProcessLookupTest < Minitest::Test
   CNJ = "0188263-19.2026.1.00.0000".freeze
@@ -28,7 +29,7 @@ class ProcessLookupTest < Minitest::Test
     end
     def get(url)
       @urls << url
-      (url.include?("abaPartes.asp") ? @parties : @detail).b
+      STF::Http::Response.new(body: (url.include?("abaPartes.asp") ? @parties : @detail).b, url: url)
     end
   end
 
@@ -46,19 +47,20 @@ class ProcessLookupTest < Minitest::Test
   class JsonPages
     attr_reader :queries
 
-    def initialize(cnjs)
-      @cnjs, @queries = cnjs, []
+    def initialize(cnjs, publicity: "Público")
+      @cnjs, @publicity, @queries = cnjs, publicity, []
     end
 
     def get(url)
       query = URI.decode_www_form(URI(url).query).to_h
       @queries << query
       cnj = @cnjs.fetch(query.fetch("pagina").to_i - 1)
-      JSON.generate("partes" => [{ "pessoaNome" => "ROBERTO FERREIRA DA SILVA",
-                                   "processoId" => 7728350, "processoIdentificacao" => "Rcl 101463",
-                                   "processoNumeroUnico" => cnj, "processoEmTramitacao" => "Sim",
-                                   "processoPublicidade" => "Público" }],
-                    "totalDePaginas" => @cnjs.size, "totalDeRegistros" => @cnjs.size)
+      body = JSON.generate("partes" => [{ "pessoaNome" => "ROBERTO FERREIRA DA SILVA",
+                                          "processoId" => 7728350, "processoIdentificacao" => "Rcl 101463",
+                                          "processoNumeroUnico" => cnj, "processoEmTramitacao" => "Sim",
+                                          "processoPublicidade" => @publicity }],
+                           "totalDePaginas" => @cnjs.size, "totalDeRegistros" => @cnjs.size)
+      STF::Http::Response.new(body: body, url: url)
     end
   end
 
@@ -195,6 +197,43 @@ class ProcessLookupTest < Minitest::Test
                               "COMPANHIA RIOGRANDENSE DE SANEAMENTO - CORSAN" => status(:active))
     assert_nil STF::ProcessLookup.new(http: Http.new, discovery: discovery).resolve("number" => CNJ)
     assert_equal ["ROBERTO FERREIRA DA SILVA"], discovery.calls.map(&:first)
+  end
+
+  def test_restricted_json_without_cnj_cannot_confirm_input_missing_from_detail
+    detail = DETAIL.sub(/<div class="processo-rotulo">.*?<\/div>/, "")
+    [nil, "********"].each do |masked_cnj|
+      json = JsonPages.new([masked_cnj], publicity: "Sigiloso")
+      lookup = STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: STF::Discovery.new(http: json))
+      assert_raises(STF::InvalidSource) { lookup.resolve("number" => CNJ) }
+    end
+  end
+
+  def test_restricted_json_allows_ineligibility_when_identity_is_confirmed
+    detail_without_cnj = DETAIL.sub(/<div class="processo-rotulo">.*?<\/div>/, "")
+    [
+      [DETAIL, nil, { "number" => CNJ }],
+      [detail_without_cnj, CNJ, { "number" => CNJ }],
+      [detail_without_cnj, nil, { "classe" => "Rcl", "numeroProcesso" => "101463" }]
+    ].each do |detail, json_cnj, criteria|
+      json = JsonPages.new([json_cnj], publicity: "Sigiloso")
+      lookup = STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: STF::Discovery.new(http: json))
+      assert_nil lookup.resolve(criteria)
+    end
+  end
+
+  def test_restricted_json_with_conflicting_cnj_is_rejected
+    detail = DETAIL.sub(/<div class="processo-rotulo">.*?<\/div>/, "")
+    json = JsonPages.new(["01882631920261000001"], publicity: "Sigiloso")
+    lookup = STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: STF::Discovery.new(http: json))
+    assert_raises(STF::InvalidSource) { lookup.resolve("number" => CNJ) }
+  end
+
+  def test_unconfirmed_restricted_party_cannot_be_overridden_by_later_public_identity
+    detail = DETAIL.sub(/<div class="processo-rotulo">.*?<\/div>/, "")
+    discovery = Discovery.new("ROBERTO FERREIRA DA SILVA" => status(:restricted, cnj: nil),
+                              "COMPANHIA RIOGRANDENSE DE SANEAMENTO - CORSAN" => status(:active))
+    lookup = STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: discovery)
+    assert_raises(STF::InvalidSource) { lookup.resolve("number" => CNJ) }
   end
 
   def test_old_or_malformed_discovery_status_is_rejected

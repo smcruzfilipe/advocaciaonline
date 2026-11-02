@@ -15,7 +15,8 @@ module STF
     def fetch(process:, date:, captured_at:)
       incidente = process.fetch("incidente")
       url = "#{PORTAL}/abaAndamentos.asp?incidente=#{incidente}&imprimir="
-      source = html_text(@http.get(url))
+      response = @http.get(url)
+      source = html_text(response.body)
       validate_complete_list(source)
       html = Nokogiri::HTML.fragment(source)
       list = html.at_css(".processo-andamentos > ul")
@@ -50,9 +51,9 @@ module STF
             "titulo" => titulo,
             "julgador" => julgador,
             "observacao" => observacao,
-            "url_coleta" => url,
+            "url_coleta" => response.url,
             "capturado_em" => captured_at.iso8601,
-            "links" => links(item, url)
+            "links" => links(item, response.url)
           }
         }
       end

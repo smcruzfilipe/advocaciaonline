@@ -2,6 +2,7 @@ require "minitest/autorun"
 require "date"
 require "time"
 require_relative "../lib/stf/andamentos"
+require_relative "../lib/stf/http"
 
 class AndamentosTest < Minitest::Test
   PROCESSO = { "incidente" => 7051926, "cnj" => "0803599-58.2023.4.05.8300", "classe" => "RE", "identificacao" => "RE 1519008" }.freeze
@@ -10,10 +11,10 @@ class AndamentosTest < Minitest::Test
 
   class Http
     attr_reader :url
-    def initialize(body) = @body = body
+    def initialize(body, final_url: nil) = (@body, @final_url = body, final_url)
     def get(url)
       @url = url
-      @body.b
+      STF::Http::Response.new(body: @body.b, url: @final_url || url)
     end
   end
 

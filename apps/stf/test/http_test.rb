@@ -2,6 +2,7 @@ require "minitest/autorun"
 require "minitest/mock"
 require "net/http"
 require_relative "../lib/stf/http"
+require_relative "../lib/stf/andamentos"
 
 class HttpTest < Minitest::Test
   class Connection
@@ -42,7 +43,12 @@ class HttpTest < Minitest::Test
     calls = 0
     with_connections(connection) do |addresses|
       result = STF::Http.new(before_request: -> { calls += 1 }).get("https://digital.stf.jus.br/example?q=1")
-      assert_equal "abcdef", result
+      assert_instance_of STF::Http::Response, result
+      assert_equal "abcdef".b, result.body
+      assert_equal Encoding::BINARY, result.body.encoding
+      assert_equal "https://digital.stf.jus.br/example?q=1", result.url
+      assert_predicate result, :frozen?
+      refute_respond_to result, :to_str
       assert_equal [["digital.stf.jus.br", 443, nil]], addresses
     end
     assert_equal 1, calls
@@ -62,11 +68,37 @@ class HttpTest < Minitest::Test
     third = Connection.new(response(Net::HTTPOK, "200", chunks: ["ok"]))
     calls = 0
     with_connections(first, second, third) do |addresses|
-      assert_equal "ok", STF::Http.new(before_request: -> { calls += 1 }).get("https://portal.stf.jus.br/start")
+      result = STF::Http.new(before_request: -> { calls += 1 }).get("https://portal.stf.jus.br/start")
+      assert_equal "ok".b, result.body
+      assert_equal "https://digital.stf.jus.br/final", result.url
       assert_equal ["portal.stf.jus.br", "portal.stf.jus.br", "digital.stf.jus.br"], addresses.map(&:first)
     end
     assert_equal 3, calls
     assert_equal "/next", second.requests.first.path
+  end
+
+  def test_redirected_movements_use_final_url_for_collection_and_relative_links
+    final_url = "https://digital.stf.jus.br/novo/diretorio/andamentos.asp?incidente=7051926&origem=portal"
+    first = Connection.new(response(Net::HTTPFound, "302", headers: {"location" => final_url}))
+    html = <<~HTML
+      <div class="processo-andamentos"><ul><li><div class="andamento-item">
+        <div class="andamento-data">05/05/2026</div><h5 class="andamento-nome">Decisão</h5>
+        <a href="peça.pdf?nome=ação&amp;versao=1.">Documento</a>
+      </div></li></ul></div>
+    HTML
+    second = Connection.new(response(Net::HTTPOK, "200", chunks: [html]))
+    process = { "incidente" => 7051926, "cnj" => "0803599-58.2023.4.05.8300",
+                "classe" => "RE", "identificacao" => "RE 1519008" }
+    with_connections(first, second) do |addresses|
+      result = STF::Andamentos.new(http: STF::Http.new).fetch(
+        process: process, date: Date.new(2026, 5, 5), captured_at: Time.iso8601("2026-05-05T12:00:00-03:00"))
+      assert_equal ["portal.stf.jus.br", "digital.stf.jus.br"], addresses.map(&:first)
+      assert_equal final_url, result.first.dig("stf", "url_coleta")
+      assert_equal "https://portal.stf.jus.br/processos/detalhe.asp?incidente=7051926", result.first.fetch("link")
+      assert_equal [{ "url" => "https://digital.stf.jus.br/novo/diretorio/pe%C3%A7a.pdf?nome=a%C3%A7%C3%A3o&versao=1.",
+                      "rotulo" => "Documento", "referencia_original" => "peça.pdf?nome=ação&versao=1." }],
+                   result.first.dig("stf", "links")
+    end
   end
 
   def test_rejects_untrusted_addresses_before_network_or_callback
@@ -116,7 +148,7 @@ class HttpTest < Minitest::Test
       end
     end
     with_connections(Connection.new(response(Net::HTTPOK, "200", chunks: ["a" * STF::Http::MAX_BYTES]))) do
-      assert_equal STF::Http::MAX_BYTES, STF::Http.new.get("https://portal.stf.jus.br/").bytesize
+      assert_equal STF::Http::MAX_BYTES, STF::Http.new.get("https://portal.stf.jus.br/").body.bytesize
     end
   end
 

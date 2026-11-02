@@ -5,6 +5,8 @@ require_relative "errors"
 
 module STF
   class Http
+    Response = Data.define(:body, :url)
+
     ALLOWED_HOSTS = %w[portal.stf.jus.br digital.stf.jus.br].freeze
     MAX_REDIRECTS = 5
     MAX_BYTES = 10 * 1024 * 1024
@@ -26,7 +28,7 @@ module STF
 
         case response
         when Net::HTTPSuccess
-          return body
+          return Response.new(body: body, url: uri.to_s)
         when Net::HTTPMovedPermanently, Net::HTTPFound, Net::HTTPSeeOther,
              Net::HTTPTemporaryRedirect, Net::HTTPPermanentRedirect
           raise InvalidSource, "limite de redirecionamentos STF excedido" if redirects >= MAX_REDIRECTS

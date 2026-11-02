@@ -5,6 +5,7 @@ require "pg"
 require "stringio"
 require_relative "../lib/stf/processor"
 require_relative "../lib/stf/worker"
+require_relative "../lib/stf/http"
 
 class ProcessorTest < Minitest::Test
   class ControlledHttp
@@ -21,7 +22,7 @@ class ProcessorTest < Minitest::Test
       response = @responses.shift or raise "unexpected request"
       raise response if response.is_a?(Exception)
       @after_request&.call
-      response
+      STF::Http::Response.new(body: response.b, url: url)
     end
   end
 

@@ -2,6 +2,7 @@ require "minitest/autorun"
 require "json"
 require "uri"
 require_relative "../lib/stf/discovery"
+require_relative "../lib/stf/http"
 
 class DiscoveryTest < Minitest::Test
   class FakeHTTP
@@ -18,7 +19,8 @@ class DiscoveryTest < Minitest::Test
       @requests << [uri, params]
       response = @pages.fetch([params["processosEmTramitacao"], params.fetch("pagina").to_i])
       raise response if response.is_a?(Exception)
-      response.is_a?(String) ? response : JSON.generate(response)
+      body = response.is_a?(String) ? response : JSON.generate(response)
+      STF::Http::Response.new(body: body.b, url: url)
     end
   end
 

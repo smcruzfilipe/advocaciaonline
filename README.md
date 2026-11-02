@@ -573,9 +573,9 @@ O teste usa a conexão administrativa exclusivamente para dados sintéticos de P
 
 ### Imagem e provas
 
-A base `ruby:4.0.9-alpine3.23` mantém o runtime Ruby vigente com `libpq` e dados de fuso, sem Rails/Node/dependências ZIP. Builds multi-stage separam compiladores e testes. Runtime STF medido com **186.017.761 bytes** não comprimidos, usuário configurado `1000:1000` e execução efetiva não root; sem testes, gcc ou cache de gems. Na integração, API, frontend, ingresso e planejador executaram com UID 1000 e PostgreSQL descartável com UID 70.
+A base `ruby:4.0.9-alpine3.23` mantém o runtime Ruby vigente com `libpq` e dados de fuso, sem Rails/Node/dependências ZIP. Builds multi-stage separam compiladores e testes. Runtime STF medido com **186.017.830 bytes** não comprimidos, usuário configurado `1000:1000` e execução efetiva não root; sem testes, gcc ou cache de gems. Na integração, API, frontend, ingresso e planejador executaram com UID 1000 e PostgreSQL descartável com UID 70.
 
-A suíte STF executou **89 testes/292 assertions**, SQL STF **21/245**, DJEN **135/1.253** e web **52 testes**, sem falhas, erros ou skips. Tipos, lint, formatação, build web e auditoria de produção passaram, com zero vulnerabilidades de produção. O backend agregado executou 590 testes; uma fixture não transacional reutilizava um e-mail e acumulava associações de rodadas anteriores: passou a usar identidade única, sem mudar assertions; o caso afetado passou com 1 teste/6 assertions.
+A suíte STF final executou **94 testes/309 assertions**, SQL STF **21/245**, DJEN **135/1.253** e web **52 testes**, sem falhas, erros ou skips. Tipos, lint, formatação, build web e auditoria de produção passaram, com zero vulnerabilidades de produção. O CI integrado registrou **590 testes/12.294 assertions** de backend aprovados. A fixture não transacional que reutilizava e-mail passou a usar identidade única, sem mudar assertions.
 
 O planejador real, com catálogo controlado, criou nove trabalhos STF/A no slot 1 e nenhum no slot 2. Processos separados executaram `--once` até oito sucessos, uma falha explícita e fila vazia. Quatro movimentos foram persistidos: dois iguais distintos, cada qual vinculado ao advogado, à parte e ao processo, mais casos sem documentos e sem CNJ. Fonte positiva é sintética; não representa movimentos reais de hoje. A comparação histórica real preservou nove eventos e documentos, sem backfill.
 
@@ -583,6 +583,14 @@ Chromium headless acessou API e PostgreSQL reais por HTTPS: lista/detalhe, marca
 
 O catálogo preserva se STF veio também da fonte DJEN, sem criar trabalho DJEN fictício para a entrada exclusiva do portal nem remover DJEN realmente oferecido. A integração mantém a falha explícita do catálogo compartilhado: na prova pontual deste ambiente o provedor DJEN respondeu HTTP 403; não foi comprovado agendamento recorrente com a fonte real disponível nem se alterou a rota de rede do servidor.
 
+Na revisão final, o transporte passou a conservar a URL validada após redirecionamentos como origem da coleta e base dos links relativos. CNJ informado deve ser confirmado: resultado restrito sem identidade comprovada falha explicitamente, sem consultar outra parte para sobrepor a restrição. As regressões falharam antes e passaram após as correções. A entrada CLI final, sem preload ou código montado, preservou o resultado 2 movimentos/1 processo e as quatro comunicações antes e depois da remoção dos artefatos de prova.
+
+### Contratos de consulta
+
+`GET /api/communications` e `GET /api/communications/:id` oferecem `process_identification` quando disponível, permitindo apresentar classe/número sem inventar CNJ. O histórico `GET /api/collection-runs/:id/execution` fornece, por trabalho, `source_path`, `eligible_process_count`, `matched_count` e `pending_identity_count`; ausência de resultado é `null`, não sucesso com zero. Autorização, isolamento por tenant e aviso de identidade pendente permanecem obrigatórios.
+
 ### Condições de operação e rollback
 
 O portal não oferece um contrato público validado de API JSON de movimentos e seu `robots.txt` exclui `/processos`. Conferir as condições de acesso com o STF antes de ativar coleta recorrente; não contornar autenticação, captcha ou bloqueios. A entrega não inicia crawler contínuo nem autoriza deploy. Para parar/rollback operacional, encerrar o worker STF e preservar as capturas; não apagar histórico ou criar outra instância PostgreSQL. DJEN mantém seu contrato e processo próprios.
+
+A migration `20261102000011` substitui a assinatura SQL de `collection_court_states` por `(uuid,text)` e exige aplicação e API correspondentes: parar a API antiga, aplicar com a role migrator e iniciar a imagem atualizada. Não aplicar essa troca de ABI com a API antiga atendendo nem presumir compatibilidade de rollback para binário antigo. Esse procedimento está documentado; não foi executado deploy.

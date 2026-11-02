@@ -27,7 +27,7 @@ module STF
       raise InvalidSource, "Identificação do processo ausente" unless number || classe
 
       query = number ? { numeroUnico: number.delete("-.") } : { classe: classe, numeroProcesso: source_number }
-      detail = Nokogiri::HTML(html_text(@http.get("#{PORTAL}/listarProcessos.asp?#{URI.encode_www_form(query)}")), nil, "UTF-8")
+      detail = Nokogiri::HTML(html_text(@http.get("#{PORTAL}/listarProcessos.asp?#{URI.encode_www_form(query)}").body), nil, "UTF-8")
       incidente_text = detail.at_css("#incidente")&.[]("value")
       identificacao = clean(detail.at_css("#classe-numero-processo")&.[]("value"))
       match = identificacao&.match(/\A(.+?)\s+([0-9]+)\z/)
@@ -47,7 +47,7 @@ module STF
 
       process = { "incidente" => incidente_text.to_i, "cnj" => cnj, "classe" => match[1],
                   "identificacao" => identificacao, "publicidade" => "Público" }
-      parties = Nokogiri::HTML.fragment(html_text(@http.get("#{PORTAL}/abaPartes.asp?incidente=#{process.fetch('incidente')}")))
+      parties = Nokogiri::HTML.fragment(html_text(@http.get("#{PORTAL}/abaPartes.asp?incidente=#{process.fetch('incidente')}").body))
       container = parties.at_css("#todas-partes")
       raise InvalidSource, "Aba de partes inválida" unless container
 
@@ -73,7 +73,10 @@ module STF
         if expected_cnj && result_cnj && expected_cnj != result_cnj
           raise InvalidSource, "Número CNJ divergente"
         end
-        return nil if status[:state] == :restricted
+        if status[:state] == :restricted
+          raise InvalidSource, "Identidade de processo restrito não comprovada" if input_cnj && !cnj && !result_cnj
+          return nil
+        end
         next if expected_cnj && result_cnj.nil?
         return nil if status[:state] == :inactive
 

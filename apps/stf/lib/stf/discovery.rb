@@ -84,7 +84,7 @@ module STF
       loop do
         params = { nome: name, processosPorPagina: PAGE_SIZE, pagina: number, tipoPesquisa: type }
         params[:processosEmTramitacao] = active if active
-        response = JSON.parse(@http.get("#{ENDPOINT}?#{URI.encode_www_form(params)}"))
+        response = JSON.parse(@http.get("#{ENDPOINT}?#{URI.encode_www_form(params)}").body)
         unless response.is_a?(Hash) && response["partes"].is_a?(Array) &&
                response["totalDePaginas"].is_a?(Integer) && response["totalDePaginas"] >= 0 &&
                response["totalDeRegistros"].is_a?(Integer) && response["totalDeRegistros"] >= 0
