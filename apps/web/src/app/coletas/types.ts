@@ -25,6 +25,10 @@ export type ExecutionJob = {
   court: string;
   medium: string;
   state: "pending" | "running" | "succeeded" | "failed";
+  source_path?: string | null;
+  eligible_process_count?: number | null;
+  matched_count?: number | null;
+  pending_identity_count?: number | null;
 };
 
 export type CollectionEvent = {

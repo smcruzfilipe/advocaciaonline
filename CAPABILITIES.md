@@ -45,3 +45,13 @@ Fronteiras aprovadas:
 Decisões confirmadas: duração única de 1 a 120 minutos, intervalo de 0 a 60 minutos e antecedência de 0 a 10.080 minutos, configurados pelo advogado sem defaults ou exceção automática à equipe; consulta de até 15 datas locais por requisição, não horizonte de reserva. AG01–AG03 concluídas documentalmente: convenções de tempo, preservação de compromissos, matriz canônica, schema, funções restritas, ABIs e HTTP aprovados. Disponibilidade mínima por cadastro/remarcação não concede detalhes de ocupantes. O backend de equipe e grupos foi implementado; as ABIs/contexto limitado da agenda e o frontend compartilhado ainda precisam ser comprovados em AG04. Nenhum componente da agenda foi implementado. As decisões dos demais módulos permanecem nos respectivos gates.
 
 Plano, [checklist](tasks/agenda/todo.md) e [contrato técnico](SPEC-agenda.md#contrato-técnico-aprovado--ag01-e-ag03) aprovados. Gate atual: AG04/C0, comprovação de provedores compartilhados e ambiente reais; AG01–AG03 são conclusões documentais, não provas de runtime. Usar explicitamente `tasks/agenda/plan.md` e `tasks/agenda/todo.md`, preservando os arquivos padrão. As demais capacidades mantêm gates próprios.
+
+## Acompanhamento de processos do STF
+
+**Estado:** coletor/processador, persistência, planejamento diário, consulta e superfície STF implementados e verificados no [PR #21](https://github.com/smcruzfilipe/advocaciaonline/pull/21), aberto para revisão. Provas integradas, CI e limites operacionais registrados no README e checklist; sem deploy ou ativação recorrente. As seis especificações DJEN originais mantêm seus contratos.
+
+| Módulo | Responsabilidade | Dependências | Fontes |
+|---|---|---|---|
+| stf | Descobrir processos em tramitação, obter andamentos do dia corrente e persistir dados, origem e links para comunicações | monitoramentos, autorização e contratos de persistência/consulta | [SPEC-stf.md](SPEC-stf.md), [tarefas e fases](tasks/todo-stf.md) |
+
+Aplicação separada no mesmo monorepo, com coletor e processador coordenados pelo planejador. Busca nominal usa JSON; andamentos são obtidos do HTML do portal, sem pressupor API JSON de movimentos. Identidade de andamento não comprovada e condições de acesso recorrente permanecem explícitas nos gates, sem reclassificar STF como DJEN nem presumir autorização de deploy.

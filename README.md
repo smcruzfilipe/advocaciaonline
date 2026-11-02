@@ -14,6 +14,7 @@ A raiz é compartilhada pelo produto inteiro; não é a raiz de uma aplicação 
 | `apps/backend/despachante/` | Despachante de coletas, processo Ruby separado da API, com `Gemfile` e lockfile próprios. | Existente; pertence ao backend e ao mesmo monorepo, mas não executa dentro do servidor Rails. |
 | `apps/web/` | Interface Next.js com TypeScript e App Router; páginas, componentes e estilos do produto. | Existente. |
 | `apps/etl/` | Execução da coleta, em processo separado da API e do despachante. | Existente; processador automático com retomada. |
+| `apps/stf/` | Coletor HTTP e processador dos andamentos STF, separados de DJEN/API, com dependências e imagem próprias. | Fonte `STF`, meio `A`; trabalhos duráveis, capturas e vínculos no PostgreSQL compartilhado. |
 | `docs/` | Especificação geral, arquitetura, contratos técnicos e direção visual compartilhados. | Existente. |
 | `tasks/` | Plano, gates e checklist de implementação do monorepo. | Existente. |
 | `SPEC-*.md` e `CAPABILITIES.md` | Contratos funcionais e mapa de capacidades do produto. | Existentes na raiz. |
@@ -27,6 +28,7 @@ A [arquitetura](docs/arquitetura.md#estrutura-do-monorepo-e-fronteiras) detalha 
 - Login comum com senha e TOTP; painel administrativo em `/admin/convites` para convidar advogados por e-mail ou copiar o link. Cadastro de advogado exclusivamente por convite, sem confirmação adicional de caixa postal; equipe exige convite e confirmação real do e-mail.
 - Isolamento por tenant do advogado, autorização por grupos e tribunal, monitoramentos de advogados/partes/processos e consulta de comunicações.
 - Duas coletas diárias do DJEN, somente Diário Eletrônico (`D`), sem editais (`E`): cadernos e fallback paginado na primeira execução, API paginada diretamente na segunda e deduplicação pela combinação de `id` e `hash`.
+- Acompanhamento STF: descoberta JSON de processos explicitamente em tramitação, extração HTTP dos andamentos da data corrente em Brasília e persistência de dados/origem/links. Contrato próprio em [SPEC-stf.md](SPEC-stf.md), sem deduplicação fictícia por ID de documento.
 - Dashboard e registros append-only do fluxo de coleta.
 
 O mapa de módulos e a ordem de dependências estão em [`CAPABILITIES.md`](CAPABILITIES.md). Requisitos detalhados: [`docs/especificacao.md`](docs/especificacao.md) e as seis especificações `SPEC-*.md` na raiz.
@@ -107,7 +109,7 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | `DATABASE_URL` | Nenhum | Sim, para API e testes | Conexão PostgreSQL com a role `advocacia_runtime`, sem propriedade das tabelas nem bypass de RLS. |
 | `MIGRATION_DATABASE_URL` | Nenhum | Sim, para migrations e testes PostgreSQL protegidos; não fornecer à API web | Conexão com `advocacia_migrator`, separada da role de execução. |
 | `DESPACHANTE_DATABASE_URL` | Nenhum | Sim, no despachante e nos testes do despachante; não fornecer à API web | Conexão PostgreSQL isolada com a role `advocacia_despachante`, exclusiva do processo confiável de planejamento; fornecer externamente por ambiente protegido ou gerenciador de segredos. |
-| `PROCESSADOR_DATABASE_URL` | Nenhum | Sim, no processador e nos testes de fronteira do Escrevente; não fornecer à API nem ao despachante | Conexão PostgreSQL exclusiva com a role `advocacia_processador`, provisionada administrativamente por `apps/backend/db/provision_processador.sql` antes da migration do Escrevente. Fornecer credencial e URL externamente por ambiente protegido ou gerenciador de segredos, sem registrar segredo no repositório. |
+| `PROCESSADOR_DATABASE_URL` | Nenhum | Sim, nos processadores DJEN/STF e nos testes de fronteira; não fornecer à API nem ao despachante | Conexão PostgreSQL exclusiva com a role `advocacia_processador`, provisionada administrativamente por `apps/backend/db/provision_processador.sql`. As ABIs de seleção/execução separam fontes DJEN e STF; a conexão não dá acesso direto às tabelas. Fornecer credencial e URL externamente por ambiente protegido ou gerenciador de segredos, sem registrar segredo no repositório. |
 | `POSTGRES_DB` | `POSTGRES_USER` da imagem PostgreSQL; `postgres` quando este não é definido; `advocacia_local` no Compose local | Não na imagem; Compose e CI fornecem um nome | Banco criado na primeira inicialização do PostgreSQL local/descartável; o CI usa `advocacia_test`. Não configura o banco de deploy. |
 | `POSTGRES_HOST_AUTH_METHOD` | `scram-sha-256` na imagem PostgreSQL 18; `trust` no CI | Não na imagem; o CI define `trust` para o banco descartável sem senha | Método de autenticação para conexões de rede na inicialização do banco; o Compose local mantém SCRAM. `trust` é exclusivo da rede interna descartável do CI, nunca do deploy. |
 | `POSTGRES_PASSWORD` | Nenhum | Sim, no PostgreSQL local | Senha administrativa, recebida de `LOCAL_POSTGRES_PASSWORD` pelo Compose. Não é fornecida à API. |
@@ -116,12 +118,12 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | `LOCAL_POSTGRES_PASSWORD` | Nenhum | Sim, no Compose local | Senha administrativa gerada por `bin/local-up` e preservada no arquivo privado `.local/compose.env`. |
 | `LOCAL_RUNTIME_PASSWORD` | Nenhum | Sim, no Compose local | Senha SCRAM da role `advocacia_runtime`, gerada no mesmo arquivo privado; compõe somente a URL da API. |
 | `LOCAL_MIGRATOR_PASSWORD` | Nenhum | Sim, no Compose local | Senha SCRAM da role `advocacia_migrator`, gerada no mesmo arquivo privado; compõe somente a URL do processo de migration. |
-| `COLETA_HORARIO_1` | Nenhum | Sim, no despachante | Primeiro horário diário em `HH:MM`, fuso `America/Sao_Paulo`, a partir de `04:00`; fornecer pela configuração do processo. |
+| `COLETA_HORARIO_1` | Nenhum | Sim, no despachante | Primeiro horário diário em `HH:MM`, fuso `America/Sao_Paulo`, a partir de `04:00`; também agenda o trabalho STF diário no slot 1. Fornecer pela configuração do processo; não há um segundo horário STF. |
 | `COLETA_HORARIO_2` | Nenhum | Sim, no despachante | Segundo horário diário em `HH:MM`, posterior ao primeiro; fornecer pela configuração do processo. |
 | `COLETA_TENTATIVAS_POR_CAMINHO` | `3` | Não | Número máximo de tentativas de cada caminho, inteiro de 1 a 3; qualquer mudança requer aprovação. |
 | `COLETA_BACKOFF_APOS_FALHA_1_SEGUNDOS` | `60` | Não | Espera em segundos após a primeira falha, inteiro positivo; alterações requerem aprovação. |
 | `COLETA_BACKOFF_APOS_FALHA_2_SEGUNDOS` | `300` | Não | Espera em segundos após a segunda falha, inteiro positivo; alterações requerem aprovação. |
-| `PROCESSADOR_TEST_ADMIN_DATABASE_URL` | Nenhum | Sim, apenas na integração do processador em banco descartável | Conexão administrativa usada exclusivamente para preparar e remover dados sintéticos do teste; fornecer no ambiente protegido de teste, nunca no processo de produção ou com acesso a banco real. |
+| `PROCESSADOR_TEST_ADMIN_DATABASE_URL` | Nenhum | Sim, apenas na integração dos processadores DJEN/STF em banco descartável | Conexão administrativa usada exclusivamente para preparar e remover dados sintéticos do teste; fornecer no ambiente protegido de teste, nunca no processo de produção ou com acesso a banco real. |
 | `APP_ORIGIN` | Nenhum | Sim, para frontend, API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS compartilhada, sem caminho ou credenciais; forneça pelo ambiente protegido. A API valida origens de operações mutáveis e compõe links de confirmação; o proxy web usa seu host canônico para contatar a API. |
 | `RAILS_API_ORIGIN` | Nenhum; `http://api:3000` no Compose local | Sim, no frontend | Origem interna da API Rails, acessível somente ao servidor Next.js; forneça pela configuração protegida do ambiente, sem expô-la ao navegador. |
 | `AUTH_INGRESS_SECRET` | Nenhum | Sim, no ingresso, frontend e API para autenticação | Segredo compartilhado para autenticar o IP do cliente encaminhado à limitação de autenticação. Gere pelo menos 32 bytes aleatórios e forneça por gerenciador de segredos; nunca exponha ao navegador nem registre seu valor. Sem ele ou sem os cabeçalhos confiáveis, a autenticação falha fechada. |
@@ -158,6 +160,7 @@ Não há prazo automático de retenção do Escrevente nesta etapa. As configura
 - [Plano de implementação e gates](tasks/plan.md)
 - [Checklist de implementação](tasks/todo.md)
 - [Contrato OpenAPI do DJEN consultado](docs/contrato-djen.md)
+- [STF: especificação](SPEC-stf.md), [plano técnico](tasks/plan-stf.md) e [checklist](tasks/todo-stf.md)
 
 ## Implementação e verificações
 
@@ -419,7 +422,7 @@ Após uma tentativa frustrada, o processador libera a concessão enquanto aguard
 
 Cada trabalho consulta somente Diário Eletrônico (`D`) no dia corrente de `America/Sao_Paulo`. Na primeira coleta, valida integralmente o ZIP do caderno e, após esgotar as tentativas, percorre a API paginada até a primeira página vazia válida; na segunda, inicia diretamente pela API, sem caderno. Contadores, etapa e espera são persistidos; falha posterior não publica páginas parciais. Somente para resultados da API, Loofah converte o campo `texto` em texto simples, removendo HTML, scripts e estilos e decodificando entidades; cadernos são persistidos sem essa sanitização. Como a primeira versão é preservada na deduplicação, uma comunicação inicialmente obtida de caderno pode continuar contendo HTML mesmo se também aparecer na API. Todo texto da fonte deve ser escapado pelo consumidor na renderização.
 
-`collection_communications`, `collection_communication_links`, `collection_job_results` e `collection_job_failures` armazenam resultados, vínculos e falhas fora dos marcos do Escrevente. A função `app_private.collection_court_states(uuid)` agrega o estado do tribunal sob a sessão autenticada; contagens ficam `NULL` quando o tribunal não terminou integralmente. A consulta está integrada à interface em `apps/web/`.
+`collection_communications`, `collection_communication_links`, `collection_job_results` e `collection_job_failures` armazenam resultados, vínculos e falhas fora dos marcos do Escrevente. A função `app_private.collection_court_states(uuid,text)` agrega o estado sob a sessão autenticada: `NULL` inclui as fontes autorizadas; `'DJEN'` isola o painel. Contagens ficam `NULL` quando o tribunal não terminou integralmente. A consulta está integrada à interface em `apps/web/`.
 
 Para os testes de integração isolados, forneça também `PROCESSADOR_TEST_ADMIN_DATABASE_URL` de um PostgreSQL descartável e execute `docker run --rm --network <rede-de-teste> -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL <imagem-de-teste-do-processador>`. A conexão administrativa é exclusiva da preparação de dados sintéticos; não deve ser fornecida ao processador de produção.
 
@@ -537,3 +540,57 @@ Chromium headless, em HTTPS local e PostgreSQL Docker descartável, exercitou em
 Instalação vazia e upgrade desde a imagem anterior foram ensaiados: credenciais, sessões e titulares preservados; identidade sem tenant não recebeu grant; pendência pública invalidada. Restore protegido removeu todos os convites/preparações, inclusive ativos, preservando identidades, liberações e tenants. Uma mutação temporária que invertia o fator TOTP foi detectada pelo teste consumidor; produção ficou intacta.
 
 API, web e ingresso executaram de fato com UID1000; PostgreSQL com UID70. Imagens finais: API **263.103.711 bytes**, web **303.898.522 bytes**, ingresso **72.190.907 bytes**. Bases Ruby4.0.9-Alpine3.23 e Node24.22.1-Alpine já vigentes, multi-stage, sem ferramentas de build/testes nos runtimes. SMTP sintético autenticado com TLS não comprova recebimento externo. Nenhum segredo real, dado persistente, novo job, dependência ou variável foi necessário.
+
+## Processos e andamentos STF
+
+Contrato: [SPEC-stf.md](SPEC-stf.md). Plano/checklist: [tasks/plan-stf.md](tasks/plan-stf.md) e [tasks/todo-stf.md](tasks/todo-stf.md); acompanhamento na [issue #20](https://github.com/smcruzfilipe/advocaciaonline/issues/20).
+
+`apps/stf/` é uma aplicação Ruby independente do Rails e do ETL DJEN. O coletor consulta JSON de processos e HTML de andamentos por HTTPS; o processador consome trabalhos PostgreSQL confiáveis, filtra a data corrente em `America/Sao_Paulo` e persiste movimentos com origem e links. Não abre PDFs, não usa MNI e não aceita argumento de data histórica. A busca nominal confere nome completo, publicidade pública e situação `Sim`; processo direto confirma atividade/publicidade pelo JSON de uma parte real do detalhe, com o mesmo incidente e CNJ quando fornecido. Classe/número continua utilizável sem CNJ, mas CNJ não vazio malformado é recusado. Situação ou publicidade não comprovadas são erro verificável, nunca presunção de elegibilidade.
+
+Fonte STF e meio `A` são distintos de DJEN/D. Capturas têm chave local tenant/execução/incidente e ordinal interno dos itens; itens iguais continuam distintos. Reentrega da mesma captura é idempotente e conserva vínculos; dados divergentes para a mesma chave são recusados. Isso não é identidade nativa STF: movimentos permanecem pendentes, com aviso de possível duplicidade, fora das métricas deduplicadas DJEN.
+
+### Build e execução
+
+Na raiz do monorepo:
+
+```bash
+docker build --target test -t advocacia-stf:test apps/stf
+docker build --target runtime -t advocacia-stf:runtime apps/stf
+```
+
+O runtime lê somente `PROCESSADOR_DATABASE_URL`, fornecida por ambiente protegido para a role existente `advocacia_processador`. Sem argumentos, `bundle exec ruby bin/processador` executa o worker contínuo; `--once` seleciona pela fila e termina após um ciclo; um UUID executa um trabalho específico. O worker não é iniciado pelo Compose local. Não fornecer conexão administrativa, de migration ou de despachante ao processo STF.
+
+No ambiente descartável de prova já provisionado, com a rede `advocacia-stf-ci` e as URLs protegidas configuradas:
+
+```bash
+docker run --rm --network advocacia-stf-ci \
+  -e PROCESSADOR_DATABASE_URL -e PROCESSADOR_TEST_ADMIN_DATABASE_URL advocacia-stf:test
+docker run --rm --network advocacia-stf-ci \
+  -e PROCESSADOR_DATABASE_URL advocacia-stf:runtime bundle exec ruby bin/processador --once
+```
+
+O teste usa a conexão administrativa exclusivamente para dados sintéticos de PostgreSQL descartável; nunca executar essa suíte contra o banco persistente local ou de deploy. Aplicar antes as migrations incrementais STF pela role migrator, após o provisionamento normal das três roles existentes.
+
+### Imagem e provas
+
+A base `ruby:4.0.9-alpine3.23` mantém o runtime Ruby vigente com `libpq` e dados de fuso, sem Rails/Node/dependências ZIP. Builds multi-stage separam compiladores e testes. Runtime STF medido com **186.017.830 bytes** não comprimidos, usuário configurado `1000:1000` e execução efetiva não root; sem testes, gcc ou cache de gems. Na integração, API, frontend, ingresso e planejador executaram com UID 1000 e PostgreSQL descartável com UID 70.
+
+A suíte STF final executou **94 testes/309 assertions**, SQL STF **21/245**, DJEN **135/1.253** e web **52 testes**, sem falhas, erros ou skips. Tipos, lint, formatação, build web e auditoria de produção passaram, com zero vulnerabilidades de produção. O CI integrado registrou **590 testes/12.294 assertions** de backend aprovados. A fixture não transacional que reutilizava e-mail passou a usar identidade única, sem mudar assertions.
+
+O planejador real, com catálogo controlado, criou nove trabalhos STF/A no slot 1 e nenhum no slot 2. Processos separados executaram `--once` até oito sucessos, uma falha explícita e fila vazia. Quatro movimentos foram persistidos: dois iguais distintos, cada qual vinculado ao advogado, à parte e ao processo, mais casos sem documentos e sem CNJ. Fonte positiva é sintética; não representa movimentos reais de hoje. A comparação histórica real preservou nove eventos e documentos, sem backfill.
+
+Chromium headless acessou API e PostgreSQL reais por HTTPS: lista/detalhe, marca oficial, data do andamento, origem/PDF/URL Unicode, referências, identidade pendente e classe/número sem CNJ. Verificou os dois estados vazios e a falha no histórico, ausência de transbordamento em 320/768/1024/1440px e negação de detalhe entre tenants (404), sem abrir destinos externos nem erros JavaScript. A dashboard permaneceu DJEN, `no_work`, sem métricas inventadas ou avisos pela falha STF.
+
+O catálogo preserva se STF veio também da fonte DJEN, sem criar trabalho DJEN fictício para a entrada exclusiva do portal nem remover DJEN realmente oferecido. A integração mantém a falha explícita do catálogo compartilhado: na prova pontual deste ambiente o provedor DJEN respondeu HTTP 403; não foi comprovado agendamento recorrente com a fonte real disponível nem se alterou a rota de rede do servidor.
+
+O transporte conserva a URL validada após redirecionamentos como origem da coleta e base dos links relativos. CNJ informado deve ser confirmado: resultado restrito sem identidade comprovada falha explicitamente, sem consultar outra parte para sobrepor a restrição. As regressões falharam antes e passaram após as correções. Na prova final, dois trabalhos novos do planejador executaram a entrada CLI com HTTP controlado: nominal antes da limpeza e CNJ depois da remoção dos arquivos exclusivos, sem código da aplicação montado. Cada trabalho persistiu dois movimentos; a role `advocacia_runtime` confirmou quatro novas comunicações e duas capturas, CNJ do JSON ausente no HTML, URL final de coleta e link relativo Unicode/query. O replay sem preload comprovou separadamente idempotência, não substituiu a coleta nova.
+
+### Contratos de consulta
+
+`GET /api/communications` e `GET /api/communications/:id` oferecem `process_identification` quando disponível, permitindo apresentar classe/número sem inventar CNJ. O histórico `GET /api/collection-runs/:id/execution` fornece, por trabalho, `source_path`, `eligible_process_count`, `matched_count` e `pending_identity_count`; ausência de resultado é `null`, não sucesso com zero. Autorização, isolamento por tenant e aviso de identidade pendente permanecem obrigatórios.
+
+### Condições de operação e rollback
+
+O portal não oferece um contrato público validado de API JSON de movimentos e seu `robots.txt` exclui `/processos`. Conferir as condições de acesso com o STF antes de ativar coleta recorrente; não contornar autenticação, captcha ou bloqueios. A entrega não inicia crawler contínuo nem autoriza deploy. Para parar/rollback operacional, encerrar o worker STF e preservar as capturas; não apagar histórico ou criar outra instância PostgreSQL. DJEN mantém seu contrato e processo próprios.
+
+A migration `20261102000011` substitui a assinatura SQL de `collection_court_states` por `(uuid,text)` e exige aplicação e API correspondentes: parar a API antiga, aplicar com a role migrator e iniciar a imagem atualizada. Não aplicar essa troca de ABI com a API antiga atendendo nem presumir compatibilidade de rollback para binário antigo. Esse procedimento está documentado; não foi executado deploy.

@@ -16,13 +16,14 @@ export function sourceField(payload, key) {
   return field(payload, key) || NOT_PROVIDED;
 }
 
-export function processLabel(payload, fallback) {
+export function processLabel(payload, fallback, identification) {
   const masked = field(payload, "numeroprocessocommascara");
   if (masked) return masked;
 
   const number =
     field(payload, "numero_processo") ||
-    (typeof fallback === "string" ? fallback.trim() : "");
+    (typeof fallback === "string" ? fallback.trim() : "") ||
+    (typeof identification === "string" ? identification.trim() : "");
   if (!number) return NOT_PROVIDED;
   return /^\d{20}$/.test(number)
     ? number.replace(
@@ -33,7 +34,14 @@ export function processLabel(payload, fallback) {
 }
 
 export function publicationDate(payload) {
-  const value = field(payload, "data_disponibilizacao");
+  return civilDate(field(payload, "data_disponibilizacao"));
+}
+
+export function movementDate(payload) {
+  return civilDate(field(stfPayload(payload), "data_andamento"));
+}
+
+function civilDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return NOT_PROVIDED;
 
@@ -67,9 +75,55 @@ export function publicationDate(payload) {
   return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
+function stfPayload(payload) {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    !Object.hasOwn(payload, "stf")
+  ) {
+    return null;
+  }
+  const stf = payload.stf;
+  return stf && typeof stf === "object" && !Array.isArray(stf) ? stf : null;
+}
+
 export function processLink(payload) {
-  const href = safeHref(field(payload, "link"));
+  const href = safeHref(
+    payload && Object.hasOwn(payload, "link") ? payload.link : null,
+  );
   return href ? new URL(href).href : null;
+}
+
+export function stfCollectionLink(payload) {
+  const stf = stfPayload(payload);
+  const href = safeHref(
+    stf && Object.hasOwn(stf, "url_coleta") ? stf.url_coleta : null,
+  );
+  return href ? new URL(href).href : null;
+}
+
+export function stfIncident(payload) {
+  const stf = stfPayload(payload);
+  const value = stf && Object.hasOwn(stf, "incidente") ? stf.incidente : null;
+  return typeof value === "number" && Number.isSafeInteger(value)
+    ? String(value)
+    : field(stf, "incidente") || NOT_PROVIDED;
+}
+
+export function stfLinks(payload) {
+  const links = stfPayload(payload)?.links;
+  if (!Array.isArray(links)) return [];
+  return links.flatMap((link) => {
+    if (!link || typeof link !== "object" || Array.isArray(link)) return [];
+    const text =
+      field(link, "rotulo") ||
+      field(link, "referencia_original") ||
+      field(link, "url");
+    if (!text) return [];
+    const href = safeHref(Object.hasOwn(link, "url") ? link.url : null);
+    return [href ? { text, href } : { text }];
+  });
 }
 
 function safeHref(value) {

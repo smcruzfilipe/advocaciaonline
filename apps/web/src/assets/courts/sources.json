@@ -31,6 +31,13 @@
       "filename": "SEEU.png"
     },
     {
+      "code": "STF",
+      "name": "Supremo Tribunal Federal",
+      "sourcePageUrl": "https://portal.stf.jus.br/",
+      "imageUrl": "https://portal.stf.jus.br/assets/img/institucional/logo-STF-negativa@2x.png",
+      "filename": "STF.png"
+    },
+    {
       "code": "STJ",
       "name": "Superior Tribunal de Justiça",
       "sourcePageUrl": "https://www.stj.jus.br/sites/portalp/Inicio",

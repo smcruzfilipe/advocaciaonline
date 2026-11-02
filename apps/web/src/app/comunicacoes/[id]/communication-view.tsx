@@ -6,17 +6,22 @@ import {
   EntityReference,
   entityLabel,
   mediumLabel,
+  formatInstant,
   ReadFeedback,
   useRead,
 } from "../_components/consultation";
 import { IdentityWarning } from "../_components/identity-warning";
 import type { CommunicationDetail } from "../types";
 import {
+  movementDate,
   processLabel,
   processLink,
   publicationDate,
   publicationContent,
   sourceField,
+  stfCollectionLink,
+  stfIncident,
+  stfLinks,
 } from "../detail-presentation.mjs";
 import styles from "../consultation.module.css";
 
@@ -92,9 +97,17 @@ export function CommunicationView({ id }: { id: string }) {
                 <dd>{state.data.court}</dd>
               </div>
               <div>
+                <dt>Fonte</dt>
+                <dd>{state.data.source}</dd>
+              </div>
+              <div>
                 <dt>Processo informado pela fonte</dt>
                 <dd className="font-mono">
-                  {processLabel(state.data.payload, state.data.process_number)}
+                  {processLabel(
+                    state.data.payload,
+                    state.data.process_number,
+                    state.data.process_identification,
+                  )}
                 </dd>
               </div>
               <div>
@@ -105,14 +118,47 @@ export function CommunicationView({ id }: { id: string }) {
                 <dt>Classe</dt>
                 <dd>{sourceField(state.data.payload, "nomeClasse")}</dd>
               </div>
-              <div>
-                <dt>Tipo de comunicação</dt>
-                <dd>{sourceField(state.data.payload, "tipoComunicacao")}</dd>
-              </div>
-              <div>
-                <dt>Data de disponibilização</dt>
-                <dd>{publicationDate(state.data.payload)}</dd>
-              </div>
+              {state.data.source === "STF" ? (
+                <>
+                  <div>
+                    <dt>Data do andamento</dt>
+                    <dd>{movementDate(state.data.payload)}</dd>
+                  </div>
+                  <div>
+                    <dt>Incidente STF</dt>
+                    <dd>{stfIncident(state.data.payload)}</dd>
+                  </div>
+                  <div>
+                    <dt>Título</dt>
+                    <dd>{sourceField(state.data.payload.stf, "titulo")}</dd>
+                  </div>
+                  <div>
+                    <dt>Julgador</dt>
+                    <dd>{sourceField(state.data.payload.stf, "julgador")}</dd>
+                  </div>
+                  <div>
+                    <dt>Capturado em</dt>
+                    <dd>
+                      {formatInstant(
+                        sourceField(state.data.payload.stf, "capturado_em"),
+                      )}
+                    </dd>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <dt>Tipo de comunicação</dt>
+                    <dd>
+                      {sourceField(state.data.payload, "tipoComunicacao")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Data de disponibilização</dt>
+                    <dd>{publicationDate(state.data.payload)}</dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt>Link</dt>
                 <dd>
@@ -123,13 +169,36 @@ export function CommunicationView({ id }: { id: string }) {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Consultar processo
+                      {state.data.source === "STF"
+                        ? "Consultar origem no STF"
+                        : "Consultar processo"}
                     </a>
                   ) : (
                     "Não fornecido"
                   )}
                 </dd>
               </div>
+              {state.data.source === "STF" && (
+                <div>
+                  <dt>URL de coleta dos andamentos</dt>
+                  <dd>
+                    {stfCollectionLink(state.data.payload) ? (
+                      <a
+                        className="text-accent underline break-words"
+                        href={
+                          stfCollectionLink(state.data.payload) ?? undefined
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Consultar fonte da coleta
+                      </a>
+                    ) : (
+                      "Não fornecido"
+                    )}
+                  </dd>
+                </div>
+              )}
             </dl>
           </section>
           <section
@@ -140,7 +209,9 @@ export function CommunicationView({ id }: { id: string }) {
               id="source-content"
               className="text-sm font-medium text-foreground"
             >
-              Conteúdo da publicação
+              {state.data.source === "STF"
+                ? "Conteúdo do andamento"
+                : "Conteúdo da publicação"}
             </h2>
             <div className="border border-border bg-input p-5 text-sm leading-relaxed">
               {typeof state.data.payload.texto === "string" ? (
@@ -171,6 +242,35 @@ export function CommunicationView({ id }: { id: string }) {
               )}
             </div>
           </section>
+          {state.data.source === "STF" &&
+            stfLinks(state.data.payload).length > 0 && (
+              <section
+                className="flex flex-col gap-3"
+                aria-labelledby="stf-links"
+              >
+                <h2 id="stf-links" className="text-sm font-medium">
+                  Links do andamento
+                </h2>
+                <ul className={styles.list}>
+                  {stfLinks(state.data.payload).map((link, index) => (
+                    <li className={styles.item} key={index}>
+                      {link.href ? (
+                        <a
+                          className="text-accent underline break-words"
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {link.text}
+                        </a>
+                      ) : (
+                        <span className="break-words">{link.text}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           <section
             className="flex flex-col gap-3"
             aria-labelledby="monitoring-links"

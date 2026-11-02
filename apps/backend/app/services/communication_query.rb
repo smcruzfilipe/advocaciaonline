@@ -72,11 +72,16 @@ class CommunicationQuery
         CASE WHEN jsonb_typeof(communication.payload->'nomeOrgao') = 'string'
           THEN communication.payload->>'nomeOrgao' END AS organ_name,
         CASE WHEN jsonb_typeof(communication.payload->'numeroprocessocommascara') = 'string'
-          THEN communication.payload->>'numeroprocessocommascara' END AS process_number_masked
+          THEN communication.payload->>'numeroprocessocommascara' END AS process_number_masked,
+        CASE WHEN jsonb_typeof(capture.process_data->'identificacao') = 'string'
+          THEN capture.process_data->>'identificacao' END AS process_identification
         #{id ? ', communication.payload::text AS payload' : ''}
       FROM public.collection_communications AS communication
       JOIN origins AS origin ON origin.tenant_id = communication.tenant_id AND origin.communication_id = communication.id
+      LEFT JOIN public.stf_captures AS capture
+        ON capture.tenant_id = communication.tenant_id AND capture.id = communication.stf_capture_id
       WHERE communication.tenant_id = $1::uuid AND ($3::uuid IS NULL OR communication.id = $3::uuid)
+        AND (communication.source <> 'STF' OR capture.process_data->'publicidade' = '"Público"'::jsonb)
         AND origin.court IN (SELECT jsonb_array_elements_text($2::jsonb))
         AND (jsonb_typeof(communication.payload->'siglaTribunal') IS DISTINCT FROM 'string'
           OR communication.payload->>'siglaTribunal' !~ '^[A-Za-z][A-Za-z0-9]{1,31}$'
@@ -101,6 +106,7 @@ class CommunicationQuery
 
   def serialize(record)
     result = record.slice("id", "court", "source", "identity_status", "warning")
+    result["process_identification"] = record.fetch("process_identification") if record.fetch("source") == "STF"
     result["process_number"] = record.fetch("process_number") if record.fetch("process_number_supplied") == true
     result["organ_name"] = record.fetch("organ_name") if record.fetch("organ_name").is_a?(String)
     result["process_number_masked"] = record.fetch("process_number_masked") if record.fetch("process_number_masked").is_a?(String)

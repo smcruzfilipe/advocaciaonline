@@ -12,9 +12,10 @@ export type Communication = {
   court: string;
   identity_status: "complete" | "pending";
   warning: string | null;
-  process_number?: string;
-  organ_name?: string;
-  process_number_masked?: string;
+  process_number?: string | null;
+  process_identification?: string | null;
+  organ_name?: string | null;
+  process_number_masked?: string | null;
 };
 
 export type CommunicationList = {

@@ -74,7 +74,7 @@ class CourtCatalogHttpTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a valid empty official catalog is a successful empty result" do
+  test "a valid empty DJEN catalog still offers the STF portal" do
     sign_in
 
     with_djen_response(body: "[]") do
@@ -82,7 +82,19 @@ class CourtCatalogHttpTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :ok
-    assert_equal({ "courts" => [] }, response.parsed_body)
+    assert_equal({ "courts" => [{ "code" => "STF", "name" => "Supremo Tribunal Federal" }] }, response.parsed_body)
+  end
+
+  test "STF offered by DJEN appears only once with its institutional name" do
+    sign_in
+    catalog = [{ "sigla" => "STF", "nome" => "STF" }]
+
+    with_djen_response(body: JSON.generate(catalog)) do
+      get "/api/courts"
+    end
+
+    assert_response :ok
+    assert_equal({ "courts" => [{ "code" => "STF", "name" => "Supremo Tribunal Federal" }] }, response.parsed_body)
   end
 
   [302, 429, 503].each do |status|
@@ -182,6 +194,7 @@ class CourtCatalogHttpTest < ActionDispatch::IntegrationTest
   def expected_catalog
     { "courts" => [
       { "code" => "PJeCor", "name" => "Corregedorias" },
+      { "code" => "STF", "name" => "Supremo Tribunal Federal" },
       { "code" => "TJAC", "name" => "Tribunal de Justiça do Estado do Acre" },
       { "code" => "TRE-AC", "name" => "Tribunal Regional Eleitoral do Acre" },
       { "code" => "TRF1", "name" => "Tribunal Regional Federal da 1ª Região" }

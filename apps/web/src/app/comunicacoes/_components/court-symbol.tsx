@@ -3,6 +3,7 @@ import symbolCJF from "@/assets/courts/CJF.png";
 import symbolCNJ from "@/assets/courts/CNJ.svg";
 import symbolPJeCor from "@/assets/courts/PJeCor.jpg";
 import symbolSEEU from "@/assets/courts/SEEU.png";
+import symbolSTF from "@/assets/courts/STF.png";
 import symbolSTJ from "@/assets/courts/STJ.svg";
 import symbolSTM from "@/assets/courts/STM.png";
 import symbolTJAC from "@/assets/courts/TJAC.svg";
@@ -100,6 +101,7 @@ const symbols: Partial<
   CNJ: { image: symbolCNJ, dark: false },
   PJeCor: { image: symbolPJeCor, dark: false },
   SEEU: { image: symbolSEEU, dark: false },
+  STF: { image: symbolSTF, dark: false },
   STJ: { image: symbolSTJ, dark: false },
   STM: { image: symbolSTM, dark: false },
   TJAC: { image: symbolTJAC, dark: false },
@@ -199,7 +201,7 @@ export function CourtSymbol({ court }: { court: string }) {
       src={symbol.image}
       alt=""
       sizes="112px"
-      className={`h-12 w-28 shrink-0 object-contain ${symbol.dark ? "brightness-0" : ""}`}
+      className={`h-12 w-28 shrink-0 object-contain ${symbol.dark ? "brightness-0" : ""} ${court === "STF" ? "bg-neutral-900 p-1" : ""}`}
     />
   );
 }

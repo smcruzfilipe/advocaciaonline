@@ -5,6 +5,19 @@ require "openssl"
 class CourtCatalog
   class Unavailable < StandardError; end
 
+  # The public catalog remains an array of code/name pairs. Preserve whether
+  # STF came from DJEN separately so the portal-only entry cannot imply DJEN work.
+  class Result < Array
+    attr_reader :djen_stf
+
+    def initialize(courts, djen_stf:)
+      super(courts)
+      @djen_stf = djen_stf
+    end
+  end
+
+  STF = { code: "STF", name: "Supremo Tribunal Federal" }.freeze
+
   ENDPOINT = URI("https://comunicaapi.pje.jus.br/api/v1/comunicacao/tribunal").freeze
 
   def self.fetch
@@ -37,7 +50,9 @@ class CourtCatalog
         courts[code] = { code: code, name: name }
       end
     end
-    courts.values.sort_by { |court| court.fetch(:code) }
+    djen_stf = courts.key?(STF.fetch(:code))
+    courts[STF.fetch(:code)] = STF
+    Result.new(courts.values.sort_by { |court| court.fetch(:code) }, djen_stf: djen_stf)
   rescue JSON::ParserError
     raise Unavailable
   end

@@ -6,6 +6,10 @@ import {
   publicationDate,
   processLink,
   publicationContent,
+  movementDate,
+  stfCollectionLink,
+  stfIncident,
+  stfLinks,
 } from "./detail-presentation.mjs";
 
 test("o número com máscara da fonte prevalece sobre números sem formatação", () => {
@@ -234,4 +238,85 @@ test("apresentação derivada de caderno preserva o original e não expõe HTML 
     { text: "manual", href: "https://example.com/manual.pdf" },
   ]);
   assert.equal(payload.texto, texto);
+});
+
+test("identificação STF preserva classe e número quando não há CNJ", () => {
+  assert.equal(
+    processLabel({ numero_processo: null }, null, "Rcl 101463"),
+    "Rcl 101463",
+  );
+  assert.equal(
+    processLabel(
+      { numero_processo: "01882631920261000000" },
+      null,
+      "Rcl 101463",
+    ),
+    "0188263-19.2026.1.00.0000",
+  );
+});
+
+test("data civil de andamento não usa disponibilização e rejeita datas inválidas", () => {
+  assert.equal(
+    movementDate({
+      stf: { data_andamento: "2026-05-05" },
+      data_disponibilizacao: "2026-05-06",
+    }),
+    "05/05/2026",
+  );
+  assert.equal(
+    movementDate({ stf: { data_andamento: "2026-02-29" } }),
+    "Não fornecido",
+  );
+});
+
+test("origem STF e links associados preservam rótulos sem abrir destinos inseguros", () => {
+  const payload = {
+    link: "https://portal.stf.jus.br/processos/detalhe.asp?incidente=7728350",
+    stf: {
+      url_coleta:
+        "https://portal.stf.jus.br/processos/abaAndamentos.asp?incidente=7728350",
+      incidente: 7728350,
+      links: [
+        {
+          url: "https://example.com/decisao.pdf",
+          rotulo: "Decisão",
+          referencia_original: "/decisao.pdf",
+        },
+        {
+          url: "javascript:alert(1)",
+          rotulo: "Malicioso",
+          referencia_original: "javascript:alert(1)",
+        },
+        {
+          url: "https://user@example.com/a",
+          referencia_original: "referência",
+        },
+        { url: "https://example.com/\npath", rotulo: "Controle" },
+      ],
+    },
+  };
+  assert.equal(processLink(payload), payload.link);
+  assert.equal(stfCollectionLink(payload), payload.stf.url_coleta);
+  assert.equal(stfIncident(payload), "7728350");
+  assert.deepEqual(stfLinks(payload), [
+    { text: "Decisão", href: "https://example.com/decisao.pdf" },
+    { text: "Malicioso" },
+    { text: "referência" },
+    { text: "Controle" },
+  ]);
+  assert.equal(
+    processLink({
+      stf: { url_coleta: "https://example.com/aba" },
+      link: "javascript:alert(1)",
+    }),
+    null,
+  );
+  assert.equal(
+    stfCollectionLink({ stf: { url_coleta: "https://x.test/\n" } }),
+    null,
+  );
+  assert.deepEqual(
+    stfLinks({ stf: { links: [null, 1, {}, { url: "https://example.com" }] } }),
+    [{ text: "https://example.com", href: "https://example.com" }],
+  );
 });
