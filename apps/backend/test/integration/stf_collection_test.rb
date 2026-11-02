@@ -12,9 +12,9 @@ class StfCollectionTest < ActiveSupport::TestCase
     @runtime = PG.connect(ENV.fetch("DATABASE_URL"))
     @migrator = PG.connect(ENV.fetch("MIGRATION_DATABASE_URL"))
     @despachante = PG.connect(ENV.fetch("DESPACHANTE_DATABASE_URL"))
-    @session_a, = authenticated_session(owner: true)
+    @session_a = authenticated_stf_session
     @lawyer_a = LawyerOnboarding.call(token: @session_a, input: profile_payload)
-    @session_b, = authenticated_session(owner: true)
+    @session_b = authenticated_stf_session
     @lawyer_b = LawyerOnboarding.call(token: @session_b, input: profile_payload.merge("full_name" => "Outra Advogada"))
     @date = @despachante.exec("SELECT (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date::text").getvalue(0, 0)
     @run = create_run(@date)
@@ -504,6 +504,24 @@ class StfCollectionTest < ActiveSupport::TestCase
   end
 
   private
+
+  def authenticated_stf_session
+    email = "stf-#{SecureRandom.uuid}@example.test"
+    password = SecureRandom.urlsafe_base64(32)
+    identity = fixture_identity(email: email, password: password, secret: PasswordAuthentication.new_secret, verified: true)
+    grant_fixture_owner(identity)
+    credential = IdentityStore.call("password_lookup", email)
+    raise "password rejected" unless PasswordAuthentication.valid_password?(password, credential.fetch("password_hash"))
+    challenge = IdentityStore.digest(SecureRandom.urlsafe_base64(32))
+    raise "challenge failed" unless IdentityStore.call("create_password_challenge", identity, challenge, credential.fetch("password_hash")).fetch("created")
+    secret = PasswordAuthentication.decrypt(credential.fetch("totp_secret"))
+    step = PasswordAuthentication.matching_step(secret, PasswordAuthentication.code(secret, Time.now.to_i / 30))
+    raise "TOTP rejected" unless step
+    token = SecureRandom.urlsafe_base64(32)
+    raise "session failed" unless IdentityStore.call("finish_password_challenge", challenge, step.to_s,
+      IdentityStore.digest(token), SecureRandom.urlsafe_base64(32), "").fetch("created")
+    token
+  end
 
   def create_run(date)
     @despachante.exec_params("INSERT INTO public.collection_runs (collection_date, slot, status) VALUES ($1, 1, 'planned') ON CONFLICT DO NOTHING", [date])
