@@ -45,7 +45,7 @@ Versões de referência e limites da decisão: [`docs/stack.md`](docs/stack.md).
 
 ## Execução local pela Tailscale
 
-O `compose.yaml` é **somente local**, não um procedimento de deploy. Sobe PostgreSQL isolado, migration de execução única, API Rails, frontend Next.js standalone e ingresso Nginx HTTPS. Não inicia despachante nem processador de coletas, não cria dados demonstrativos e não oferece bypass de login.
+O `compose.yaml` é **somente local**, não um procedimento de deploy. Sobe PostgreSQL isolado, migration de execução única, API Rails, frontend Next.js e ingresso Nginx HTTPS. Não inicia despachante nem processador de coletas, não cria dados demonstrativos e não oferece bypass de login.
 
 Pré-requisitos: Docker com Compose v2.24 ou superior, OpenSSL, Tailscale conectado com MagicDNS/HTTPS habilitados e permissão para `tailscale cert` (ou sudo). A chave TLS precisa ser legível pelo UID 1000 do ingresso; nesta máquina o usuário local também tem UID 1000.
 
@@ -92,7 +92,7 @@ docker run --rm -it --name advocacia-web --network advocacia-local \
 
 Enquanto o container estiver ativo, `docker exec advocacia-web npm run format:check`, `docker exec advocacia-web npm run lint`, `docker exec advocacia-web npm run typecheck`, `docker exec advocacia-web npm test` e `docker exec advocacia-web npm run build` executam as verificações. O diretório de dependências e o build usam tmpfs; não são instalados no host.
 
-O ingresso público deve terminar TLS, encaminhar a mesma origem ao Next.js e **substituir**, não concatenar nem confiar nos valores do navegador, os cabeçalhos `X-Advocacia-Client-IP` pelo endereço IP real do cliente e `X-Advocacia-Ingress-Secret` pelo valor protegido de `AUTH_INGRESS_SECRET` nas requisições de autenticação. O segredo deve ser acessível somente ao ingresso, Next.js e API; impedir acesso público direto ao Next.js e à API. Se houver balanceador anterior, o ingresso só pode usar o IP repassado por ele depois de validar sua cadeia de confiança.
+Em produção, o Traefik termina TLS e encaminha ao frontend, que aceita conexões somente do proxy configurado em `TRUSTED_PROXY_IP`. O servidor web extrai o último IP de `X-Forwarded-For` recebido desse proxy e substitui os cabeçalhos internos antes de chamar a API. O Traefik deve acrescentar o IP da conexão e não confiar em cabeçalhos encaminhados por clientes; outro balanceador só pode antecedê-lo com uma cadeia de confiança validada. Não publicar a porta da API nem permitir acesso direto ao frontend. O Compose local mantém o ingresso Nginx independente e usa seu nome de serviço como proxy confiável.
 
 Não registrar tokens, senhas, códigos TOTP nem os cabeçalhos internos em logs de ingresso ou observabilidade. A API e o frontend compartilham `APP_ORIGIN`; cookies `Secure` e CSRF exigem HTTPS também no desenvolvimento. Leituras e mutações exigem um navegador com Web Locks em contexto seguro para coordenar sessões e vínculos entre abas. O relay aceita até 1 MiB de corpo por requisição e impõe prazo de 20 segundos; configure também limites de corpo e tempo no ingresso HTTPS. Se uma mutação perder a confirmação, consulte o estado antes de repeti-la.
 
@@ -127,9 +127,8 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | `PROCESSADOR_TEST_ADMIN_DATABASE_URL` | Nenhum | Sim, apenas na integração dos processadores DJEN/STF em banco descartável | Conexão administrativa usada exclusivamente para preparar e remover dados sintéticos do teste; fornecer no ambiente protegido de teste, nunca no processo de produção ou com acesso a banco real. |
 | `APP_ORIGIN` | Nenhum | Sim, para frontend, API, migration e testes Rails; não é usada pelo despachante | Origem pública HTTPS compartilhada, sem caminho ou credenciais; forneça pelo ambiente protegido. A API valida origens de operações mutáveis e compõe links de confirmação; o proxy web usa seu host canônico para contatar a API. |
 | `RAILS_API_ORIGIN` | Nenhum; `http://api:3000` no Compose local | Sim, no frontend | Origem interna da API Rails, acessível somente ao servidor Next.js; forneça pela configuração protegida do ambiente, sem expô-la ao navegador. |
-| `AUTH_INGRESS_SECRET` | Nenhum | Sim, no ingresso, frontend e API para autenticação | Segredo compartilhado para autenticar o IP do cliente encaminhado à limitação de autenticação. Gere pelo menos 32 bytes aleatórios e forneça por gerenciador de segredos; nunca exponha ao navegador nem registre seu valor. Sem ele ou sem os cabeçalhos confiáveis, a autenticação falha fechada. |
-| `TRUSTED_PROXY_IP` | Nenhum | Sim, no ingresso de produção | IPv4 exato do Traefik na rede Docker do apps-contabo, confirmado pelo control plane; nunca fornecer o CIDR compartilhado. Apenas esse peer pode fornecer o IP real do cliente. Reconfirmar o valor se o proxy for recriado; não alterar a confiança silenciosamente. |
-| `WEB_UPSTREAM_HOST` | Nenhum | Sim, no ingresso de produção | Nome DNS interno real do serviço web gerado pelo Dokploy, sem protocolo ou porta. Fornecer pela configuração protegida do ingresso; não presumir que o nome solicitado seja preservado sem sufixo. |
+| `TRUSTED_PROXY_IP` | Nenhum; `ingress` no Compose local | Sim, no frontend | Endereço IP do proxy confiável, ou nome DNS resolvido para IPv4 na rede interna. Em produção, usar o IP específico do Traefik; não usar uma sub-rede compartilhada. Fornecer pela configuração protegida do frontend. |
+| `AUTH_INGRESS_SECRET` | Nenhum | Sim, no frontend e API para autenticação; também usado pelo ingresso local | Segredo compartilhado que autentica o IP do cliente encaminhado à limitação de autenticação. Gere pelo menos 32 bytes aleatórios e forneça por gerenciador de segredos; nunca exponha ao navegador nem registre seu valor. Sem ele, a autenticação falha fechada. |
 | `ADMIN_DATABASE_URL` | Nenhum | Sim, somente no job temporário de provisionamento de produção | Conexão administrativa da instância PostgreSQL compartilhada, obtida da configuração protegida do Dokploy; remover do job após provisionar somente o banco e as roles da aplicação. Nunca fornecer à API ou aos workers. |
 | `APP_DATABASE_NAME` | Nenhum | Sim, somente nesse job | Nome do banco autorizado; o bootstrap desta implantação exige exatamente `advocacia_online` para não atuar em bancos de terceiros. |
 | `MIGRATOR_DATABASE_PASSWORD` | Nenhum | Sim, somente nesse job | Senha criptograficamente aleatória da role `advocacia_migrator`, gerada uma única vez e persistida na configuração operacional protegida do Dokploy; não rotacionar em redeploys. |
@@ -145,7 +144,7 @@ As variáveis abaixo são lidas pelos componentes, seus testes ou processos indi
 | `RAILS_ENV` | `production` na imagem runtime; `test` na imagem de testes | Não | Seleciona o ambiente Rails. |
 | `RAILS_LOG_LEVEL` | `info` | Não | Nível de logging. |
 | `PORT` | `3000` nas imagens API e web | Não | Porta interna do servidor Puma ou Next.js; a publicação HTTPS local é controlada por `LOCAL_HTTPS_PORT`. |
-| `HOSTNAME` | `0.0.0.0` na imagem web | Não | Endereço de escuta do servidor Next.js standalone dentro do container. |
+| `HOSTNAME` | `0.0.0.0` na imagem web | Não | Endereço de escuta do servidor Next.js dentro do container. |
 | `NODE_ENV` | `production` na imagem web | Não | Seleciona o runtime otimizado Next.js. |
 | `RAILS_MAX_THREADS` | `5` | Não | Número de threads Puma e tamanho do pool de conexões PostgreSQL. |
 | `BUNDLE_PATH` | `/bundle` na imagem | Não | Diretório das gems na imagem. |
