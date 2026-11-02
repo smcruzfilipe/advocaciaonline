@@ -14,8 +14,7 @@ class TeamInvitationMailer
       message.from = settings.fetch(:from)
       message.to = email
       message.subject = "Convite para sua equipe no Advocacia Online"
-      message.content_type = "text/plain; charset=UTF-8"
-      message.body = <<~BODY
+      text = <<~BODY
         Você recebeu um convite para integrar uma equipe no Advocacia Online.
 
         Para aceitar, acesse o link abaixo e entre com a conta de #{email}:
@@ -25,6 +24,8 @@ class TeamInvitationMailer
         Este convite é de uso único e expira em até 24 horas. A revogação ou o vencimento da credencial pode invalidá-lo antes desse prazo.
         Se você não esperava este convite, ignore esta mensagem.
       BODY
+      EmailTemplate.apply(message, text: text, title: "Convite para sua equipe",
+        action_label: "Aceitar convite e entrar", action_url: url)
 
       # Direct transport avoids global Mail callbacks that could log the invitation.
       # https://github.com/mikel/mail/blob/2.9.1/lib/mail/network/delivery_methods/smtp.rb

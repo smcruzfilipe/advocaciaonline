@@ -30,10 +30,14 @@ class VerificationMailerTest < ActiveSupport::TestCase
       Net::SMTP.stub(:new, transport) { VerificationMailer.deliver!(email: "person@example.test", token: token) }
     end
     assert_equal ["person@example.test"], transport.message.to
-    link = URI(transport.message.body.decoded.lines.map(&:strip).find { |line| line.start_with?("https://") })
+    assert_equal "multipart/alternative", transport.message.mime_type
+    link = URI(transport.message.text_part.decoded.lines.map(&:strip).find { |line| line.start_with?("https://") })
     assert_equal "#{AppSettings.origin}/verify-email", "#{link.scheme}://#{link.host}#{link.port == 443 ? '' : ":#{link.port}"}#{link.path}"
     assert_nil link.query
     assert_equal({ "token" => token }, URI.decode_www_form(link.fragment).to_h)
+    action = Nokogiri::HTML(transport.message.html_part.decoded).css("a").find { |anchor| anchor.text.strip == "Confirmar meu e-mail" }
+    assert_not_nil action
+    assert_equal link.to_s, action["href"]
     refute_includes transport.message.header.to_s, token
     assert transport.starttls_always?
     assert transport.tls_verify

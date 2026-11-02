@@ -58,9 +58,12 @@ class FirstAccessInvitationMailerTest < ActiveSupport::TestCase
     assert_equal "convites@example.test", envelope.fetch(:sender)
     assert_equal ["advogado@example.test"], envelope.fetch(:recipients)
     assert_equal ["advogado@example.test"], message.to
-    assert_equal "text/plain", message.mime_type
-    assert_includes message.body.decoded, @link
-    assert_includes message.body.decoded, "24 horas"
+    assert_equal "multipart/alternative", message.mime_type
+    assert_includes message.text_part.decoded, @link
+    assert_includes message.text_part.decoded, "24 horas"
+    action = Nokogiri::HTML(message.html_part.decoded).css("a").find { |anchor| anchor.text.strip == "Iniciar meu cadastro" }
+    assert_not_nil action
+    assert_equal @link, action["href"]
     refute_includes message.header.to_s, @token
     assert_empty logs.string
   end
