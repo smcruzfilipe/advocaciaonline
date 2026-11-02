@@ -1,6 +1,6 @@
 # Tarefas: acompanhamento de processos do STF
 
-**Estado:** spec, to-do e continuidade one-shot aprovados expressamente pelo solicitante. Planejamento STF00 concluído documentalmente; implementação iniciará pelos contratos do [plano técnico](plan-stf.md). Issue própria: [#20](https://github.com/smcruzfilipe/advocaciaonline/issues/20). Fonte normativa: [SPEC-stf.md](../SPEC-stf.md), critérios C1–C9. Preservar os planos de DJEN, primeiro acesso e agenda. O workflow exige um único PR; não abrir um PR de scaffold ou apenas de marca como se fosse a feature.
+**Estado:** spec, plano e continuidade one-shot aprovados expressamente pelo solicitante; coletor/processador, persistência, planejador, consulta e painel STF implementados e verificados. Contratos no [plano técnico](plan-stf.md), issue [#20](https://github.com/smcruzfilipe/advocaciaonline/issues/20) e único PR [#21](https://github.com/smcruzfilipe/advocaciaonline/pull/21). Fonte normativa: [SPEC-stf.md](../SPEC-stf.md), critérios C1–C9. Provas e condições operacionais estão no handoff abaixo; planos DJEN, primeiro acesso e agenda permanecem preservados.
 
 ## Fontes, execução e rastreio
 
@@ -158,7 +158,7 @@ A fase seguinte só começa depois do gate anterior observado e registrado. Pend
 
 ## Handoff e evidências
 
-Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/issues/20); decisões, inventário, subdivisões e comandos em [plan-stf.md](plan-stf.md). Prova de fonte STF00.B: aba de partes do incidente `7728350` e API pública `PARTE/sim` retornaram o mesmo incidente/CNJ em tramitação, HTTP 200, uma página. Não é prova de execução da implementação. Próximas evidências e PR serão registrados aqui sem segredos.
+Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/issues/20); decisões, inventário, subdivisões e comandos em [plan-stf.md](plan-stf.md). A prova documental STF00.B comparou partes do incidente `7728350` e API pública `PARTE/sim`, com o mesmo incidente/CNJ em tramitação, HTTP 200, uma página. Essa comparação não substitui as provas da implementação, registradas abaixo junto ao PR e aos resultados observados, sem segredos.
 
 | Artefato | Estado |
 |---|---|
@@ -208,9 +208,9 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 ### Evidências da finalização
 
 - Revisões de integração e runtime concluídas sem achados materiais restantes. Foram corrigidas confirmação de CNJ em processo restrito e proveniência após redirecionamento; o caso restrito não permite que outra parte sobreponha a evidência. Regressões falharam antes; aplicativo final **94 testes/309 assertions**, zero falhas/erros/skips.
-- Imagem final STF **186.017.830 bytes**, UID 1000. CLI definitiva sem preload/montagem de código retornou `succeeded`, `andamentos`, 2 movimentos/1 processo/2 identidades pendentes antes e depois da limpeza. HTTP autenticado continuou apresentando as mesmas quatro comunicações.
+- Imagem final STF **186.017.830 bytes**, UID 1000. Dois trabalhos **novos**, ainda `pending` e criados pelo planejador real, executaram a entrada `bin/processador` com transporte HTTP controlado: busca nominal antes da limpeza e busca por CNJ depois da remoção dos arquivos exclusivos, sem montar código da aplicação. Cada um concluiu `succeeded/andamentos`, 2 movimentos/1 processo/2 identidades pendentes. A leitura autorizada como `advocacia_runtime` confirmou duas capturas e quatro novas comunicações, sendo duas inseridas após a limpeza; CNJ confirmado do JSON apesar de ausente no HTML, URL final após redirecionamento e link relativo Unicode/query preservados. Replay anterior sem preload comprovou somente idempotência, não foi usado como substituto dessa coleta nova.
 - Consulta real ao incidente 7728350 manteve os nove eventos idênticos aos nove itens extraídos, sem persistência histórica; CLI de fonte real concluiu 0 movimentos/1 processo elegível. Isso prova vazio real, não movimentos positivos reais de hoje.
-- Removidos scripts, fixtures com sessões e configuração exclusiva de prova; encerrados apenas sete containers e duas redes identificados `workflow=stf-20`, além dos certificados de teste. Os quatro containers preexistentes `advocacia-local-*` permaneceram executando e saudáveis. Testes permanentes e evidências foram preservados.
+- Removidos scripts, fixtures com sessões e configuração exclusiva de prova; encerrados apenas containers/redes próprios identificados `workflow=stf-20`, além dos certificados e imagem de navegador de teste. A prova positiva adicional também removeu seu PostgreSQL/rede descartáveis e os três arquivos exclusivos, sem deixar sessão no disco. Os quatro containers preexistentes `advocacia-local-*` permaneceram executando e saudáveis. Testes permanentes e evidências foram preservados.
 - CI do código final `ec5a478`: [Backend](https://github.com/smcruzfilipe/advocaciaonline/actions/runs/41374821857) **590 testes/12.294 assertions**, DJEN **135/1.253**, STF **94/309**, zero falhas/erros/skips; [Web](https://github.com/smcruzfilipe/advocaciaonline/actions/runs/41374821893) **52 testes aprovados**, tipos/lint/formatação/build e zero vulnerabilidades de produção. Checks terminaram em sucesso antes de `gh pr ready 21`.
 - PR remoto sem solicitações de review ou threads pendentes; revisões técnicas locais encerradas sem achados materiais restantes. `gh pr ready 21` confirmou retirada de draft. O único item transversal não aplicável à entrega é aprovação humana **antes de merge/deploy**, pois nenhuma dessas ações está autorizada ou foi executada; permanece requisito para essas ações futuras.
 
