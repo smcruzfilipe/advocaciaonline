@@ -4,8 +4,10 @@ require "tzinfo"
 class CollectionSchedule
   TIME_ZONE = TZInfo::Timezone.get("America/Sao_Paulo")
   TIME_FORMAT = /\A(?:[01][0-9]|2[0-3]):[0-5][0-9]\z/
+  DEFAULT_WEEKDAYS = "1,2,3,4,5,6,7".freeze
+  WEEKDAYS_FORMAT = /\A[1-7](?:,[1-7])*\z/
 
-  def initialize(first:, second:)
+  def initialize(first:, second:, weekdays: DEFAULT_WEEKDAYS)
     @minutes = [minutes_for(first), minutes_for(second)]
     if @minutes.first < 4 * 60
       raise ArgumentError, "O primeiro horário da coleta não pode ser anterior a 04:00."
@@ -13,19 +15,33 @@ class CollectionSchedule
     if @minutes.first >= @minutes.last
       raise ArgumentError, "Os horários da coleta devem ser distintos e ascendentes."
     end
+    unless weekdays.is_a?(String) && WEEKDAYS_FORMAT.match?(weekdays)
+      raise ArgumentError, "COLETA_DIAS_SEMANA deve conter dias ISO de 1 a 7 separados por vírgula."
+    end
+    @weekdays = weekdays.split(",").map(&:to_i)
+    if @weekdays.uniq.length != @weekdays.length
+      raise ArgumentError, "COLETA_DIAS_SEMANA não pode conter dias repetidos."
+    end
   end
 
   def due(now:)
     date = TIME_ZONE.to_local(now).to_date
+    return [] unless @weekdays.include?(date.cwday)
+
     slots_on(date).select { |slot| slot.fetch(:scheduled_at) <= now }
   end
 
   def next_at(now:)
     date = TIME_ZONE.to_local(now).to_date
-    following = slots_on(date).find { |slot| slot.fetch(:scheduled_at) > now }
-    return following.fetch(:scheduled_at) if following
+    if @weekdays.include?(date.cwday)
+      following = slots_on(date).find { |slot| slot.fetch(:scheduled_at) > now }
+      return following.fetch(:scheduled_at) if following
+    end
 
-    slots_on(date + 1).first.fetch(:scheduled_at)
+    begin
+      date += 1
+    end until @weekdays.include?(date.cwday)
+    slots_on(date).first.fetch(:scheduled_at)
   end
 
   private

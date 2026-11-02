@@ -43,6 +43,11 @@ class DespachanteExecutionTest < ActiveSupport::TestCase
         DespachanteRunner.new(despachante_url: unusable_url, first: first, second: second)
       end
     end
+    ["", "1,1", "1,8"].each do |weekdays|
+      assert_raises(ArgumentError) do
+        DespachanteRunner.new(despachante_url: unusable_url, first: "04:00", second: "16:00", weekdays: weekdays)
+      end
+    end
     assert_raises(ArgumentError) { DespachanteRunner.new(despachante_url: unusable_url) }
     assert_raises(ArgumentError) { DespachanteRunner.new(despachante_url: unusable_url, first: "04:00") }
     assert_raises(ArgumentError) { DespachanteRunner.new(despachante_url: unusable_url, second: "16:00") }
@@ -65,6 +70,41 @@ class DespachanteExecutionTest < ActiveSupport::TestCase
     end
 
     assert_empty runs(@date)
+  end
+
+  test "weekday configuration prevents weekend runs and still plans both weekday slots" do
+    saturday = @date + (6 - @date.cwday) % 7
+    monday = saturday + 2
+    configured = DespachanteRunner.new(despachante_url: @despachante_url,
+      first: "04:00", second: "16:00", weekdays: "1,2,3,4,5")
+    forbidden_catalog = -> { flunk "disabled days must not request the source catalog" }
+
+    CourtCatalog.stub(:fetch, forbidden_catalog) do
+      assert_empty configured.run_once(now: utc_on(saturday, 19))
+      assert_empty configured.run_once(now: utc_on(saturday + 1, 19))
+    end
+    assert_empty runs(saturday)
+    assert_empty runs(saturday + 1)
+
+    assert_empty configured.run_once(now: utc_on(monday, 6, 59, 59))
+    first = with_catalog { configured.run_once(now: utc_on(monday, 7)) }
+    assert_equal 1, first.length
+    both = with_catalog { configured.run_once(now: utc_on(monday, 19)) }
+    assert_equal 2, both.length
+    assert_equal first.first, both.first
+    assert_real_plan(both.first, date: monday, slot: 1)
+    assert_real_plan(both.last, date: monday, slot: 2)
+  end
+
+  test "the CLI uses configured weekdays when deciding whether to plan" do
+    saturday = @date + (6 - @date.cwday) % 7
+    report = run_cli_with_clock(first: "04:00", second: "16:00", now: utc_on(saturday, 19),
+      mode: "weekday_disabled", observed_date: saturday, weekdays: "1,2,3,4,5")
+
+    assert_empty report.fetch("requests")
+    assert_not_empty report.fetch("waits")
+    assert report.fetch("waits").all? { |entry| entry.fetch("runs").empty? }
+    assert_empty runs(saturday)
   end
 
   test "the two scheduled instants create independent durable executions and pending work" do
@@ -406,10 +446,10 @@ class DespachanteExecutionTest < ActiveSupport::TestCase
     JSON.parse(stdout)
   end
 
-  def run_cli_with_clock(first:, second:, now:, mode:, observed_date: @date)
+  def run_cli_with_clock(first:, second:, now:, mode:, observed_date: @date, weekdays: nil)
     environment = {
       "DESPACHANTE_DATABASE_URL" => @despachante_url,
-      "COLETA_HORARIO_1" => first, "COLETA_HORARIO_2" => second,
+      "COLETA_HORARIO_1" => first, "COLETA_HORARIO_2" => second, "COLETA_DIAS_SEMANA" => weekdays,
       "DATABASE_URL" => nil, "MIGRATION_DATABASE_URL" => nil, "RAILS_ENV" => nil,
       "APP_ORIGIN" => nil, "AUTH_INGRESS_SECRET" => nil,
       "SECRET_KEY_BASE" => nil

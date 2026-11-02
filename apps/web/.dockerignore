@@ -6,6 +6,8 @@
 !postcss.config.mjs
 !next-env.d.ts
 !tsconfig.json
+!server.mjs
+!proxy-trust.mjs
 !src/
 !src/**
 src/**/*.test.*
