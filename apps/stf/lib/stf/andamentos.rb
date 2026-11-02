@@ -145,7 +145,7 @@ module STF
 
     def absolute_url(base, reference)
       return if reference.nil? || reference.strip.empty?
-      uri = URI.join(base, reference)
+      uri = URI.join(base, URI::DEFAULT_PARSER.escape(reference.strip, /[^\x21-\x7e]/))
       uri.to_s if %w[http https].include?(uri.scheme&.downcase) && uri.host && !uri.host.empty?
     rescue URI::InvalidURIError
       nil

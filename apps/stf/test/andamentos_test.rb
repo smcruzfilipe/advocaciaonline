@@ -79,6 +79,16 @@ class AndamentosTest < Minitest::Test
     ], results.first.dig("stf", "links")
   end
 
+  def test_unicode_anchor_and_text_urls_are_encoded_without_losing_original_references
+    anchor = "https://example.test/decisão.pdf?nome=ação#página%202"
+    textual = "https://example.test/peça_(1)"
+    results, = fetch(item(date: "05/05/2026", title: "Peça", observation: textual, links: "<a href='#{anchor}'>Decisão</a>"))
+    assert_equal [
+      { "url" => "https://example.test/decis%C3%A3o.pdf?nome=a%C3%A7%C3%A3o#p%C3%A1gina%202", "rotulo" => "Decisão", "referencia_original" => anchor },
+      { "url" => "https://example.test/pe%C3%A7a_(1)", "rotulo" => nil, "referencia_original" => textual }
+    ], results.first.dig("stf", "links")
+  end
+
   def test_optional_fields_and_empty_day
     results, = fetch(item(date: "05/05/2026", title: "Protocolo"))
     assert_nil results.first.dig("stf", "julgador")
