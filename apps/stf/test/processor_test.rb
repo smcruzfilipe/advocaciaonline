@@ -37,6 +37,7 @@ class ProcessorTest < Minitest::Test
     @job = scalar("INSERT INTO public.collection_jobs (run_id, tenant_id, entity_type, entity_id, source, court, medium, criteria, created_at, updated_at) VALUES ($1, $2, 'party', $3, 'STF', 'STF', 'A', $4::jsonb, now(), now()) RETURNING id", [@run, @tenant, @party, JSON.generate("name" => "Maria Silva")])
     @responses = []
     @date_source = -> { @date }
+    @capture_times = []
     @http_factory = ->(callback) { @http = ControlledHttp.new(callback, @responses, @after_request) }
   end
 
@@ -61,6 +62,11 @@ class ProcessorTest < Minitest::Test
     payload = JSON.parse(rows.first.fetch("payload"))
     assert_equal @date.iso8601, payload.fetch("stf").fetch("data_andamento")
     assert_equal "https://portal.stf.jus.br/processos/downloadPeca.asp?id=1", payload.fetch("stf").fetch("links").first.fetch("url")
+    metadata = JSON.parse(scalar("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1", [@tenant]))
+    assert_equal 1, @capture_times.size
+    assert_equal @capture_times.first.iso8601, metadata.fetch("capturado_em")
+    assert_equal metadata.fetch("capturado_em"), payload.fetch("stf").fetch("capturado_em")
+    assert_equal "01882631920261000000", payload.fetch("numero_processo")
     requests = @http.requests.dup
     @admin.exec_params("UPDATE public.collection_job_executions SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE job_id = $1", [@job])
     assert_equal "succeeded", processor.call(@job).fetch("state")
@@ -138,10 +144,31 @@ class ProcessorTest < Minitest::Test
     assert_equal "1", scalar("SELECT count(*)::text FROM public.stf_captures WHERE tenant_id = $1", [@tenant])
     assert_equal "0", scalar("SELECT count(*)::text FROM public.collection_communications WHERE tenant_id = $1", [@tenant])
     metadata = JSON.parse(scalar("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1", [@tenant]))
-    assert_equal "0188263-19.2026.1.00.0000", metadata.fetch("cnj")
+    assert_equal "01882631920261000000", metadata.fetch("cnj")
+    assert_equal 1, @capture_times.size
+    assert_equal @capture_times.first.iso8601, metadata.fetch("capturado_em")
     assert_equal "Sim", metadata.fetch("em_tramitacao")
     assert_equal "Público", metadata.fetch("publicidade")
     assert_equal @job, scalar("SELECT job_id FROM public.stf_capture_links WHERE tenant_id = $1", [@tenant])
+  end
+
+  def test_each_process_uses_its_own_capture_time_for_empty_and_nonempty_items
+    response = JSON.parse(discovery)
+    response["partes"] << response.fetch("partes").first.merge(
+      "processoId" => 7728351, "processoNumeroUnico" => "0188263-19.2026.1.00.0001")
+    response["totalDeRegistros"] = 2
+    yesterday = movements.gsub(@date.strftime('%d/%m/%Y'), (@date - 1).strftime('%d/%m/%Y'))
+    @responses.concat([JSON.generate(response), movements, yesterday])
+
+    assert_equal "succeeded", processor.call(@job).fetch("state")
+    assert_equal 2, @capture_times.size
+    rows = @admin.exec_params("SELECT incidente, process_data FROM public.stf_captures WHERE tenant_id = $1 ORDER BY incidente", [@tenant]).to_a
+    assert_equal [7728350, 7728351], rows.map { |row| row.fetch("incidente").to_i }
+    rows.each_with_index do |row, index|
+      assert_equal @capture_times[index].iso8601, JSON.parse(row.fetch("process_data")).fetch("capturado_em")
+    end
+    payload = JSON.parse(scalar("SELECT payload FROM public.collection_communications WHERE tenant_id = $1", [@tenant]))
+    assert_equal @capture_times.first.iso8601, payload.fetch("stf").fetch("capturado_em")
   end
 
   def test_day_change_after_last_response_prevents_commit
@@ -186,7 +213,8 @@ class ProcessorTest < Minitest::Test
   end
 
   def processor
-    STF::Processor.new(database_url: ENV.fetch("PROCESSADOR_DATABASE_URL"), http_factory: @http_factory, date_source: -> { @date_source.call })
+    STF::Processor.new(database_url: ENV.fetch("PROCESSADOR_DATABASE_URL"), http_factory: @http_factory,
+      date_source: -> { @date_source.call }, time_source: -> { Time.now.utc.tap { |time| @capture_times << time } })
   end
 
   def discovery

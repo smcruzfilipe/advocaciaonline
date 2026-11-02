@@ -39,7 +39,7 @@ class DiscoveryTest < Minitest::Test
     result = STF::Discovery.new(http: http).search(name: "  Roberto Ferreira da SILVA ", type: "ADVOGADO")
 
     assert_equal [7728350, 12], result.map { |process| process.fetch("incidente") }
-    assert_equal({ "incidente" => 7728350, "cnj" => "0188263-19.2026.1.00.0000", "classe" => "Rcl", "identificacao" => "Rcl 101463", "publicidade" => "Público" }, result.first)
+    assert_equal({ "incidente" => 7728350, "cnj" => "01882631920261000000", "classe" => "Rcl", "identificacao" => "Rcl 101463", "publicidade" => "Público" }, result.first)
     assert_equal ["1", "2"], http.requests.map { |_, params| params["pagina"] }
     http.requests.each do |uri, params|
       assert_equal "https://digital.stf.jus.br/integracoes-processos/api/public/partes/processos", "#{uri.scheme}://#{uri.host}#{uri.path}"
@@ -77,6 +77,17 @@ class DiscoveryTest < Minitest::Test
     http = FakeHTTP.new({ [nil, 1] => page([row, row, row(id: 10, name: "ROBERTO FERREIRA DA SILVA JR.")]) })
     result = STF::Discovery.new(http: http).search(name: "Roberto Ferreira da Silva", type: "ADVOGADO")
     assert_equal [7728350], result.map { |process| process.fetch("incidente") }
+  end
+
+  def test_search_deduplicates_equivalent_cnj_formats_but_rejects_different_cnj
+    name = "Roberto Ferreira da Silva"
+    http = FakeHTTP.new({ [nil, 1] => page([row, row(cnj: "01882631920261000000")]) })
+    result = STF::Discovery.new(http: http).search(name: name, type: "ADVOGADO")
+    assert_equal 1, result.size
+    assert_equal "01882631920261000000", result.first.fetch("cnj")
+
+    http = FakeHTTP.new({ [nil, 1] => page([row, row(cnj: "01882631920261000001")]) })
+    assert_raises(STF::InvalidSource) { STF::Discovery.new(http: http).search(name: name, type: "ADVOGADO") }
   end
 
   def test_late_http_error_is_not_a_partial_success

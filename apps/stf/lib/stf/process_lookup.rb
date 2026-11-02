@@ -39,6 +39,7 @@ module STF
       if number && (cnj.nil? || number.delete("-.") != cnj.delete("-."))
         raise InvalidSource, "Número CNJ divergente"
       end
+      cnj = cnj&.delete("-.")
       if classe && (classe.strip.casecmp?(match[1]) == false || source_number.to_i != match[2].to_i)
         raise InvalidSource, "Identificação STF divergente"
       end

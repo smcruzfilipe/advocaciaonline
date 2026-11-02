@@ -48,7 +48,7 @@ module STF
             status = :restricted
           else
             record_cnj = optional_cnj(record)
-            next if expected_cnj && record_cnj&.delete("-.") != expected_cnj
+            next if expected_cnj && record_cnj != expected_cnj
             status = record.fetch("processoEmTramitacao") == "Sim" ? :active : :inactive
           end
           raise InvalidSource, "Situações contraditórias para processo STF" if found && found != status
@@ -133,7 +133,7 @@ module STF
       return nil if cnj.nil? || (cnj.is_a?(String) && cnj.strip.empty?)
       raise InvalidSource, "CNJ de processo STF inválido" unless cnj.is_a?(String) && CNJ.match?(cnj)
 
-      cnj
+      cnj.delete("-.")
     end
 
     def process_from(record)

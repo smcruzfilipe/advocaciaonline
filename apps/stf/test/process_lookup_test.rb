@@ -4,7 +4,7 @@ require_relative "../lib/stf/process_lookup"
 
 class ProcessLookupTest < Minitest::Test
   CNJ = "0188263-19.2026.1.00.0000".freeze
-  EXPECTED = { "incidente" => 7728350, "cnj" => CNJ, "classe" => "Rcl", "identificacao" => "Rcl 101463", "publicidade" => "Público" }.freeze
+  EXPECTED = { "incidente" => 7728350, "cnj" => "01882631920261000000", "classe" => "Rcl", "identificacao" => "Rcl 101463", "publicidade" => "Público" }.freeze
   DETAIL = <<~HTML.freeze
     <div class="processo-titulo"><input id="incidente" value="7728350">
     <input id="classe-numero-processo" value="Rcl 101463"></div>
@@ -49,7 +49,14 @@ class ProcessLookupTest < Minitest::Test
     assert_equal EXPECTED, result
     assert_equal "01882631920261000000", URI.decode_www_form(URI(http.urls.first).query).to_h.fetch("numeroUnico")
     assert_equal "https://portal.stf.jus.br/processos/abaPartes.asp?incidente=7728350", http.urls.last
-    assert_equal [["COMPANHIA RIOGRANDENSE DE SANEAMENTO - CORSAN", 7728350, CNJ], ["ROBERTO FERREIRA DA SILVA", 7728350, CNJ]], discovery.calls
+    assert_equal [["COMPANHIA RIOGRANDENSE DE SANEAMENTO - CORSAN", 7728350, EXPECTED.fetch("cnj")], ["ROBERTO FERREIRA DA SILVA", 7728350, EXPECTED.fetch("cnj")]], discovery.calls
+  end
+
+  def test_masked_input_matches_unmasked_detail_and_returns_canonical_cnj
+    detail = DETAIL.sub(CNJ, "01882631920261000000")
+    discovery = Discovery.new("ROBERTO FERREIRA DA SILVA" => :active)
+    assert_equal EXPECTED, STF::ProcessLookup.new(http: Http.new(detail: detail), discovery: discovery).resolve("number" => CNJ)
+    assert_equal EXPECTED.fetch("cnj"), discovery.calls.last.last
   end
 
   def test_class_and_number_resolve_and_explicit_inactive_is_not_eligible

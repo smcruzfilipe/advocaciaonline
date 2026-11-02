@@ -53,6 +53,8 @@ class StfCollectionTest < ActiveSupport::TestCase
       assert_equal "f", properties.fetch("public_execute"), signature
     end
     assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT app_private.require_djen_job(NULL)") }
+    assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT app_private.stf_semantic_cnj('{}'::jsonb, 'cnj')") }
+    assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT app_private.stf_semantic_items('[]'::jsonb)") }
     assert_equal "t", @migrator.exec("SELECT relforcerowsecurity FROM pg_class WHERE oid = 'public.stf_captures'::regclass").getvalue(0, 0)
     assert_equal "t", @migrator.exec("SELECT relforcerowsecurity FROM pg_class WHERE oid = 'public.stf_capture_links'::regclass").getvalue(0, 0)
     assert_raises(PG::InsufficientPrivilege) { @processor.exec("SELECT * FROM public.stf_capture_links") }
@@ -132,9 +134,12 @@ class StfCollectionTest < ActiveSupport::TestCase
   test "empty captures retain provenance and links for each job with idempotent terminal replay" do
     first = start(@job_a)
     second = start(@job_a2)
-    expected = commit(@job_a, first, [process_record(123, [])])
-    capture = @migrator.exec_params("SELECT id, process_data, semantic_items FROM public.stf_captures WHERE tenant_id = $1", [@lawyer_a.tenant_id]).first
-    assert_equal process_record(123, []).except("items"), JSON.parse(capture.fetch("process_data"))
+    first_capture = process_record(123, [])
+    later_capture = first_capture.merge("capturado_em" => "#{@date}T01:00:00-03:00")
+    expected = commit(@job_a, first, [first_capture])
+    capture = @migrator.exec_params("SELECT id, process_data, semantic_items, recorded_at, (process_data->>'capturado_em')::timestamptz < recorded_at AS captured_before_recorded FROM public.stf_captures WHERE tenant_id = $1", [@lawyer_a.tenant_id]).first
+    assert_equal first_capture.except("items"), JSON.parse(capture.fetch("process_data"))
+    assert_equal "t", capture.fetch("captured_before_recorded")
     assert_equal [], JSON.parse(capture.fetch("semantic_items"))
     [
       process_record(123, []).merge("classe" => "RE"),
@@ -142,7 +147,10 @@ class StfCollectionTest < ActiveSupport::TestCase
       process_record(123, []).merge("cnj" => "0188263-19.2026.1.00.0001")
     ].each { |changed| assert_raises(PG::InvalidParameterValue) { commit(@job_a2, second, [changed]) } }
     assert_equal "1", @migrator.exec_params("SELECT count(*) FROM public.stf_capture_links WHERE capture_id = $1", [capture.fetch("id")]).getvalue(0, 0)
-    assert_equal expected, commit(@job_a2, second, [process_record(123, [])])
+    assert_equal expected, commit(@job_a2, second, [later_capture])
+    retained = @migrator.exec_params("SELECT process_data, recorded_at FROM public.stf_captures WHERE id = $1", [capture.fetch("id")]).first
+    assert_equal first_capture.except("items"), JSON.parse(retained.fetch("process_data"))
+    assert_equal capture.fetch("recorded_at"), retained.fetch("recorded_at")
     assert_equal expected, commit(@job_a, first, nil)
     assert_equal expected, commit(@job_a2, second, nil)
     links = @migrator.exec_params("SELECT job_id FROM public.stf_capture_links WHERE capture_id = $1", [capture.fetch("id")]).column_values(0)
@@ -221,6 +229,30 @@ class StfCollectionTest < ActiveSupport::TestCase
     assert_equal expected, commit(@job_a2, proof, [original])
   end
 
+  test "equivalent CNJ formats share two distinct ordinal movements and their job links" do
+    masked = process_record(123, [movement("2026-11-01T10:00:00Z"), movement("2026-11-01T10:00:00Z")])
+    result = commit(@job_a, start(@job_a), [masked])
+    digits = "01882631920261000000"
+    unmasked = masked.merge("cnj" => digits, "capturado_em" => "#{@date}T01:00:00-03:00",
+      "items" => masked.fetch("items").map { |item| item.merge("numero_processo" => digits) })
+    proof = start(@job_a2)
+    changed = unmasked.merge("items" => unmasked.fetch("items").map { |item| item.merge("numero_processo" => "01882631920261000001") })
+    assert_raises(PG::InvalidParameterValue) { commit(@job_a2, proof, [changed]) }
+    assert_equal result, commit(@job_a2, proof, [unmasked])
+    rows = @migrator.exec_params(<<~SQL, [@lawyer_a.tenant_id]).to_a
+      SELECT communication.id, communication.stf_ordinal, communication.payload,
+        (SELECT count(*) FROM public.collection_communication_links link WHERE link.communication_id = communication.id) AS links
+      FROM public.collection_communications communication
+      WHERE communication.tenant_id = $1 AND communication.source = 'STF' ORDER BY stf_ordinal
+    SQL
+    assert_equal %w[1 2], rows.map { |row| row.fetch("stf_ordinal") }
+    assert_equal 2, rows.map { |row| row.fetch("id") }.uniq.size
+    assert_equal %w[2 2], rows.map { |row| row.fetch("links") }
+    assert_equal masked.fetch("items"), rows.map { |row| JSON.parse(row.fetch("payload")) }
+    capture = @migrator.exec_params("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1", [@lawyer_a.tenant_id]).getvalue(0, 0)
+    assert_equal masked.except("items"), JSON.parse(capture)
+  end
+
   test "new results require complete source metadata and matching item incident and date" do
     proof = start(@job_a)
     valid = process_record(123, [movement("2026-11-01T10:00:00Z")])
@@ -231,6 +263,11 @@ class StfCollectionTest < ActiveSupport::TestCase
       valid.merge("publicidade" => ""), valid.merge("publicidade" => true),
       valid.merge("classe" => ""), valid.merge("identificacao" => " "),
       valid.merge("em_tramitacao" => "Não"), valid.except("em_tramitacao"),
+      valid.except("capturado_em"), valid.merge("capturado_em" => nil), valid.merge("capturado_em" => 123),
+      valid.merge("capturado_em" => "#{@date}"), valid.merge("capturado_em" => "#{@date}T00:00:00"),
+      valid.merge("capturado_em" => "#{@date}T25:00:00-03:00"),
+      valid.merge("capturado_em" => "#{(Date.iso8601(@date) - 1)}T23:59:59-03:00"),
+      valid.merge("capturado_em" => "#{@date}T01:00:00Z"),
       valid.merge("items" => [movement("2026-11-01T10:00:00Z", incident: 555)]),
       valid.merge("items" => [movement("2026-11-01T10:00:00Z").deep_merge("stf" => { "data_andamento" => "2000-01-01" })]),
       valid.merge("items" => [movement("2026-11-01T10:00:00Z").deep_merge("stf" => { "data_andamento" => nil })])
@@ -244,7 +281,7 @@ class StfCollectionTest < ActiveSupport::TestCase
   test "legacy capture without source metadata cannot be silently backfilled by another job" do
     @migrator.exec_params("INSERT INTO public.stf_captures (tenant_id, run_id, incidente, semantic_items) VALUES ($1,$2,123,'[]'::jsonb)",
       [@lawyer_a.tenant_id, @run])
-    legacy = process_record(555, []).except("items", "publicidade")
+    legacy = process_record(555, []).except("items", "publicidade", "capturado_em")
     @migrator.exec_params("INSERT INTO public.stf_captures (tenant_id, run_id, incidente, semantic_items, process_data) VALUES ($1,$2,555,'[]'::jsonb,$3::jsonb)",
       [@lawyer_a.tenant_id, @run, JSON.generate(legacy)])
     proof = start(@job_a)
@@ -264,6 +301,39 @@ class StfCollectionTest < ActiveSupport::TestCase
     assert_equal legacy, JSON.parse(saved_legacy)
     assert_equal "0", @migrator.exec_params("SELECT count(*) FROM public.stf_capture_links WHERE job_id = ANY($1::uuid[])",
       ["{#{@job_a},#{@job_a2}}"]).getvalue(0, 0)
+  end
+
+  test "legacy complete metadata remains without an invented capture instant" do
+    legacy = process_record(123, []).except("items", "capturado_em")
+    @migrator.exec_params("INSERT INTO public.stf_captures (tenant_id, run_id, incidente, semantic_items, process_data) VALUES ($1,$2,123,'[]'::jsonb,$3::jsonb)",
+      [@lawyer_a.tenant_id, @run, JSON.generate(legacy)])
+    result = commit(@job_a, start(@job_a), [process_record(123, [])])
+    assert_equal [0, 1], result.values_at("matched_count", "eligible_process_count")
+    saved = @migrator.exec_params("SELECT process_data FROM public.stf_captures WHERE tenant_id = $1 AND incidente = 123", [@lawyer_a.tenant_id]).getvalue(0, 0)
+    assert_equal legacy, JSON.parse(saved)
+    assert_equal "1", @migrator.exec_params("SELECT count(*) FROM public.stf_capture_links WHERE job_id = $1", [@job_a]).getvalue(0, 0)
+  end
+
+  test "legacy masked semantic items compare equal without rewriting source history" do
+    item = movement("2026-11-01T10:00:00Z")
+    original = process_record(123, [item])
+    legacy_items = [item.deep_dup.tap { |value| value.fetch("stf").delete("capturado_em") }]
+    capture_id = @migrator.exec_params(<<~SQL, [@lawyer_a.tenant_id, @run, JSON.generate(legacy_items), JSON.generate(original.except("items", "capturado_em"))]).getvalue(0, 0)
+      INSERT INTO public.stf_captures(tenant_id, run_id, incidente, semantic_items, process_data)
+      VALUES($1, $2, 123, $3::jsonb, $4::jsonb) RETURNING id
+    SQL
+    @migrator.exec_params(<<~SQL, [@lawyer_a.tenant_id, JSON.generate(item), capture_id])
+      INSERT INTO public.collection_communications(tenant_id, source, identity_status, warning, payload, stf_capture_id, stf_ordinal)
+      VALUES($1, 'STF', 'pending', 'possible_duplicate', $2::jsonb, $3, 1)
+    SQL
+    expected = commit(@job_a, start(@job_a), [original])
+    digits = "01882631920261000000"
+    redelivery = process_record(123, [item.merge("numero_processo" => digits)]).merge("cnj" => digits)
+    assert_equal expected, commit(@job_a2, start(@job_a2), [redelivery])
+    capture = @migrator.exec_params("SELECT semantic_items, process_data FROM public.stf_captures WHERE tenant_id = $1 AND incidente = 123", [@lawyer_a.tenant_id]).first
+    assert_equal legacy_items, JSON.parse(capture.fetch("semantic_items"))
+    assert_equal original.except("items", "capturado_em"), JSON.parse(capture.fetch("process_data"))
+    assert_equal "2", @migrator.exec_params("SELECT count(*) FROM public.collection_communication_links WHERE communication_id IN (SELECT id FROM public.collection_communications WHERE tenant_id = $1 AND source = 'STF')", [@lawyer_a.tenant_id]).getvalue(0, 0)
   end
 
   test "same capture compares movement order and multiplicity" do
@@ -538,7 +608,8 @@ class StfCollectionTest < ActiveSupport::TestCase
 
   def process_record(incident, items)
     { "incidente" => incident, "cnj" => "0188263-19.2026.1.00.0000", "classe" => "Rcl",
-      "identificacao" => "Rcl 101463", "em_tramitacao" => "Sim", "publicidade" => "Público", "items" => items }
+      "identificacao" => "Rcl 101463", "em_tramitacao" => "Sim", "publicidade" => "Público",
+      "capturado_em" => "#{@date}T00:00:00-03:00", "items" => items }
   end
 
   def movement(timestamp, incident: 123)
