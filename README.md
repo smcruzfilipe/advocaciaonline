@@ -327,6 +327,14 @@ Em `/primeiro-acesso#token=...`, o formulário captura o segredo apenas em memó
 
 **Verificação PA04/PA05:** foco com 27 testes e 288 assertions e suíte Rails completa com 536 testes e 11.710 assertions, sem falhas, erros ou skips, em PostgreSQL Docker descartável com roles segregadas. `zeitwerk:check` aprovado. HTTP real em Puma de produção não root comprovou senha/TOTP comuns, emissão/cópia/duplicidade/reemissão e negações; o instante de 24 horas devolveu `404` e removeu o segredo. Consumo via store exigiu a sessão MFA da mesma identidade; restore protegido eliminou os convites/preparações e preservou a liberação consumida. Isso não antecipa a prova do cadastro público de conta nova, prevista em PA09, nem SMTP/UI de convites.
 
+### Apresentação dos e-mails
+
+Os próximos envios de convite de equipe, convite de primeiro acesso, confirmação de e-mail, redefinição de senha e aviso de senha alterada usam o visual exportado do Banani em `docs/banani/byZqYk7YE568/emails-export.json`, adaptado para a marca Advocacia Online e os dados/links reais de cada fluxo. A mudança não reenvia mensagens anteriores nem cria notificações de comunicações judiciais.
+
+`apps/backend/app/services/email_template.rb` monta `multipart/alternative` com o texto original e uma versão HTML UTF-8: cabeçalho escuro, conteúdo central, botão de ação, link copiável e rodapé. O HTML usa tabelas de apresentação e estilos inline, com ajuste de espaçamento para celular e sem fontes remotas, imagens de rastreamento, contatos fictícios ou links jurídicos ilustrativos. Valores dinâmicos são escapados; URLs e tokens continuam nos mesmos destinos e fragmentos. Assuntos, destinatários, prazos, STARTTLS e tratamento de erros foram preservados. Nenhuma variável de ambiente foi adicionada.
+
+Verificação local: **594 testes e 12.345 asserções**, sem falhas, erros ou skips, em PostgreSQL descartável; build do runtime e `zeitwerk:check` aprovados. Os cinco formatos atravessaram um SMTP local com STARTTLS, apenas com destinatários e tokens sintéticos. O HTML recebido foi exercitado no Chromium headless não root em 320, 768, 1024 e 1440 px, sem overflow horizontal e com acesso ao botão por teclado. Não houve envio externo, reenvio de mensagens reais ou deploy. Essa prova não equivale a validação em Gmail, Outlook ou Apple Mail.
+
 ### API de onboarding
 
 | Método e caminho | Comportamento |

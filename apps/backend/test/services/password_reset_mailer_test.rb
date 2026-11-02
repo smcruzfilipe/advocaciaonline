@@ -14,9 +14,31 @@ class PasswordResetMailerTest < ActiveSupport::TestCase
     message = capture do
       PasswordResetMailer.deliver!(email: "Person@example.test", token: token)
     end
-    assert_includes message.body.decoded, "#{AppSettings.origin}/reset-password#token=#{token}"
+    link = "#{AppSettings.origin}/reset-password#token=#{token}"
+    assert_equal "multipart/alternative", message.mime_type
+    assert_includes message.text_part.decoded, link
+    action = Nokogiri::HTML(message.html_part.decoded).css("a").find { |anchor| anchor.text.strip == "Definir nova senha" }
+    assert_not_nil action
+    assert_equal link, action["href"]
     refute_includes message.header.to_s, token
-    refute_includes message.body.decoded, "?token="
+    refute_includes message.text_part.decoded, "?token="
+  end
+
+  test "password change confirmation contains the original notice and a login action" do
+    message = capture do
+      PasswordResetMailer.deliver_changed!(email: "person@example.test")
+    end
+
+    assert_equal "multipart/alternative", message.mime_type
+    assert_equal "Sua senha foi alterada no Advocacia Online", message.subject
+    assert_includes message.text_part.decoded, "A senha da sua conta no Advocacia Online foi alterada."
+    assert_includes message.text_part.decoded, "#{AppSettings.origin}/reset-password"
+    html = Nokogiri::HTML(message.html_part.decoded)
+    assert_includes html.text, "Confirmação de alteração de senha"
+    assert_includes html.text, "Senha alterada"
+    action = html.css("a").find { |anchor| anchor.text.strip == "Ir para o login" }
+    assert_not_nil action
+    assert_equal "#{AppSettings.origin}/login", action["href"]
   end
 
 
