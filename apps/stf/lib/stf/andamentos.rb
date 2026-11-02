@@ -109,34 +109,20 @@ module STF
       end
       item.xpath(".//text()[not(ancestor::a)]").each do |text|
         next if hint?(text) || text.ancestors.any? { |node| %w[script style svg].include?(node.name) }
-        text.text.scan(%r{https?://[^\s<>"']+}i).each do |reference|
-          url = absolute_url(base, text_url(reference))
+        text.text.scan(%r{([\[(]?)(https?://[^\s<>"']+)}i).each do |opening, reference|
+          url = absolute_url(base, text_url(reference, opening))
           result << { "url" => url, "rotulo" => nil, "referencia_original" => reference } if url
         end
       end
       result
     end
 
-    def text_url(reference)
-      finish = reference.bytesize
-      parentheses = reference.count(")") - reference.count("(")
-      brackets = reference.count("]") - reference.count("[")
-      while finish.positive?
-        case reference.getbyte(finish - 1)
-        when 46, 44, 59, 58, 33, 63
-          # Sentence punctuation is not part of the resolved destination.
-        when 41
-          break unless parentheses.positive?
-          parentheses -= 1
-        when 93
-          break unless brackets.positive?
-          brackets -= 1
-        else
-          break
-        end
-        finish -= 1
+    def text_url(reference, opening)
+      case opening
+      when "(" then reference.sub(/\)[.,;:!?]*\z/, "")
+      when "[" then reference.sub(/\][.,;:!?]*\z/, "")
+      else reference
       end
-      reference.byteslice(0, finish)
     end
 
     def hint?(node)

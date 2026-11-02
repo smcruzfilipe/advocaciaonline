@@ -24,8 +24,12 @@ module STF
 
         process = process_from(record)
         id = process.fetch("incidente")
-        if matches.key?(id) && matches[id] != process
-          raise InvalidSource, "Dados contraditórios para processo STF"
+        if (previous = matches[id])
+          if previous.merge("cnj" => process["cnj"]) != process ||
+             (previous["cnj"] && process["cnj"] && previous["cnj"] != process["cnj"])
+            raise InvalidSource, "Dados contraditórios para processo STF"
+          end
+          process["cnj"] ||= previous["cnj"]
         end
         matches[id] = process
       end
@@ -39,22 +43,32 @@ module STF
 
       expected_name = canonical_name(name)
       expected_cnj = cnj&.delete("-.")
+      found = nil
       %w[sim nao].each do |filter|
-        found = nil
         each_record(name: name, type: "PARTE", active: filter) do |record|
           next unless canonical_name(record.fetch("pessoaNome")) == expected_name
           next unless record.fetch("processoId") == incidente
-          if publicity(record) == :restricted
-            status = :restricted
-          else
-            record_cnj = optional_cnj(record)
-            next if expected_cnj && record_cnj != expected_cnj
-            status = record.fetch("processoEmTramitacao") == "Sim" ? :active : :inactive
+
+          restricted = publicity(record) == :restricted
+          raw_cnj = record["processoNumeroUnico"]
+          record_cnj = if restricted && !(raw_cnj.is_a?(String) && CNJ.match?(raw_cnj))
+                         nil
+                       else
+                         optional_cnj(record)
+                       end
+          status = restricted ? :restricted : (record.fetch("processoEmTramitacao") == "Sim" ? :active : :inactive)
+          if expected_cnj && record_cnj && expected_cnj != record_cnj
+            raise InvalidSource, "CNJ divergente para processo STF"
           end
-          raise InvalidSource, "Situações contraditórias para processo STF" if found && found != status
-          found = status
+          if found && found[:state] != status
+            raise InvalidSource, "Situações contraditórias para processo STF"
+          end
+          if found && found[:cnj] && record_cnj && found[:cnj] != record_cnj
+            raise InvalidSource, "CNJs contraditórios para processo STF"
+          end
+          found = { state: status, cnj: found&.fetch(:cnj) || record_cnj }
         end
-        return found if found
+        return found if found && (found[:state] == :restricted || expected_cnj.nil? || found[:cnj])
       end
       nil
     end

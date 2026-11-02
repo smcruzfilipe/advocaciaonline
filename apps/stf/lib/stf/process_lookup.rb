@@ -36,10 +36,11 @@ module STF
       unless incidente_text&.match?(/\A[1-9][0-9]*\z/) && match && (cnj.nil? || CNJ.match?(cnj))
         raise InvalidSource, "Detalhe de processo inválido ou incompleto"
       end
-      if number && (cnj.nil? || number.delete("-.") != cnj.delete("-."))
+      input_cnj = number&.delete("-.")
+      cnj = cnj&.delete("-.")
+      if input_cnj && cnj && input_cnj != cnj
         raise InvalidSource, "Número CNJ divergente"
       end
-      cnj = cnj&.delete("-.")
       if classe && (classe.strip.casecmp?(match[1]) == false || source_number.to_i != match[2].to_i)
         raise InvalidSource, "Identificação STF divergente"
       end
@@ -50,25 +51,35 @@ module STF
       container = parties.at_css("#todas-partes")
       raise InvalidSource, "Aba de partes inválida" unless container
 
-      names = container.css(".processo-partes").filter_map do |row|
+      preferred, other = [], []
+      container.css(".processo-partes").each do |row|
         role = clean(row.at_css(".detalhe-parte")&.text)
         name = clean(row.at_css(".nome-parte")&.text)
         raise InvalidSource, "Parte incompleta" unless role && name
-        name unless role.match?(/\AADV/i) || name.casecmp?("SEM REPRESENTAÇÃO NOS AUTOS")
-      end.uniq
-      active = inactive = false
-      names.each do |name|
-        case @discovery.find_status(name: name, incidente: process.fetch("incidente"), cnj: cnj)
-        when :active then active = true
-        when :inactive then inactive = true
-        when :restricted then return nil
-        when nil then next
-        else raise InvalidSource, "Situação de processo desconhecida"
-        end
-      end
-      return process if active
-      return nil if inactive
+        next if role.match?(/\AADV/i) || name.casecmp?("SEM REPRESENTAÇÃO NOS AUTOS")
 
+        (role.match?(/\ABENEF/i) ? preferred : other) << name
+      end
+      expected_cnj = input_cnj || cnj
+      (preferred + other).uniq.each do |name|
+        status = @discovery.find_status(name: name, incidente: process.fetch("incidente"), cnj: expected_cnj)
+        next if status.nil?
+        unless status.is_a?(Hash) && status.size == 2 && status.key?(:cnj) && status.key?(:state) &&
+               [:active, :inactive, :restricted].include?(status[:state]) &&
+               (status[:cnj].nil? || (status[:cnj].is_a?(String) && /\A[0-9]{20}\z/.match?(status[:cnj])))
+          raise InvalidSource, "Situação de processo desconhecida"
+        end
+        result_cnj = status[:cnj]
+        if expected_cnj && result_cnj && expected_cnj != result_cnj
+          raise InvalidSource, "Número CNJ divergente"
+        end
+        return nil if status[:state] == :restricted
+        next if expected_cnj && result_cnj.nil?
+        return nil if status[:state] == :inactive
+
+        process["cnj"] = cnj || result_cnj
+        return process
+      end
       raise InvalidSource, "Situação do processo não comprovada"
     end
 

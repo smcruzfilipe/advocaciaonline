@@ -63,7 +63,7 @@ class AndamentosTest < Minitest::Test
   end
 
   def test_shared_piece_remains_attached_to_each_event_and_urls_in_text_are_scoped
-    first = item(date: "05/05/2026", title: "Primeiro", links: '<a href="downloadPeca.asp?id=42">Peça</a> Texto https://example.test/outro.')
+    first = item(date: "05/05/2026", title: "Primeiro", links: '<a href="downloadPeca.asp?id=42">Peça</a> Texto (https://example.test/outro).')
     second = item(date: "05/05/2026", title: "Segundo", links: '<a href="downloadPeca.asp?id=42">Peça</a>')
     items, = fetch(first + second)
     assert_equal ["Primeiro", "Segundo"], items.map { |entry| entry.dig("stf", "titulo") }
@@ -72,9 +72,9 @@ class AndamentosTest < Minitest::Test
   end
 
   def test_textual_urls_preserve_balanced_parentheses_and_original_punctuation
-    results, = fetch(item(date: "05/05/2026", title: "Peça", observation: "Peça https://example.test/documento_(1). Outro (https://example.test/outro)."))
+    results, = fetch(item(date: "05/05/2026", title: "Peça", observation: "Peça (https://example.test/documento_(1)). Outro (https://example.test/outro)."))
     assert_equal [
-      { "url" => "https://example.test/documento_(1)", "rotulo" => nil, "referencia_original" => "https://example.test/documento_(1)." },
+      { "url" => "https://example.test/documento_(1)", "rotulo" => nil, "referencia_original" => "https://example.test/documento_(1))." },
       { "url" => "https://example.test/outro", "rotulo" => nil, "referencia_original" => "https://example.test/outro)." }
     ], results.first.dig("stf", "links")
   end
@@ -87,6 +87,13 @@ class AndamentosTest < Minitest::Test
       { "url" => "https://example.test/decis%C3%A3o.pdf?nome=a%C3%A7%C3%A3o#p%C3%A1gina%202", "rotulo" => "Decisão", "referencia_original" => anchor },
       { "url" => "https://example.test/pe%C3%A7a_(1)", "rotulo" => nil, "referencia_original" => textual }
     ], results.first.dig("stf", "links")
+  end
+
+  def test_textual_urls_keep_legitimate_terminal_punctuation
+    urls = ["https://example.test/file?token=abc.", "https://example.test/file#item!", "https://example.test/name."]
+    results, = fetch(item(date: "05/05/2026", title: "Referências", observation: urls.join(" ")))
+    assert_equal urls, results.first.dig("stf", "links").map { |link| link.fetch("url") }
+    assert_equal urls, results.first.dig("stf", "links").map { |link| link.fetch("referencia_original") }
   end
 
   def test_optional_fields_and_empty_day
