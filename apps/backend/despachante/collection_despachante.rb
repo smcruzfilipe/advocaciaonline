@@ -34,7 +34,15 @@ class CollectionDespachante
       source_failure = nil
       if current_day?(date, clock)
         begin
-          courts = catalog.call.map { |court| court.fetch(:code) }.uniq
+          catalog_result = catalog.call
+          codes = catalog_result.map { |court| court.fetch(:code) }.uniq
+          djen_codes = if catalog_result.is_a?(CourtCatalog::Result) && !catalog_result.djen_stf
+            codes - ["STF"]
+          else
+            codes
+          end
+          courts = djen_codes.map { |code| { source: "DJEN", court: code, medium: "D" } }
+          courts << { source: "STF", court: "STF", medium: "A" } if slot == 1 && codes.include?("STF")
         rescue StandardError => error
           source_failure = error
         end
@@ -179,11 +187,12 @@ class CollectionDespachante
 
     entities.flat_map do |entity|
       selection = entity.fetch("courts") && JSON.parse(entity.fetch("courts"))
-      applicable = selection ? selection & courts : courts
       criteria = JSON.parse(entity.fetch("criteria"))
-      applicable.map do |court|
+      courts.filter_map do |court|
+        next if selection && !selection.include?(court.fetch(:court))
+
         { tenant_id: entity.fetch("tenant_id"), entity_type: entity.fetch("entity_type"),
-          entity_id: entity.fetch("entity_id"), source: "DJEN", court: court, medium: "D", criteria: criteria }
+          entity_id: entity.fetch("entity_id"), criteria: criteria }.merge(court)
       end
     end
   end

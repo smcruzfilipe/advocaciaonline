@@ -52,6 +52,20 @@ class AuthorizationGroupsHttpTest < ActionDispatch::IntegrationTest
     assert IdentityStore.context(token)
   end
 
+  test "owner can authorize the STF portal even when DJEN does not list STF" do
+    _, csrf, = sign_in_owner
+    group = create_group(csrf, "Consulta STF")
+
+    CourtCatalog.stub(:request_body, "[]") do
+      post "/api/authorization/groups/#{group.fetch('id')}/rules", params: {
+        operation: "consultar_comunicacoes", effect: "allow", court: "STF"
+      }, as: :json, headers: write_headers(csrf)
+    end
+
+    assert_response :created
+    assert_equal "STF", response.parsed_body.fetch("rules").sole.fetch("court")
+  end
+
   test "owner assigns and removes pending memberships but never memberships from another tenant" do
     _, csrf, lawyer = sign_in_owner
     group = create_group(csrf, "Equipe")

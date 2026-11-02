@@ -34,8 +34,7 @@ export function RunJobs({ runId }: { runId: string }) {
       </h2>
       <p className="text-sm text-muted-foreground">
         O estado operacional vem da coleta, não da presença ou ausência de
-        marcos. Ele não informa contagens de publicações nem resultado parcial
-        por tribunal.
+        marcos. As contagens abaixo refletem somente resultados persistidos.
       </p>
       {pendingState ? (
         <ReadFeedback
@@ -131,6 +130,46 @@ function JobList({
                 </dd>
               </div>
             </dl>
+            {job.source === "STF" && (
+              <div className="mt-3 text-sm">
+                {operational?.source_path === "andamentos" ? (
+                  <>
+                    <dl className={styles.metadata}>
+                      <div>
+                        <dt>Processos elegíveis</dt>
+                        <dd>
+                          {operational.eligible_process_count ??
+                            "Não disponível"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Andamentos encontrados</dt>
+                        <dd>{operational.matched_count ?? "Não disponível"}</dd>
+                      </div>
+                      <div>
+                        <dt>Identidades pendentes</dt>
+                        <dd>
+                          {operational.pending_identity_count ??
+                            "Não disponível"}
+                        </dd>
+                      </div>
+                    </dl>
+                    {operational.state === "succeeded" &&
+                      operational.eligible_process_count === 0 && (
+                        <p>Nenhum processo elegível encontrado.</p>
+                      )}
+                    {operational.state === "succeeded" &&
+                      operational.eligible_process_count != null &&
+                      operational.eligible_process_count > 0 &&
+                      operational.matched_count === 0 && (
+                        <p>Nenhum andamento encontrado para o dia.</p>
+                      )}
+                  </>
+                ) : (
+                  <p>Resultado de andamentos não disponível.</p>
+                )}
+              </div>
+            )}
             <details className={styles.disclosure}>
               <summary>Critérios fixados no planejamento</summary>
               <p className="text-xs text-muted-foreground">

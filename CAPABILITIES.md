@@ -48,7 +48,7 @@ Plano, [checklist](tasks/agenda/todo.md) e [contrato técnico](SPEC-agenda.md#co
 
 ## Acompanhamento de processos do STF
 
-**Estado:** spec e checklist criados por autorização expressa na branch `stf`; implementação e gates de entrega ainda não concluídos. Esta extensão não altera o escopo DJEN das seis especificações originais.
+**Estado:** coletor/processador, persistência, planejamento diário, consulta e superfície STF implementados na branch `stf`; provas integradas registradas no README e checklist. Finalização de reviews/CI e PR pronto ainda em andamento. As seis especificações DJEN originais mantêm seus contratos.
 
 | Módulo | Responsabilidade | Dependências | Fontes |
 |---|---|---|---|

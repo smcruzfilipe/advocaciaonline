@@ -24,7 +24,7 @@ export default function CommunicationsPage() {
             Comunicações
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Publicações judiciais coletadas para seus monitoramentos. Agrupadas
+            Comunicações judiciais coletadas para seus monitoramentos. Agrupadas
             por tribunal e limitadas ao seu acesso.
           </p>
         </div>
@@ -89,6 +89,7 @@ export default function CommunicationsPage() {
                             communication.process_number_masked,
                         },
                         communication.process_number,
+                        communication.process_identification,
                       );
                       const organ =
                         communication.organ_name?.trim() ||
@@ -103,6 +104,9 @@ export default function CommunicationsPage() {
                               <h3 className="break-words font-mono text-xs text-muted-foreground">
                                 {process}
                               </h3>
+                              <p className="text-xs text-muted-foreground">
+                                Fonte: {communication.source}
+                              </p>
                               <p className="break-words text-xs text-muted-foreground">
                                 {organ}
                               </p>

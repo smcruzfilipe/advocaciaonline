@@ -514,6 +514,36 @@ class DashboardHttpTest < ActionDispatch::IntegrationTest
     refute response.parsed_body.key?("periods")
   end
 
+  test "current day STF failures never alter DJEN dashboard metrics or states, including masked states" do
+    @now = Time.current
+    @date = @now.in_time_zone("America/Sao_Paulo").to_date
+    @midnight = @now.in_time_zone("America/Sao_Paulo").beginning_of_day
+    djen = create_job(court: "STF")
+    succeed(djen)
+    persist(djen, at: @midnight)
+    run = create_run
+    stf = @planner.exec_params(<<~SQL, [run, @lawyer.tenant_id, @lawyer.id]).first
+      INSERT INTO public.collection_jobs (run_id, tenant_id, entity_type, entity_id, source, court, medium, criteria)
+      VALUES ($1, $2, 'lawyer', $3, 'STF', 'STF', 'A', '{}') RETURNING id, tenant_id
+    SQL
+    fail_job(stf)
+
+    dashboard
+    assert_response :ok
+    assert_equal "succeeded", body.fetch("state")
+    assert_equal [{ "court" => "STF", "state" => "succeeded" }], body.fetch("courts")
+    assert_empty body.fetch("warnings")
+    assert_metrics today: [1, 1], week: [1, 1], last_seven_days: [1, 1]
+
+    assign_group(rule("consultar_comunicacoes"))
+    dashboard
+    assert_response :ok
+    assert_equal "masked", body.fetch("state")
+    assert_equal [{ "court" => "STF", "state" => "succeeded" }], body.fetch("courts")
+    assert_empty body.fetch("warnings")
+    assert_metrics today: ["*", "*"], week: ["*", "*"], last_seven_days: ["*", "*"]
+  end
+
   private
 
   def dashboard(**params)

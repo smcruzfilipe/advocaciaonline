@@ -689,7 +689,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
     empty_run = create_run(@date, 2)
     @despachante.exec_params("INSERT INTO public.collection_run_audiences (run_id, tenant_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [empty_run, @lawyer_a.tenant_id])
     runtime_as(@session_a) do
-      assert_empty @runtime.exec_params("SELECT * FROM app_private.collection_court_states($1)", [empty_run]).to_a
+      assert_empty @runtime.exec_params("SELECT * FROM app_private.collection_court_states($1, NULL)", [empty_run]).to_a
     end
   end
 
@@ -899,7 +899,7 @@ class ProcessadorPersistenceTest < ActiveSupport::TestCase
   end
 
   def court_state
-    @runtime.exec_params("SELECT * FROM app_private.collection_court_states($1)", [@run_id]).first
+    @runtime.exec_params("SELECT * FROM app_private.collection_court_states($1, NULL)", [@run_id]).first
   end
 
   def while_commit_blocked(job, proof)

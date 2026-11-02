@@ -70,7 +70,7 @@ class DashboardSnapshot
       SELECT run.status AS planning_status, run.slot, summary.court, summary.state,
         COALESCE(summary.failed_count > 0, false) AS has_failure
       FROM app_private.collection_runs_for_session() AS run
-      LEFT JOIN LATERAL app_private.collection_court_states(run.id) AS summary ON true
+      LEFT JOIN LATERAL app_private.collection_court_states(run.id, 'DJEN') AS summary ON true
       WHERE run.collection_date = $1::date
       ORDER BY run.slot DESC, summary.court
     SQL
@@ -93,6 +93,7 @@ class DashboardSnapshot
           ON execution.job_id = job.id AND execution.tenant_id = job.tenant_id
         LEFT JOIN public.collection_job_results AS result
           ON result.job_id = job.id AND result.tenant_id = job.tenant_id
+        WHERE job.source = 'DJEN'
       ), summaries AS (
         SELECT run_id, court, CASE
           WHEN bool_and(state = 'succeeded') THEN 'succeeded'
@@ -125,6 +126,7 @@ class DashboardSnapshot
           ON execution.job_id = job.id AND execution.tenant_id = job.tenant_id
         LEFT JOIN public.collection_job_results AS result
           ON result.job_id = job.id AND result.tenant_id = job.tenant_id
+        WHERE job.source = 'DJEN'
         GROUP BY runs.collection_date, runs.slot, job.court
       )
       SELECT DISTINCT failed.court FROM summaries AS failed
@@ -180,7 +182,7 @@ class DashboardSnapshot
     source_courts = @connection.exec_query(<<~SQL, "Dashboard source tribunals", binds(@context.fetch("tenant_id"))).filter_map do |row|
       SELECT DISTINCT payload->>'siglaTribunal' AS court
       FROM public.collection_communications
-      WHERE tenant_id = $1::uuid AND jsonb_typeof(payload->'siglaTribunal') = 'string'
+      WHERE tenant_id = $1::uuid AND source = 'DJEN' AND jsonb_typeof(payload->'siglaTribunal') = 'string'
     SQL
       court = row.fetch("court")
       court if allowed?("consultar_comunicacoes", court: court)

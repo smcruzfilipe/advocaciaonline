@@ -101,33 +101,33 @@ A fase seguinte só começa depois do gate anterior observado e registrado. Pend
 
 ### STF06 — Integração diária ao planejador
 
-- [ ] Planejar critérios do perfil/partes/processos elegíveis e fonte STF respeitando filtros e cadência diária ratificada, sem duplicar o planejador ou alterar DJEN.
-- [ ] Integrar coletor/processador ao mecanismo durável, seleção/concessão corretas por fonte e retomada do dia; manter alterações/desativações aplicáveis apenas aos próximos planos.
-- [ ] Provar acionamento definitivo sem UUID digitado como único caminho, concorrência de executores, reinício e virada; execução antiga não consulta data anterior.
+- [x] Planejar critérios do perfil/partes/processos elegíveis e fonte STF respeitando filtros e cadência diária ratificada, sem duplicar o planejador ou alterar DJEN.
+- [x] Integrar coletor/processador ao mecanismo durável, seleção/concessão corretas por fonte e retomada do dia; manter alterações/desativações aplicáveis apenas aos próximos planos.
+- [x] Provar acionamento definitivo sem UUID digitado como único caminho, concorrência de executores, reinício e virada; execução antiga não consulta data anterior.
 
 **Aceite:** trabalho diário vai a estado terminal pelos processos reais e preserva os contratos congelados. **Dependências:** STF05. **Arquivos prováveis:** integração no planejador, interface SQL, entrada STF e testes próprios; subdividir antes da edição conforme STF00. **Verificação:** cenário controlado em PostgreSQL Docker descartável com processos independentes e observação de estados/linhas. **Critérios:** C1, C4, C6, C8.
 
 ### STF07 — Consulta API e estado operacional
 
-- [ ] Estender lista/detalhe e histórico aplicáveis para reconhecer STF e o payload ratificado sem supor campos DJEN; conservar origem, dados, links e identidade pendente.
-- [ ] Aplicar autorização por tenant/tribunal e não revelar resultados por IDs, agregações ou cache. Falha não pode virar zero; pendentes não entram como comunicações deduplicadas nas métricas DJEN.
-- [ ] Migrar callers/testes afetados no mesmo conjunto da mudança de contrato, preservando consulta DJEN e máscara `*`.
+- [x] Estender lista/detalhe e histórico aplicáveis para reconhecer STF e o payload ratificado sem supor campos DJEN; conservar origem, dados, links e identidade pendente.
+- [x] Aplicar autorização por tenant/tribunal e não revelar resultados por IDs, agregações ou cache. Falha não pode virar zero; pendentes não entram como comunicações deduplicadas nas métricas DJEN.
+- [x] Migrar callers/testes afetados no mesmo conjunto da mudança de contrato, preservando consulta DJEN e máscara `*`.
 
 **Aceite:** dados STF persistidos são consultáveis somente pelo escopo correto e os estados são honestos. **Dependências:** STF06. **Arquivos existentes a avaliar:** `apps/backend/app/services/communication_query.rb`, `apps/backend/app/services/dashboard_snapshot.rb`, controladores e testes de integração; cada folha deve explicitar os realmente afetados antes de editar. **Verificação:** chamadas HTTP reais com dois tenants, tribunal negado, identidade pendente e falha; regressões DJEN afetadas. **Critérios:** C6–C8.
 
 ### STF08 — Comunicações web, links e marca STF
 
-- [ ] Apresentar andamentos STF individualmente na superfície existente, com origem navegável, documentos/links externos rotulados e aviso de identidade quando aplicável.
-- [ ] Integrar a marca oficial preservada e sua procedência; escapar conteúdo e aceitar somente links navegáveis seguros, sem download automático, HTML executado ou nova tela administrativa.
-- [ ] Provar detalhes, fonte sem links e com múltiplos links, negação e estados de erro no navegador headless; não transmitir dados sintéticos a destinos externos para provar clique.
+- [x] Apresentar andamentos STF individualmente na superfície existente, com origem navegável, documentos/links externos rotulados e aviso de identidade quando aplicável.
+- [x] Integrar a marca oficial preservada e sua procedência; escapar conteúdo e aceitar somente links navegáveis seguros, sem download automático, HTML executado ou nova tela administrativa.
+- [x] Provar detalhes, fonte sem links e com múltiplos links, negação e estados de erro no navegador headless; não transmitir dados sintéticos a destinos externos para provar clique.
 
 **Aceite:** usuário autorizado lê os dados e consegue abrir origem/links corretos, sem quebra de DJEN ou vazamento. **Dependências:** STF07. **Arquivos:** consumidores existentes em `apps/web/src/` identificados por referências em STF00; usar `apps/web/src/assets/courts/STF.png` e `sources.json`, não duplicar asset. **Verificação:** superfície real integrada à API/banco de prova, lint/typecheck/build e testes existentes afetados; não criar testes que só confiram cópia de texto ou wiring. **Critérios:** C5, C7.
 
 ### STF09 — Runtime, CI e prova integrada terminal
 
-- [ ] Entregar a imagem própria mínima STF, somente runtime/dependências/artefatos necessários, com build multi-stage quando necessário e processos não root; não adicionar outra instância PostgreSQL de deploy.
-- [ ] Integrar os comandos/testes reais ao CI, com banco descartável e roles de verdade. Registrar tamanho/base/usuário e execução efetiva, sem afirmar conformidade apenas pela instrução `USER`.
-- [ ] Executar cenário definitivo com planejador e processos STF, persistência e consulta: resultado positivo controlado, sucesso vazio, falha, duplicata de entrega, dois eventos iguais, isolamento e virada. Registrar também os limites da consulta à fonte real.
+- [x] Entregar a imagem própria mínima STF, somente runtime/dependências/artefatos necessários, com build multi-stage quando necessário e processos não root; não adicionar outra instância PostgreSQL de deploy.
+- [x] Integrar os comandos/testes reais ao CI, com banco descartável e roles de verdade. Registrar tamanho/base/usuário e execução efetiva, sem afirmar conformidade apenas pela instrução `USER`.
+- [x] Executar cenário definitivo com planejador e processos STF, persistência e consulta: resultado positivo controlado, sucesso vazio, falha, duplicata de entrega, dois eventos iguais, isolamento e virada. Registrar também os limites da consulta à fonte real.
 
 **Aceite:** gate Refinamento demonstrado no mesmo PR draft, sem serviço falso, fonte trocada ou teste enfraquecido. **Dependências:** STF06–STF08. **Arquivos propostos:** `apps/stf/Dockerfile`, dependências/lockfile e workflow necessário; README atualizado junto às variáveis, com folhas separadas se preciso. **Verificação:** comandos ratificados, usuários/processos observados, saída terminal e leitura SQL/HTTP reais. **Critérios:** C1–C8.
 
@@ -196,3 +196,11 @@ Issue e plano publicados: [#20](https://github.com/smcruzfilipe/advocaciaonline/
 - Migration `20261102000010` compara CNJs mascarados/20 dígitos semanticamente e conserva `capturado_em` da primeira captura, inclusive vazia, separado de `recorded_at`; não inventa instante legado nem sobrescreve histórico. Duas regressões SQL falharam antes; após a correção, **21 testes/245 assertions** passaram. A fixture legada foi inserida diretamente para respeitar a proibição de UPDATE, mantendo as assertions de imutabilidade. Aplicativo **67/253** sem falhas/erros/skips.
 - CLI autenticada atual manteve positivo 2/1, vazio 0/1, ausente 0/0 e falha exit1. Runtime conferiu novamente data, destinos PDF/Unicode e originais de ambos; captura vazia registrou `2026-11-02T00:15:40Z` antes de `2026-11-02T00:15:40.463114+00:00`. A prova preserva precisão subsegundo do PostgreSQL.
 - CNJ fornecido pelo JSON é preservado mesmo quando falta no HTML; conflito explícito não é aceito como ausência. Prova CLI nominal + processo terminou 2/1 em ambos, mantendo somente dois eventos e dois vínculos por evento. Aplicativo **89/292** sem falhas/erros/skips. URLs textuais sem delimitador preservam integralmente query, fragmento e pontuação legítima; somente invólucros narrativos explícitos são removidos do destino, sem perder a referência original.
+
+### Evidências do refinamento
+
+- Planejador real e PostgreSQL limpo: nove trabalhos STF/A no slot 1, zero no slot 2. `bin/processador --once`, em processos separados, chegou a oito sucessos e uma falha de fonte, depois fila vazia; não foram inseridos trabalhos pela fixture. Quatro comunicações persistidas; os dois eventos iguais continuaram distintos, cada qual com vínculos a advogado/parte/processo.
+- API HTTPS e Chromium headless: quatro comunicações para A, nenhuma para B, detalhe de A negado a B com 404; dados/links/originais, marca, ausência de documentos/CNJ e estados zero/falha foram observados. Sem overflow em 320/768/1024/1440px; zero erros JavaScript. Dashboard DJEN manteve `no_work`, contagens ausentes e nenhum aviso STF.
+- STF **89 testes/292 assertions**, SQL STF **21/245**, DJEN **135/1.253**, web **52 testes**, tipos/lint/formatação/build/auditoria de produção aprovados. Backend: 590 casos, uma fixture reutilizada corrigida sem enfraquecer assertions; reexecução afetada 1/6 aprovada. CI remoto será acompanhado na finalização.
+- ABI de estados migrada para `(uuid,text)` e todos os callers atualizados. Runtime STF 186.017.761 bytes; processos API/web/ingresso/planejador UID 1000, PostgreSQL UID 70. Workflow inclui build/test STF e smoke de runtime; sintaxe YAML validada.
+- Limite operacional observado: catálogo real DJEN retornou HTTP 403; o contrato compartilhado mantém falha explícita, sem inventar catálogo nem alterar a rota do host. Fonte positiva controlada não é alegada como movimento real de hoje. Não houve deploy/ativação recorrente.

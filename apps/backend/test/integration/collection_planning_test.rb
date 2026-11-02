@@ -100,6 +100,63 @@ class CollectionPlanningTest < ActiveSupport::TestCase
     assert_equal [], Lawyer.pluck(:id)
   end
 
+  test "portal STF plans eligible frozen targets once without inventing DJEN work" do
+    token, lawyer = create_lawyer
+    other_token, other_lawyer = create_lawyer(name: "Bruno Lima", number: "00999", uf: "RO", secondary_oabs: [])
+    all_party = create_party(token, name: "Todos os tribunais")
+    stf_party = create_party(token, name: "Parte STF", courts: ["STF"])
+    excluded_party = create_party(token, name: "Apenas Acre", courts: ["TJAC"])
+    stf_process = create_process(token, courts: %w[STF TJAC])
+    excluded_process = create_process(token, number: OTHER_CNJ, courts: ["TJAC"])
+    other_party = create_party(other_token, name: "Outro tenant", courts: ["STF"])
+    catalog = CourtCatalog.stub(:request_body, JSON.generate([{ sigla: "TJAC", nome: "Acre" }])) { CourtCatalog.fetch }
+
+    first_id = with_catalog(catalog) { despachante.plan(slot: 1, now: @now) }
+    first_work = jobs(first_id, tenant_id: lawyer.tenant_id)
+    stf = first_work.select { |job| job.fetch("source") == "STF" }
+    assert_equal [lawyer.id, all_party.id, stf_party.id, stf_process.id].sort,
+      stf.map { |job| job.fetch("entity_id") }.sort
+    assert stf.all? { |job| job.values_at("court", "medium") == %w[STF A] }
+    assert_equal lawyer_criteria, stf.find { |job| job.fetch("entity_id") == lawyer.id }.fetch("criteria")
+    assert_equal({ "number" => CNJ }, stf.find { |job| job.fetch("entity_id") == stf_process.id }.fetch("criteria"))
+    refute_includes stf.map { |job| job.fetch("entity_id") }, excluded_party.id
+    refute_includes stf.map { |job| job.fetch("entity_id") }, excluded_process.id
+    assert_equal [other_lawyer.id, other_party.id].sort,
+      jobs(first_id, tenant_id: other_lawyer.tenant_id).select { |job| job.fetch("source") == "STF" }
+        .map { |job| job.fetch("entity_id") }.sort
+    assert first_work.select { |job| job.fetch("source") == "DJEN" }
+      .all? { |job| job.values_at("court", "medium") == %w[TJAC D] }
+    assert_equal [lawyer.id, all_party.id, excluded_party.id, stf_process.id, excluded_process.id].sort,
+      first_work.select { |job| job.fetch("source") == "DJEN" }.map { |job| job.fetch("entity_id") }.sort
+
+    DatabaseContext.with_session(token) { stf_party.update!(name: "Editada", active: false) }
+    assert_equal first_id, with_catalog(catalog) { despachante.plan(slot: 1, now: @now + 1.hour) }
+    assert_equal first_work, jobs(first_id, tenant_id: lawyer.tenant_id)
+
+    second_id = with_catalog(catalog) { despachante.plan(slot: 2, now: @now + 12.hours) }
+    second_work = jobs(second_id, tenant_id: lawyer.tenant_id)
+    assert second_work.all? { |job| job.values_at("source", "court", "medium") == %w[DJEN TJAC D] }
+    assert_equal [lawyer.id, all_party.id, excluded_party.id, stf_process.id, excluded_process.id].sort,
+      second_work.map { |job| job.fetch("entity_id") }.sort
+  end
+
+  test "STF actually offered by DJEN retains DJEN work in both slots as well as portal work in slot one" do
+    token, lawyer = create_lawyer
+    party = create_party(token, name: "Parte STF", courts: ["STF"])
+    catalog = CourtCatalog.stub(:request_body, JSON.generate([{ sigla: "STF", nome: "STF" }])) { CourtCatalog.fetch }
+
+    [1, 2].each do |slot|
+      run_id = with_catalog(catalog) { despachante.plan(slot: slot, now: @now) }
+      work = jobs(run_id, tenant_id: lawyer.tenant_id)
+      assert_equal [lawyer.id, party.id].sort,
+        work.select { |job| job.values_at("source", "court", "medium") == %w[DJEN STF D] }
+          .map { |job| job.fetch("entity_id") }.sort
+      portal_work = work.select { |job| job.values_at("source", "court", "medium") == %w[STF STF A] }
+      assert_equal(slot == 1 ? [lawyer.id, party.id].sort : [], portal_work.map { |job| job.fetch("entity_id") }.sort)
+      assert_equal(slot == 1 ? 4 : 2, work.size)
+    end
+  end
+
   test "both slots plan only Diario Eletronico work and the database rejects editais" do
     _, lawyer = create_lawyer
 

@@ -183,5 +183,9 @@ export function EntityReference({
 }
 
 export function mediumLabel(medium: string) {
-  return medium === "D" ? "Diário Eletrônico (D)" : medium;
+  return medium === "D"
+    ? "Diário Eletrônico (D)"
+    : medium === "A"
+      ? "Andamentos (A)"
+      : medium;
 }

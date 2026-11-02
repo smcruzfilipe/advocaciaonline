@@ -28,6 +28,18 @@ class PartyMonitoringsHttpTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a party can select the STF portal when DJEN does not list STF" do
+    _, csrf, lawyer = sign_in_lawyer
+
+    CourtCatalog.stub(:request_body, "[]") do
+      post "/api/monitorings/parties", params: { name: "Parte STF", courts: ["STF"] },
+        as: :json, headers: write_headers(csrf)
+    end
+
+    assert_response :created
+    assert_party(response.parsed_body, tenant_id: lawyer.tenant_id, name: "Parte STF", courts: ["STF"])
+  end
+
   test "an explicit null court filter has the same all-courts meaning as an omitted filter" do
     _, csrf, lawyer = sign_in_lawyer
 

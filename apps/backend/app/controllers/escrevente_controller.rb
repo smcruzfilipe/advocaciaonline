@@ -20,14 +20,22 @@ class EscreventeController < ApplicationController
 
   def execution
     jobs = for_visible_run do |connection, binds|
-      connection.exec_query(<<~SQL, "Tenant collection execution states", binds).to_a
-        SELECT jobs.id AS job_id, jobs.court, jobs.medium,
-          COALESCE(executions.state, 'pending') AS state
+      connection.exec_query(<<~SQL, "Tenant collection execution states", binds).map do |job|
+        SELECT jobs.id AS job_id, jobs.court, jobs.medium, jobs.source,
+          COALESCE(executions.state, 'pending') AS state,
+          results.source_path, results.eligible_process_count, results.matched_count, results.pending_identity_count
         FROM public.collection_jobs AS jobs
-        LEFT JOIN public.collection_job_executions AS executions ON executions.job_id = jobs.id
+        LEFT JOIN public.collection_job_executions AS executions
+          ON executions.job_id = jobs.id AND executions.tenant_id = jobs.tenant_id
+        LEFT JOIN public.collection_job_results AS results
+          ON results.job_id = jobs.id AND results.tenant_id = jobs.tenant_id
         WHERE jobs.run_id = $1::uuid
         ORDER BY jobs.id
       SQL
+        source = job.delete("source")
+        job.except!("source_path", "eligible_process_count", "matched_count", "pending_identity_count") unless source == "STF"
+        job
+      end
     end
     return run_not_found unless jobs
 
