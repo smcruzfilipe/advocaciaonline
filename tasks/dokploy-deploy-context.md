@@ -21,9 +21,9 @@ O solicitante autorizou a implantação pelo control plane/API Dokploy. Validaç
 - Publicar o repositório `smcruzfilipe/advocaciaonline` pela branch **main**, nunca `dev`.
 - Configurar integração GitHub, evento `push`, `autoDeploy=true` e `watchPaths` por aplicação.
 - Agenda de produção definida pelo solicitante: **segunda a sexta, às 04h00 e 16h00**, fuso `America/Sao_Paulo`. `COLETA_HORARIO_1=04:00`, `COLETA_HORARIO_2=16:00`, `COLETA_DIAS_SEMANA=1,2,3,4,5`; STF somente no primeiro slot. A aplicação deve respeitar os dias, não apenas o fuso do servidor.
-- Seis aplicações permanentes, uma réplica inicial cada: ingresso, web, API, despachante, processador DJEN e processador STF.
-- Ingresso: Nginx não root atrás do roteamento HTTPS do Dokploy, preservando o contrato de cabeçalhos confiáveis de autenticação. Não copiar certificados Tailscale nem o Compose local.
-- API/web/workers/banco não ganham portas públicas que contornem o ingresso.
+- Cinco aplicações permanentes, uma réplica inicial cada: web, API, despachante, processador DJEN e processador STF.
+- O Traefik existente encaminha HTTPS diretamente ao frontend. O frontend aceita apenas o IP exato do Traefik em `TRUSTED_PROXY_IP`, valida o IP encaminhado e gera os cabeçalhos internos de autenticação. Não copiar certificados Tailscale nem o Compose local.
+- API/web/workers/banco não ganham portas públicas que contornem o Traefik.
 - Jobs de provisionamento e migration são temporários e sequenciais; não são outra instância PostgreSQL.
 - Criar somente o banco **advocacia_online** e as roles previstas nos scripts do projeto: `advocacia_migrator`, `advocacia_runtime`, `advocacia_despachante`, `advocacia_processador`.
 - Não alterar configuração, volumes, senhas, roles ou bancos de outras aplicações; não recriar/reiniciar o PostgreSQL compartilhado.
@@ -32,11 +32,11 @@ O solicitante autorizou a implantação pelo control plane/API Dokploy. Validaç
 - Aplicar migrations antes das aplicações correspondentes. A ABI `collection_court_states(uuid,text)` exige atualização coordenada; filtros de observação não ordenam migrations.
 - Não modificar a saída de rede por causa do DJEN: o solicitante informou que o acesso brasileiro já funciona.
 
-## Divisão do trabalho desta execução
+## Divisão histórica da implantação inicial
 
 O integrador é o único responsável pelas operações mutantes remotas e pelo manuseio dos segredos. Workers recebem contexto sem credenciais, investigam e produzem artefatos independentes; não fazem chamadas privadas, SSH, alterações Git, Docker ou deploy remoto. Builds/verificações agregadas ficam com o integrador, respeitando a validação funcional reservada ao solicitante.
 
-1. **Ingresso:** Dockerfile, configuração Nginx e instruções de integração, baseados em `docker/local/` e no contrato atual do frontend/API. Configuração de produção própria; sem alteração da lógica de autenticação.
+1. **Ingresso original:** Dockerfile e configuração Nginx que antecederam a substituição pelo encaminhamento direto do Traefik.
 2. **Banco:** bootstrap PostgreSQL específico e instruções de migration, baseados em `apps/backend/db/provision*.sql`, `apps/backend/bin/migrate` e README. Sem senhas embutidas; sem alterações em terceiros.
 3. **API Dokploy:** schemas e operações oficiais de projeto/ambiente/aplicações/GitHub/build/env/rede/domínio/deployment, incluindo jobs de execução única e acompanhamento técnico.
 

@@ -89,6 +89,7 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:?Execute bin/local-up primeiro}
       RAILS_API_ORIGIN: http://api:3000
       AUTH_INGRESS_SECRET: ${AUTH_INGRESS_SECRET:?Execute bin/local-up primeiro}
+      TRUSTED_PROXY_IP: ingress
     depends_on:
       api:
         condition: service_healthy

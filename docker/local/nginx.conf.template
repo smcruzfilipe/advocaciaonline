@@ -29,7 +29,7 @@ http {
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Host $http_host;
             proxy_set_header X-Forwarded-Proto https;
-            proxy_set_header X-Forwarded-For "";
+            proxy_set_header X-Forwarded-For $remote_addr;
             proxy_set_header X-Real-IP "";
             proxy_set_header X-Advocacia-Client-IP $remote_addr;
             proxy_set_header X-Advocacia-Ingress-Secret "${AUTH_INGRESS_SECRET}";
